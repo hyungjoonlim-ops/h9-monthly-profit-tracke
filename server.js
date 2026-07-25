@@ -554,22 +554,33 @@ const PORT = process.env.PORT || 3000;
 try {
   const schema = await readFile(join(__dirname, 'db', 'schema.sql'), 'utf8');
   await pool.query(schema);
-  const { rows } = await pool.query(
-    "SELECT COUNT(*)::int AS n FROM mt_rate_cards WHERE role IN ('SW','SDS','LG')"
+  // 단가표 시딩(1회): 기존 H9 직군별 단가표 유지 + 월별 실투입용 기준(SW/SDS/LG) 단가 행 추가
+  const seeded = await pool.query(
+    "SELECT 1 FROM mt_app_settings WHERE key='rate_seed_v2'"
   );
-  if (rows[0].n === 0) {
-    // 구버전 직군 기반 기본 시드는 제거하고 기준(SW/SDS/LG) 단가로 전환
-    await pool.query(
-      `DELETE FROM mt_rate_cards WHERE role IN
-       ('DT개발','TF (수원,SDS)','서비스개발','PM','Interaction','UX','Visual')`
-    );
+  if (!seeded.rows.length) {
     await pool.query(`
       insert into mt_rate_cards (role, junior, mid, senior, expert, sort_order) values
-        ('SW',  4900000, 6300000, 7700000, 9100000, 0),
-        ('SDS', 4900000, 6300000, 7700000, 9100000, 1),
-        ('LG',  4700000, 5500000, 7200000, 9500000, 2)
+        ('DT개발',        5200000, 6800000, 8900000, 9400000, 0),
+        ('TF (수원,SDS)', 4900000, 6300000, 7700000, 9100000, 1),
+        ('서비스개발',    4700000, 5500000, 7200000, 9500000, 2),
+        ('PM',            5100000, 5600000, 6700000, 7400000, 3),
+        ('Interaction',   4900000, 5700000, 6300000, 9000000, 4),
+        ('UX',            4800000, 5900000, 7000000, 7500000, 5),
+        ('Visual',        4900000, 5700000, 6200000, 9100000, 6),
+        ('SW',            4900000, 6300000, 7700000, 9100000, 7),
+        ('SDS',           4900000, 6300000, 7700000, 9100000, 8),
+        ('LG',            4700000, 5500000, 7200000, 9500000, 9)
       on conflict (role) do nothing
     `);
+    await pool.query(`
+      update mt_rate_cards set sort_order = case role when 'SW' then 7 when 'SDS' then 8 when 'LG' then 9 end
+      where role in ('SW','SDS','LG')
+    `);
+    await pool.query(
+      `INSERT INTO mt_app_settings(key,value,updated_at) VALUES('rate_seed_v2','1',now())
+       ON CONFLICT(key) DO NOTHING`
+    );
   }
   console.log('✓ DB 스키마 확인/생성 완료');
 } catch (e) {

@@ -1,0 +1,28 @@
+# Render Blueprint — https://render.com
+# GitHub 리포를 연결하면 이 파일을 읽어 웹 서비스를 자동 구성합니다.
+# 비밀값(sync:false)은 Render 대시보드에서 직접 입력합니다.
+services:
+  - type: web
+    name: h9-monthly-profit
+    runtime: node
+    plan: free
+    region: singapore        # Supabase(ap-northeast-2, 서울)와 가장 가까운 무료 리전
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SESSION_SECRET   # Render가 자동 생성
+        generateValue: true
+      - key: PGHOST
+        sync: false
+      - key: PGPORT
+        sync: false
+      - key: PGUSER
+        sync: false
+      - key: PGPASSWORD
+        sync: false
+      - key: PGDATABASE
+        sync: false
+      - key: APP_PASSWORD      # 앱 접근 비밀번호
+        sync: false

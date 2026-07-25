@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>H9 프로젝트별 월간 수익률 변동 관리</title>
+<style>
+  :root{
+    --bg:#1b2735; --panel:#243343; --panel2:#2c3d50; --line:#3a4d63;
+    --ink:#eef3f9; --muted:#9db0c6; --accent:#3ea6ff; --accent2:#2b7fd4;
+    --good:#37c98b; --warn:#f2c14e; --bad:#ef6b6b; --chip:#223142;
+    --hl:#e8d84a; --hlbg:#3a3620;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:'Segoe UI',-apple-system,'Malgun Gothic',sans-serif;font-size:14px;line-height:1.5}
+  header{background:var(--panel);border-bottom:1px solid var(--line);padding:16px 24px;display:flex;align-items:baseline;gap:14px;position:sticky;top:0;z-index:10;flex-wrap:wrap}
+  header h1{font-size:18px;font-weight:700;letter-spacing:-.3px}
+  header .sub{color:var(--muted);font-size:12px}
+  header .conn{margin-left:auto;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+  header .dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+  header .dot.on{background:var(--good)} header .dot.off{background:var(--bad)}
+  .tabs{display:flex;gap:4px;padding:0 24px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .tab{padding:11px 18px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;font-weight:600;font-size:13px}
+  .tab.active{color:var(--ink);border-bottom-color:var(--accent)}
+  .tab:hover{color:var(--ink)}
+  main{padding:24px;max-width:1280px;margin:0 auto}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;margin-bottom:20px}
+  .panel h2{font-size:15px;margin-bottom:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .panel h2 .tag{background:var(--chip);color:var(--muted);font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+  th:first-child,td:first-child{text-align:left}
+  td:first-child select,td:first-child input{text-align:left}
+  th{color:var(--muted);font-weight:600;font-size:12px}
+  tr:hover td{background:var(--panel2)}
+  input,select,textarea{background:var(--panel2);border:1px solid var(--line);color:var(--ink);padding:7px 9px;border-radius:6px;font-size:13px;width:100%;font-family:inherit}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
+  input.num{text-align:right}
+  input.dirty,select.dirty{border-color:var(--warn)}
+  button{background:var(--accent);color:#04121f;border:none;padding:9px 16px;border-radius:7px;font-weight:700;cursor:pointer;font-size:13px}
+  button:hover{background:var(--accent2);color:#fff}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  button.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
+  button.ghost:hover{color:var(--ink);border-color:var(--accent)}
+  button.danger{background:transparent;color:var(--bad);border:1px solid var(--line)}
+  button.danger:hover{background:var(--bad);color:#fff}
+  button.sm{padding:5px 10px;font-size:12px}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{color:var(--muted);font-size:12px;font-weight:600}
+  .field.grow{flex:1;min-width:180px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:14px;margin-bottom:20px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+  .card.hl{border-color:var(--hl);background:linear-gradient(180deg,var(--hlbg),var(--panel))}
+  .card .lbl{color:var(--muted);font-size:12px;margin-bottom:6px}
+  .card .val{font-size:23px;font-weight:800;letter-spacing:-.5px}
+  .card .val.good{color:var(--good)} .card .val.warn{color:var(--warn)} .card .val.bad{color:var(--bad)}
+  .card .foot{color:var(--muted);font-size:11px;margin-top:4px}
+  .muted{color:var(--muted)}
+  .right{text-align:right}
+  .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700}
+  .pill.good{background:rgba(55,201,139,.15);color:var(--good)}
+  .pill.warn{background:rgba(242,193,78,.15);color:var(--warn)}
+  .pill.bad{background:rgba(239,107,107,.15);color:var(--bad)}
+  .pill.flat{background:var(--chip);color:var(--muted)}
+  .delta{font-size:12px;font-weight:700}
+  .delta.up{color:var(--good)} .delta.down{color:var(--bad)} .delta.flat{color:var(--muted)}
+  .toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px}
+  .hint{color:var(--muted);font-size:12px;margin-top:6px}
+  .empty{text-align:center;color:var(--muted);padding:40px 20px}
+  .del-x{color:var(--bad);cursor:pointer;font-weight:700;padding:2px 8px}
+  .del-x:hover{color:#fff}
+  .hidden{display:none}
+  .savebar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+  .status{color:var(--good);font-size:12px}
+  .status.err{color:var(--bad)}
+  .chartwrap{overflow-x:auto}
+  .chartwrap svg{display:block;min-width:520px}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:8px}
+  .legend .key{display:inline-block;width:18px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}
+  .clickable{cursor:pointer}
+  .pj-item{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;background:var(--panel2);flex-wrap:wrap;gap:8px}
+  .pj-item .meta{color:var(--muted);font-size:12px}
+  .pj-item .actions{display:flex;gap:8px}
+  .tablewrap{overflow-x:auto}
+  .months{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+  .mchip{padding:6px 12px;border:1px solid var(--line);border-radius:20px;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;background:var(--panel2)}
+  .mchip:hover{color:var(--ink);border-color:var(--accent)}
+  .mchip.active{background:var(--accent);color:#04121f;border-color:var(--accent)}
+  .mchip .mm{font-weight:400;font-size:11px;opacity:.85}
+  .addline{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px dashed var(--line)}
+  .grade-head th{background:var(--panel2)}
+  .vsbox{display:flex;gap:20px;align-items:center;flex-wrap:wrap;padding:14px 18px;border:1px solid var(--hl);border-radius:10px;background:linear-gradient(180deg,var(--hlbg),var(--panel));margin-bottom:16px}
+  .vsbox .big{font-size:26px;font-weight:800;letter-spacing:-.5px}
+  .vsbox .lbl{color:var(--muted);font-size:12px}
+  .vsbox .sep{color:var(--muted);font-size:20px}
+  @media(max-width:760px){.cards{grid-template-columns:1fr 1fr}}
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
+  .modal-bg.show{display:flex}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;width:100%;max-width:360px}
+  .modal h3{font-size:16px;margin-bottom:16px}
+  .modal .field{margin-bottom:12px}
+  .modal .field label{display:block;color:var(--muted);font-size:12px;font-weight:600;margin-bottom:5px}
+  .modal .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+  .modal .msg{font-size:12px;min-height:16px;margin-top:10px}
+  .modal .msg.err{color:var(--bad)} .modal .msg.ok{color:var(--good)}
+</style>
+</head>
+<body>
+<header>
+  <h1>H9 월간 수익률 변동 관리</h1>
+  <span class="sub">견적 기준 투입계획 · 월별 실투입 인력(MM) · 수익률 실시간 비교</span>
+  <span class="conn"><span class="dot" id="connDot"></span><span id="connText">DB 연결 확인 중…</span>
+    <button class="ghost sm" id="btnChangePw" style="margin-left:10px;display:none">비밀번호 변경</button>
+    <button class="ghost sm" id="btnLogout" style="display:none">로그아웃</button></span>
+</header>
+<div class="tabs">
+  <div class="tab active" data-tab="dash">대시보드</div>
+  <div class="tab" data-tab="monthly">월별 투입 · 수익률</div>
+  <div class="tab" data-tab="plan">프로젝트 · 견적 기준</div>
+  <div class="tab" data-tab="staff">인력 · 단가</div>
+</div>
+<main>
+
+<!-- ══════════ 대시보드 ══════════ -->
+<section id="tab-dash">
+  <div class="cards" id="dashCards"></div>
+  <div class="panel">
+    <h2>전사 월별 수익률 추이 <span class="tag">전 프로젝트 합산</span></h2>
+    <div class="chartwrap" id="dashChart"><div class="empty">월별 투입을 입력하면 추이가 표시됩니다.</div></div>
+    <div class="legend" id="dashLegend"></div>
+  </div>
+  <div class="panel">
+    <h2>프로젝트별 현황 <span class="tag" id="pjCount">0건</span></h2>
+    <div class="tablewrap">
+    <table>
+      <thead><tr>
+        <th>프로젝트</th><th>발주처</th><th>상태</th><th>계약액</th>
+        <th>견적 수익률</th><th>최근 실적월</th><th>최근월 수익률</th>
+        <th>견적 대비</th><th>전월 대비</th><th>누적 수익률</th>
+      </tr></thead>
+      <tbody id="dashBody"></tbody>
+    </table>
+    </div>
+    <div class="hint">행을 클릭하면 해당 프로젝트의 월별 투입 화면으로 이동합니다. 견적 수익률은 견적 기준 투입계획으로 산출된 고정 기준입니다.</div>
+  </div>
+</section>
+
+<!-- ══════════ 월별 투입 · 수익률 ══════════ -->
+<section id="tab-monthly" class="hidden">
+  <div class="panel">
+    <div class="row">
+      <div class="field grow"><label>프로젝트 선택</label><select id="moProject"></select></div>
+      <div class="field"><label>월 추가</label><input type="month" id="moAddYm"></div>
+      <button class="ghost" id="btnMoAddYm">+ 월 추가</button>
+    </div>
+    <div class="hint" id="moProjectInfo"></div>
+    <div class="months" id="moChips"></div>
+  </div>
+
+  <div class="vsbox" id="moVs"></div>
+
+  <div class="panel">
+    <div class="toolbar">
+      <h2>실제 투입 인력 <span class="tag" id="moYmLabel"></span></h2>
+      <div style="display:flex;gap:8px">
+        <button class="ghost sm" id="btnCopyPrev">← 전월 투입 복사</button>
+        <button class="ghost sm" id="btnMoAddRow">+ 인력 추가</button>
+      </div>
+    </div>
+    <div class="tablewrap">
+    <table>
+      <thead><tr>
+        <th style="min-width:160px">인력 (이름)</th><th>직군</th><th>등급</th>
+        <th style="min-width:100px">단가/MM</th><th style="width:90px">투입 MM</th>
+        <th style="min-width:110px">인건비</th><th style="width:30px"></th>
+      </tr></thead>
+      <tbody id="moBody"></tbody>
+      <tfoot><tr style="font-weight:700" id="moFoot"></tr></tfoot>
+    </table>
+    </div>
+    <div class="row" style="margin-top:16px">
+      <div class="field grow"><label>당월 매출 인식액 (0 = 균등 자동) </label><input id="moRevenue" class="num" inputmode="numeric" value="0"></div>
+      <div class="field grow"><label>당월 외주비</label><input id="moCostOut" class="num" inputmode="numeric" value="0"></div>
+      <div class="field grow"><label>당월 부대비</label><input id="moCostEtc" class="num" inputmode="numeric" value="0"></div>
+      <div class="field grow"><label>비고</label><input id="moNote"></div>
+    </div>
+    <div class="savebar">
+      <button id="btnMoSave">이 달 투입·실적 저장</button>
+      <span class="status" id="moStatus"></span>
+    </div>
+    <div class="hint">인력을 선택하면 인력 DB의 직군·등급·단가가 자동으로 따라오고, 인력 탭에서 등급을 바꾸면 여기 원가도 함께 바뀝니다. 매출 인식액을 0으로 두면 계약액 ÷ 계약개월수로 균등 인식합니다.</div>
+  </div>
+
+  <div class="panel">
+    <h2>월별 수익률 변동 vs 견적 기준 <span class="tag" id="moChartName"></span></h2>
+    <div class="chartwrap" id="moChart"><div class="empty">투입 실적이 없습니다.</div></div>
+    <div class="legend" id="moLegend"></div>
+  </div>
+
+  <div class="panel">
+    <div class="toolbar">
+      <h2>월별 요약 <span class="tag">원 단위 · VAT 제외</span></h2>
+      <button class="ghost sm" id="btnMoExport">CSV 내보내기</button>
+    </div>
+    <div class="tablewrap">
+    <table>
+      <thead><tr>
+        <th>월</th><th>인원</th><th>MM</th><th>인건비</th><th>외주비</th><th>부대비</th>
+        <th>매출</th><th>수익</th><th>수익률</th><th>견적 대비</th><th>전월 대비</th>
+      </tr></thead>
+      <tbody id="moSummary"></tbody>
+    </table>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ 프로젝트 · 견적 기준 ══════════ -->
+<section id="tab-plan" class="hidden">
+  <div class="panel">
+    <h2 id="pjFormTitle">새 프로젝트 등록</h2>
+    <div class="row">
+      <div class="field grow"><label>프로젝트명 *</label><input id="pjName" placeholder="예: SK에코플랜트 26년 CTMS 리뉴얼"></div>
+      <div class="field"><label>발주처</label><input id="pjClient" placeholder="발주처"></div>
+      <div class="field"><label>상태</label><select id="pjStatus"><option>진행중</option><option>완료</option><option>보류</option></select></div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <div class="field grow"><label>계약액 (VAT 제외, 원)</label><input id="pjBudget" class="num" inputmode="numeric" value="0"></div>
+      <div class="field"><label>시작월</label><input type="month" id="pjStart"></div>
+      <div class="field"><label>종료월</label><input type="month" id="pjEnd"></div>
+      <div class="field grow"><label>메모</label><input id="pjMemo" placeholder="비고"></div>
+    </div>
+    <div class="savebar">
+      <button id="btnSavePj">프로젝트 저장</button>
+      <button class="ghost hidden" id="btnCancelEdit">수정 취소</button>
+      <span class="status" id="pjStatusMsg"></span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="toolbar">
+      <h2>견적(계약) 기준 투입 계획 <span class="tag" id="planPjName"></span></h2>
+      <div class="field" style="min-width:260px"><select id="planProject"></select></div>
+    </div>
+    <div class="cards" id="planCards"></div>
+    <div class="tablewrap">
+    <table>
+      <thead><tr class="grade-head">
+        <th style="min-width:150px">직군</th><th style="width:90px">등급</th>
+        <th style="min-width:105px">단가/MM</th><th style="width:90px">계획 MM</th>
+        <th style="min-width:110px">계획 인건비</th><th style="width:30px"></th>
+      </tr></thead>
+      <tbody id="planBody"></tbody>
+      <tfoot><tr style="font-weight:700" id="planFoot"></tr></tfoot>
+    </table>
+    </div>
+    <div class="addline">
+      <button class="ghost sm" id="btnPlanAddRow">+ 직군 행 추가</button>
+      <div class="field"><label>견적 외주비</label><input id="planOut" class="num" inputmode="numeric" value="0"></div>
+      <div class="field"><label>견적 부대비</label><input id="planEtc" class="num" inputmode="numeric" value="0"></div>
+    </div>
+    <div class="savebar">
+      <button id="btnSavePlan">견적 기준 저장 (수익률 확정)</button>
+      <span class="status" id="planStatus"></span>
+    </div>
+    <div class="hint">저장 시점의 단가가 스냅샷으로 고정되어, 이후 단가표가 바뀌어도 견적 수익률 기준은 변하지 않습니다. 이 기준이 월별 실적과 실시간 비교됩니다.</div>
+  </div>
+
+  <div class="panel">
+    <h2>등록된 프로젝트 <span class="tag" id="pjListCount">0건</span></h2>
+    <div id="pjList"></div>
+  </div>
+</section>
+
+<!-- ══════════ 인력 · 단가 ══════════ -->
+<section id="tab-staff" class="hidden">
+  <div class="panel">
+    <div class="toolbar">
+      <h2>H9 인력 명부 <span class="tag" id="staffCount">0명</span></h2>
+      <button class="ghost sm" id="btnBulkOpen">구글시트 붙여넣기 일괄 등록</button>
+    </div>
+    <div class="tablewrap">
+    <table>
+      <thead><tr>
+        <th style="min-width:140px">이름</th><th style="min-width:140px">직군</th><th style="width:90px">등급</th>
+        <th>단가/MM</th><th style="width:70px">재직</th><th style="min-width:140px">메모</th><th style="width:30px"></th>
+      </tr></thead>
+      <tbody id="staffBody"></tbody>
+    </table>
+    </div>
+    <div class="addline">
+      <div class="field"><label>이름</label><input id="stName" placeholder="홍길동"></div>
+      <div class="field"><label>직군</label><select id="stRole"></select></div>
+      <div class="field"><label>등급</label><select id="stGrade"></select></div>
+      <button class="ghost" id="btnAddStaff">인력 추가</button>
+      <span class="status" id="staffStatus"></span>
+    </div>
+    <div class="hint">등급을 바꾸면 이 인력이 투입된 모든 월의 인건비·수익률이 자동으로 다시 계산됩니다.</div>
+  </div>
+
+  <div class="panel">
+    <h2>직군별·등급별 단가표 <span class="tag">원/MM</span></h2>
+    <div class="tablewrap">
+    <table>
+      <thead><tr class="grade-head"><th style="min-width:150px">직군</th><th>초급</th><th>중급</th><th>고급</th><th>특급</th><th style="width:30px"></th></tr></thead>
+      <tbody id="rateBody"></tbody>
+    </table>
+    </div>
+    <div class="addline">
+      <div class="field grow"><label>새 직군명</label><input id="newRole" placeholder="예: QA실"></div>
+      <button class="ghost" id="btnAddRole">직군 추가</button>
+    </div>
+    <div class="savebar">
+      <button id="btnSaveRates">단가표 저장</button>
+      <span class="status" id="rateStatus"></span>
+    </div>
+    <div class="hint">단가표 변경은 인력 단가(월별 실적 원가)에 즉시 반영되지만, 이미 저장된 견적 기준(스냅샷)은 바뀌지 않습니다.</div>
+  </div>
+</section>
+</main>
+
+<div class="modal-bg" id="pwModal">
+  <form class="modal" id="pwForm">
+    <h3>비밀번호 변경</h3>
+    <div class="field"><label>현재 비밀번호</label><input type="password" id="pwCur" autocomplete="current-password"></div>
+    <div class="field"><label>새 비밀번호 (4자 이상)</label><input type="password" id="pwNew" autocomplete="new-password"></div>
+    <div class="field"><label>새 비밀번호 확인</label><input type="password" id="pwNew2" autocomplete="new-password"></div>
+    <div class="msg" id="pwMsg"></div>
+    <div class="btns">
+      <button type="button" class="ghost" id="pwCancel">취소</button>
+      <button type="submit" id="pwSubmit">변경</button>
+    </div>
+  </form>
+</div>
+
+<div class="modal-bg" id="bulkModal">
+  <div class="modal" style="max-width:520px">
+    <h3>인력 일괄 등록 (구글시트 붙여넣기)</h3>
+    <p class="hint" style="margin-bottom:10px">시트에서 <b>이름 · 직군 · 등급</b> 3개 열을 복사해 붙여넣으세요. (탭/쉼표 구분, 한 줄당 한 명, 등급: 초급/중급/고급/특급)</p>
+    <textarea id="bulkText" rows="10" placeholder="홍길동	DT개발	고급&#10;김철수	UX	중급"></textarea>
+    <div class="msg" id="bulkMsg"></div>
+    <div class="btns">
+      <button type="button" class="ghost" id="bulkCancel">취소</button>
+      <button type="button" id="bulkSubmit">등록</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const GRADES=['초급','중급','고급','특급'];
+let projects=[],staff=[],rates={},allPlans=[],allAssigns=[],allRecords=[];
+let curPjId=null,curYm=null,editPjId=null,planPjId=null;
+let moDraft=null; // {assigns:[{staffId,mm}], rec:{revenue,costOut,costEtc,note}}
+let planDraft=null; // {rows:[{role,grade,mm,rate}], out, etc}
+
+// ── DB API ────────────────────────────────────────────
+async function api(path,opts){
+  const r=await fetch('/api'+path,{headers:{'Content-Type':'application/json'},...opts});
+  if(r.status===401){location.href='/login.html';throw new Error('세션이 만료되었습니다.');}
+  if(!r.ok){let m='서버 오류';try{m=(await r.json()).error||m;}catch(e){}throw new Error(m);}
+  return r.status===204?null:r.json();
+}
+function setConn(ok,msg){
+  document.getElementById('connDot').className='dot '+(ok?'on':'off');
+  document.getElementById('connText').textContent=msg;
+}
+
+// ── 유틸 ──────────────────────────────────────────────
+const won=n=>Math.round(n||0).toLocaleString('ko-KR');
+const parseNum=s=>{const v=parseFloat(String(s).replace(/[^0-9.\-]/g,''));return isNaN(v)?0:v;}
+const cls=m=>m>=20?'good':m>=0?'warn':'bad';
+function deltaHtml(d){
+  if(d==null)return '<span class="delta flat">–</span>';
+  if(Math.abs(d)<0.05)return '<span class="delta flat">0.0%p</span>';
+  return d>0?'<span class="delta up">▲ +'+d.toFixed(1)+'%p</span>':'<span class="delta down">▼ '+d.toFixed(1)+'%p</span>';
+}
+function ymAdd(ym,n){const [y,m]=ym.split('-').map(Number);const d=new Date(y,m-1+n,1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+function ymRange(a,b){
+  if(!a)return [];if(!b)b=a;
+  const out=[];let c=a;let guard=0;
+  while(c<=b&&guard++<240){out.push(c);c=ymAdd(c,1);}
+  return out;
+}
+const ymLabel=ym=>ym?ym.replace('-','.'):'-';
+const rateOf=(role,gi)=>(rates[role]&&rates[role][gi]!=null)?rates[role][gi]:0;
+const staffById=id=>staff.find(s=>s.id===id)||null;
+function staffRate(id){const s=staffById(id);return s?rateOf(s.role,s.grade):0;}
+
+// ── 계산 코어 ─────────────────────────────────────────
+// 견적(계약) 기준: 프로젝트의 계획 행 + 견적 외주/부대비 → 고정 기준 수익률
+function planStats(p){
+  const rows=allPlans.filter(r=>r.projectId===p.id);
+  if(!rows.length)return null;
+  let labor=0,mm=0;rows.forEach(r=>{labor+=r.rate*r.mm;mm+=r.mm;});
+  const cost=labor+p.planCostOut+p.planCostEtc;
+  const margin=p.budget>0?(p.budget-cost)/p.budget*100:null;
+  return {labor,mm,cost,margin,rows};
+}
+const planMarginOf=p=>{const ps=planStats(p);return ps&&ps.margin!=null?ps.margin:null;};
+// 균등 매출 인식액 (계약액 ÷ 계약개월수)
+function evenRevenue(p){
+  const months=ymRange(p.startYm,p.endYm);
+  return (p.budget>0&&months.length)?p.budget/months.length:0;
+}
+// 특정 프로젝트·월의 실제 실적 (투입 인력 기반)
+function monthActual(p,ym,ovAssigns,ovRec){
+  const assigns=ovAssigns||allAssigns.filter(a=>a.projectId===p.id&&a.ym===ym);
+  const rec=ovRec||allRecords.find(r=>r.projectId===p.id&&r.ym===ym)||{revenue:0,costOut:0,costEtc:0,note:''};
+  let labor=0,mm=0;
+  assigns.forEach(a=>{labor+=staffRate(a.staffId)*a.mm;mm+=a.mm;});
+  const inRange=(!p.startYm||ym>=p.startYm)&&(!p.endYm||ym<=p.endYm);
+  const revAuto=rec.revenue>0?false:inRange;
+  const revenue=rec.revenue>0?rec.revenue:(inRange?evenRevenue(p):0);
+  const cost=labor+(rec.costOut||0)+(rec.costEtc||0);
+  const hasData=assigns.length>0||rec.revenue>0||(rec.costOut||0)>0||(rec.costEtc||0)>0;
+  const profit=revenue-cost;
+  const margin=(hasData&&revenue>0)?profit/revenue*100:null;
+  return {labor,mm,heads:assigns.length,revenue,revAuto,cost,profit,margin,hasData,rec,assigns};
+}
+// 프로젝트의 실적월 목록 (기간 + 투입/실적 존재 월)
+function projectMonths(p){
+  return [...new Set([
+    ...ymRange(p.startYm,p.endYm),
+    ...allAssigns.filter(a=>a.projectId===p.id).map(a=>a.ym),
+    ...allRecords.filter(r=>r.projectId===p.id).map(r=>r.ym),
+  ])].sort();
+}
+function projectSeries(p){
+  const months=projectMonths(p);
+  const acts=months.map(ym=>monthActual(p,ym));
+  let lastActive=-1;acts.forEach((a,i)=>{if(a.hasData)lastActive=i;});
+  let cr=0,cc=0;
+  const monthly=[],cumul=[];
+  acts.forEach((a,i)=>{
+    monthly.push(a.hasData?a.margin:null);
+    if(i<=lastActive&&a.hasData){cr+=a.revenue;cc+=a.cost;}
+    cumul.push(i<=lastActive&&a.hasData&&cr>0?(cr-cc)/cr*100:null);
+  });
+  return {months,acts,monthly,cumul,lastActive,cumRev:cr,cumCost:cc};
+}
+
+// ── SVG 라인 차트 (외부 라이브러리 없음) ──────────────
+function lineChart(el,labels,series,opts={}){
+  const box=document.getElementById(el);
+  if(!labels.length||!series.some(s=>s.data.some(v=>v!=null))){
+    box.innerHTML='<div class="empty">'+(opts.emptyMsg||'표시할 데이터가 없습니다.')+'</div>';return;
+  }
+  const W=Math.max(560,labels.length*64),H=260,L=52,R=16,T=16,B=40;
+  const vals=[];series.forEach(s=>s.data.forEach(v=>{if(v!=null)vals.push(v);}));
+  let lo=Math.min(0,...vals),hi=Math.max(10,...vals);
+  const pad=(hi-lo)*0.12||5;lo-=pad;hi+=pad;
+  const X=i=>L+(labels.length===1?((W-L-R)/2):(i*(W-L-R)/(labels.length-1)));
+  const Y=v=>T+(hi-v)/(hi-lo)*(H-T-B);
+  let g='';
+  const step=(hi-lo)/4;
+  for(let i=0;i<=4;i++){
+    const v=lo+step*i,y=Y(v);
+    g+='<line x1="'+L+'" y1="'+y+'" x2="'+(W-R)+'" y2="'+y+'" stroke="#3a4d63" stroke-width="1" stroke-dasharray="3,4"/>';
+    g+='<text x="'+(L-8)+'" y="'+(y+4)+'" text-anchor="end" font-size="11" fill="#9db0c6">'+v.toFixed(0)+'%</text>';
+  }
+  if(lo<0&&hi>0){const y=Y(0);g+='<line x1="'+L+'" y1="'+y+'" x2="'+(W-R)+'" y2="'+y+'" stroke="#9db0c6" stroke-width="1"/>';}
+  const skip=Math.ceil(labels.length/12);
+  labels.forEach((lb,i)=>{
+    if(i%skip!==0&&i!==labels.length-1)return;
+    g+='<text x="'+X(i)+'" y="'+(H-B+22)+'" text-anchor="middle" font-size="11" fill="#9db0c6">'+ymLabel(lb)+'</text>';
+  });
+  series.forEach(s=>{
+    let path='',pen=false;
+    s.data.forEach((v,i)=>{
+      if(v==null){pen=false;return;}
+      path+=(pen?'L':'M')+X(i).toFixed(1)+' '+Y(v).toFixed(1)+' ';pen=true;
+    });
+    g+='<path d="'+path+'" fill="none" stroke="'+s.color+'" stroke-width="2.5" '+(s.dash?'stroke-dasharray="6,5"':'')+' stroke-linejoin="round" stroke-linecap="round"/>';
+    if(!s.noDots)s.data.forEach((v,i)=>{
+      if(v==null)return;
+      g+='<circle cx="'+X(i)+'" cy="'+Y(v)+'" r="3.5" fill="'+s.color+'"><title>'+ymLabel(labels[i])+' · '+s.name+' '+v.toFixed(1)+'%</title></circle>';
+    });
+  });
+  box.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="max-height:300px">'+g+'</svg>';
+}
+function legendHtml(el,series){
+  document.getElementById(el).innerHTML=series.map(s=>
+    '<span><span class="key" style="background:'+s.color+';'+(s.dash?'opacity:.7':'')+'"></span>'+s.name+'</span>').join('');
+}
+
+// ── 대시보드 ──────────────────────────────────────────
+function renderDash(){
+  const months=[...new Set([...allAssigns.map(a=>a.ym),...allRecords.map(r=>r.ym)])].sort();
+  const compData=months.map(ym=>{
+    let rev=0,cost=0,has=false;
+    projects.forEach(p=>{
+      const a=monthActual(p,ym);
+      if(a.hasData){rev+=a.revenue;cost+=a.cost;has=true;}
+    });
+    return has&&rev>0?(rev-cost)/rev*100:null;
+  });
+  const lastIdx=(()=>{for(let i=compData.length-1;i>=0;i--)if(compData[i]!=null)return i;return -1;})();
+  const lastYm=lastIdx>=0?months[lastIdx]:null;
+  let lastRev=0,lastCost=0,prevM=null;
+  if(lastYm)projects.forEach(p=>{const a=monthActual(p,lastYm);if(a.hasData){lastRev+=a.revenue;lastCost+=a.cost;}});
+  for(let i=lastIdx-1;i>=0;i--)if(compData[i]!=null){prevM=compData[i];break;}
+  const lastM=lastIdx>=0?compData[lastIdx]:null;
+  const active=projects.filter(p=>p.status==='진행중').length;
+  document.getElementById('dashCards').innerHTML=
+    '<div class="card"><div class="lbl">등록 프로젝트</div><div class="val">'+projects.length+'</div><div class="foot">진행중 '+active+'건 · 인력 '+staff.filter(s=>s.active).length+'명</div></div>'+
+    '<div class="card"><div class="lbl">최근 실적월 매출</div><div class="val">'+won(lastRev)+'</div><div class="foot">'+(lastYm?ymLabel(lastYm)+' · 전 프로젝트':'실적 없음')+'</div></div>'+
+    '<div class="card"><div class="lbl">최근 실적월 수익</div><div class="val '+(lastRev-lastCost>=0?'good':'bad')+'">'+won(lastRev-lastCost)+'</div><div class="foot">원가 '+won(lastCost)+'</div></div>'+
+    '<div class="card hl"><div class="lbl">최근월 전사 수익률</div><div class="val '+(lastM!=null?cls(lastM):'')+'">'+(lastM!=null?lastM.toFixed(1)+'%':'-')+'</div><div class="foot">전월 대비 '+(lastM!=null&&prevM!=null?deltaHtml(lastM-prevM):'–')+'</div></div>';
+  const series=[{name:'전사 월별 수익률',color:'#3ea6ff',data:compData}];
+  lineChart('dashChart',months,series,{emptyMsg:'월별 투입을 입력하면 추이가 표시됩니다.'});
+  legendHtml('dashLegend',months.length?series:[]);
+  document.getElementById('pjCount').textContent=projects.length+'건';
+  const body=document.getElementById('dashBody');
+  if(!projects.length){body.innerHTML='<tr><td colspan="10" class="empty">프로젝트 · 견적 기준 탭에서 프로젝트를 등록하세요.</td></tr>';return;}
+  body.innerHTML=projects.map(p=>{
+    const s=projectSeries(p);
+    const pm=planMarginOf(p);
+    let lastM2=null,prevM2=null,lastYm2=null;
+    s.monthly.forEach((v,i)=>{if(v!=null){prevM2=lastM2;lastM2=v;lastYm2=s.months[i];}});
+    const cum=s.cumRev>0?(s.cumRev-s.cumCost)/s.cumRev*100:null;
+    const statusPill=p.status==='진행중'?'good':p.status==='완료'?'flat':'warn';
+    return '<tr class="clickable" data-goto="'+p.id+'">'+
+      '<td style="font-weight:700">'+p.name+'</td><td>'+(p.client||'-')+'</td>'+
+      '<td><span class="pill '+statusPill+'">'+p.status+'</span></td>'+
+      '<td>'+won(p.budget)+'</td>'+
+      '<td>'+(pm!=null?'<span class="pill '+cls(pm)+'">'+pm.toFixed(1)+'%</span>':'<span class="muted">미확정</span>')+'</td>'+
+      '<td>'+(lastYm2?ymLabel(lastYm2):'-')+'</td>'+
+      '<td>'+(lastM2!=null?'<span class="pill '+cls(lastM2)+'">'+lastM2.toFixed(1)+'%</span>':'-')+'</td>'+
+      '<td>'+(lastM2!=null&&pm!=null?deltaHtml(lastM2-pm):'–')+'</td>'+
+      '<td>'+(lastM2!=null&&prevM2!=null?deltaHtml(lastM2-prevM2):'–')+'</td>'+
+      '<td>'+(cum!=null?'<span class="pill '+cls(cum)+'">'+cum.toFixed(1)+'%</span>':'-')+'</td></tr>';
+  }).join('');
+  body.querySelectorAll('[data-goto]').forEach(tr=>tr.onclick=()=>{
+    curPjId=+tr.dataset.goto;curYm=null;switchTab('monthly');renderMonthly();
+  });
+}
+
+// ── 월별 투입 · 수익률 ────────────────────────────────
+function curProject(){return projects.find(p=>p.id===curPjId)||null;}
+function initMoDraft(){
+  const p=curProject();if(!p||!curYm){moDraft=null;return;}
+  const assigns=allAssigns.filter(a=>a.projectId===p.id&&a.ym===curYm).map(a=>({staffId:a.staffId,mm:a.mm}));
+  const rec=allRecords.find(r=>r.projectId===p.id&&r.ym===curYm);
+  moDraft={assigns,rec:rec?{revenue:rec.revenue,costOut:rec.costOut,costEtc:rec.costEtc,note:rec.note}:{revenue:0,costOut:0,costEtc:0,note:''}};
+}
+function renderMonthly(){
+  const sel=document.getElementById('moProject');
+  sel.innerHTML=projects.map(p=>'<option value="'+p.id+'" '+(p.id===curPjId?'selected':'')+'>'+p.name+'</option>').join('');
+  sel.onchange=()=>{curPjId=+sel.value;curYm=null;renderMonthly();};
+  const p=curProject();
+  const info=document.getElementById('moProjectInfo');
+  if(!p){info.textContent='프로젝트를 먼저 등록하세요.';document.getElementById('moChips').innerHTML='';
+    document.getElementById('moVs').innerHTML='<span class="muted">프로젝트가 없습니다.</span>';
+    document.getElementById('moBody').innerHTML='';document.getElementById('moSummary').innerHTML='';
+    lineChart('moChart',[],[]);legendHtml('moLegend',[]);return;}
+  const pm=planMarginOf(p);
+  info.innerHTML=(p.client||'-')+' · 계약액 '+won(p.budget)+'원 · '+ymLabel(p.startYm)+' ~ '+ymLabel(p.endYm)+
+    ' · 견적 수익률 <b>'+(pm!=null?pm.toFixed(1)+'%':'미확정 — 프로젝트·견적 기준 탭에서 투입계획을 저장하세요')+'</b>';
+  // 월 칩
+  const months=projectMonths(p);
+  if(!curYm||!months.includes(curYm)){
+    const today=new Date();const nowYm=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0');
+    // 기본 선택: 실적이 있는 마지막 월 → 없으면 이번 달 → 없으면 마지막 월
+    let lastData=null;months.forEach(ym=>{if(monthActual(p,ym).hasData)lastData=ym;});
+    curYm=lastData||(months.includes(nowYm)?nowYm:(months[months.length-1]||null));
+  }
+  document.getElementById('moChips').innerHTML=months.map(ym=>{
+    const a=monthActual(p,ym);
+    return '<span class="mchip'+(ym===curYm?' active':'')+'" data-ym="'+ym+'">'+ymLabel(ym)+
+      (a.hasData?' <span class="mm">'+(a.margin!=null?a.margin.toFixed(0)+'%':'')+'</span>':'')+'</span>';
+  }).join('');
+  document.querySelectorAll('#moChips .mchip').forEach(c=>c.onclick=()=>{curYm=c.dataset.ym;initMoDraft();renderMonthly();});
+  if(!moDraft)initMoDraft();
+  renderMoEditor();renderMoVs();renderMoChart();renderMoSummary();
+}
+function moActual(){ // 편집중 드래프트 기준 당월 실적 (실시간)
+  const p=curProject();if(!p||!curYm||!moDraft)return null;
+  return monthActual(p,curYm,moDraft.assigns,moDraft.rec);
+}
+function renderMoVs(){
+  const p=curProject();const box=document.getElementById('moVs');
+  if(!p||!curYm){box.innerHTML='<span class="muted">월을 선택하세요.</span>';return;}
+  const pm=planMarginOf(p);
+  const a=moActual();
+  const s=projectSeries(p);
+  const cum=s.cumRev>0?(s.cumRev-s.cumCost)/s.cumRev*100:null;
+  const mval=a&&a.hasData&&a.margin!=null?a.margin:null;
+  box.innerHTML=
+    '<div><div class="lbl">견적 기준 수익률 (고정)</div><div class="big" style="color:var(--warn)">'+(pm!=null?pm.toFixed(1)+'%':'미확정')+'</div></div>'+
+    '<div class="sep">vs</div>'+
+    '<div><div class="lbl">'+ymLabel(curYm)+' 실제 수익률 (실시간)</div><div class="big '+(mval!=null?cls(mval):'')+'" style="color:var(--'+(mval!=null?(mval>=20?'good':mval>=0?'warn':'bad'):'muted')+')">'+(mval!=null?mval.toFixed(1)+'%':'-')+'</div></div>'+
+    '<div><div class="lbl">견적 대비</div><div class="big" style="font-size:20px">'+(mval!=null&&pm!=null?deltaHtml(mval-pm):'–')+'</div></div>'+
+    '<div style="margin-left:auto"><div class="lbl">프로젝트 누적 수익률</div><div class="big" style="font-size:20px" >'+(cum!=null?'<span class="pill '+cls(cum)+'" style="font-size:14px">'+cum.toFixed(1)+'%</span>':'-')+
+    (cum!=null&&pm!=null?' '+deltaHtml(cum-pm):'')+'</div></div>';
+}
+function staffOptions(sel){
+  const list=staff.filter(s=>s.active||s.id===sel);
+  return '<option value="">— 선택 —</option>'+list.map(s=>
+    '<option value="'+s.id+'" '+(s.id===sel?'selected':'')+'>'+s.name+' ('+s.role+' '+GRADES[s.grade]+')</option>').join('');
+}
+function renderMoEditor(){
+  const p=curProject();
+  document.getElementById('moYmLabel').textContent=curYm?ymLabel(curYm):'';
+  const body=document.getElementById('moBody');
+  if(!p||!curYm||!moDraft){body.innerHTML='<tr><td colspan="7" class="empty">월을 선택하세요.</td></tr>';return;}
+  if(!moDraft.assigns.length){
+    body.innerHTML='<tr><td colspan="7" class="empty">투입 인력이 없습니다. [+ 인력 추가] 또는 [← 전월 투입 복사]를 누르세요.</td></tr>';
+  }else{
+    body.innerHTML=moDraft.assigns.map((a,i)=>{
+      const s=staffById(a.staffId);
+      const rate=a.staffId?staffRate(a.staffId):0;
+      return '<tr><td><select data-i="'+i+'" data-f="staff">'+staffOptions(a.staffId)+'</select></td>'+
+        '<td>'+(s?s.role:'-')+'</td>'+
+        '<td>'+(s?'<span class="pill flat">'+GRADES[s.grade]+'</span>':'-')+'</td>'+
+        '<td class="right">'+won(rate)+'</td>'+
+        '<td><input class="num" data-i="'+i+'" data-f="mm" value="'+a.mm+'" inputmode="decimal"></td>'+
+        '<td class="right">'+won(rate*a.mm)+'</td>'+
+        '<td><span class="del-x" data-del="'+i+'">×</span></td></tr>';
+    }).join('');
+  }
+  const act=moActual();
+  document.getElementById('moFoot').innerHTML=act?
+    '<td>합계 '+act.heads+'명</td><td></td><td></td><td></td><td class="right">'+act.mm.toFixed(2)+'</td><td class="right">'+won(act.labor)+'</td><td></td>':'';
+  body.querySelectorAll('select[data-f="staff"]').forEach(el=>el.onchange=e=>{
+    const i=+e.target.dataset.i;moDraft.assigns[i].staffId=+e.target.value||0;refreshMoLive();
+  });
+  body.querySelectorAll('input[data-f="mm"]').forEach(el=>el.onchange=e=>{
+    const i=+e.target.dataset.i;moDraft.assigns[i].mm=parseNum(e.target.value);refreshMoLive();
+  });
+  body.querySelectorAll('[data-del]').forEach(x=>x.onclick=e=>{
+    moDraft.assigns.splice(+e.target.dataset.del,1);refreshMoLive();
+  });
+  // 실적 입력칸
+  const rev=document.getElementById('moRevenue');
+  rev.value=moDraft.rec.revenue||0;
+  rev.placeholder=won(evenRevenue(p));
+  document.getElementById('moCostOut').value=moDraft.rec.costOut||0;
+  document.getElementById('moCostEtc').value=moDraft.rec.costEtc||0;
+  document.getElementById('moNote').value=moDraft.rec.note||'';
+}
+function refreshMoLive(){renderMoEditor();renderMoVs();renderMoChartLive();renderMoSummary();}
+['moRevenue','moCostOut','moCostEtc','moNote'].forEach(id=>{
+  document.addEventListener('DOMContentLoaded',()=>{
+    document.getElementById(id).onchange=e=>{
+      if(!moDraft)return;
+      const map={moRevenue:'revenue',moCostOut:'costOut',moCostEtc:'costEtc',moNote:'note'};
+      const f=map[id];
+      moDraft.rec[f]=f==='note'?e.target.value:parseNum(e.target.value);
+      refreshMoLive();
+    };
+  });
+});
+// 차트: 저장된 데이터 + 편집중 월은 드래프트로 대체 (실시간 반영)
+function moSeriesData(){
+  const p=curProject();if(!p)return null;
+  const months=projectMonths(p);
+  const acts=months.map(ym=>(ym===curYm&&moDraft)?monthActual(p,ym,moDraft.assigns,moDraft.rec):monthActual(p,ym));
+  let lastActive=-1;acts.forEach((a,i)=>{if(a.hasData)lastActive=i;});
+  let cr=0,cc=0;const monthly=[],cumul=[];
+  acts.forEach((a,i)=>{
+    monthly.push(a.hasData?a.margin:null);
+    if(i<=lastActive&&a.hasData){cr+=a.revenue;cc+=a.cost;}
+    cumul.push(i<=lastActive&&a.hasData&&cr>0?(cr-cc)/cr*100:null);
+  });
+  return {months,acts,monthly,cumul};
+}
+function renderMoChartLive(){renderMoChart();}
+function renderMoChart(){
+  const p=curProject();
+  if(!p){lineChart('moChart',[],[]);legendHtml('moLegend',[]);return;}
+  document.getElementById('moChartName').textContent=p.name;
+  const d=moSeriesData();
+  const pm=planMarginOf(p);
+  const series=[
+    {name:'월별 실제 수익률',color:'#3ea6ff',data:d.monthly},
+    {name:'누적 수익률',color:'#37c98b',data:d.cumul},
+  ];
+  if(pm!=null)series.push({name:'견적 기준 '+pm.toFixed(1)+'%',color:'#f2c14e',dash:true,noDots:true,data:d.months.map(()=>pm)});
+  lineChart('moChart',d.months,series,{emptyMsg:'투입 실적이 없습니다.'});
+  legendHtml('moLegend',d.months.length?series:[]);
+}
+function renderMoSummary(){
+  const p=curProject();const body=document.getElementById('moSummary');
+  if(!p){body.innerHTML='';return;}
+  const d=moSeriesData();const pm=planMarginOf(p);
+  let prev=null;
+  body.innerHTML=d.months.map((ym,i)=>{
+    const a=d.acts[i];
+    const dh=(a.margin!=null&&prev!=null)?deltaHtml(a.margin-prev):'<span class="delta flat">–</span>';
+    if(a.margin!=null)prev=a.margin;
+    return '<tr'+(ym===curYm?' style="outline:1px solid var(--accent)"':'')+'>'+
+      '<td style="font-weight:700" class="clickable" data-mo="'+ym+'">'+ymLabel(ym)+'</td>'+
+      '<td>'+(a.hasData?a.heads:'-')+'</td><td>'+(a.hasData?a.mm.toFixed(2):'-')+'</td>'+
+      '<td>'+(a.hasData?won(a.labor):'-')+'</td><td>'+(a.hasData?won(a.rec.costOut):'-')+'</td><td>'+(a.hasData?won(a.rec.costEtc):'-')+'</td>'+
+      '<td>'+(a.hasData?won(a.revenue)+(a.revAuto?' <span class="muted" style="font-size:10px">균등</span>':''):'-')+'</td>'+
+      '<td style="color:'+(a.profit>=0?'var(--good)':'var(--bad)')+'">'+(a.hasData?won(a.profit):'-')+'</td>'+
+      '<td>'+(a.margin!=null?'<span class="pill '+cls(a.margin)+'">'+a.margin.toFixed(1)+'%</span>':'-')+'</td>'+
+      '<td>'+(a.margin!=null&&pm!=null?deltaHtml(a.margin-pm):'–')+'</td>'+
+      '<td>'+dh+'</td></tr>';
+  }).join('');
+  body.querySelectorAll('[data-mo]').forEach(td=>td.onclick=()=>{curYm=td.dataset.mo;initMoDraft();renderMonthly();});
+}
+document.getElementById('btnMoAddRow').onclick=()=>{
+  if(!moDraft)return;
+  moDraft.assigns.push({staffId:0,mm:1});renderMoEditor();
+};
+document.getElementById('btnCopyPrev').onclick=()=>{
+  const p=curProject();if(!p||!curYm||!moDraft)return;
+  const months=projectMonths(p);const idx=months.indexOf(curYm);
+  if(idx<=0)return alert('복사할 전월이 없습니다.');
+  const prevYm=months[idx-1];
+  const prev=allAssigns.filter(a=>a.projectId===p.id&&a.ym===prevYm);
+  if(!prev.length)return alert(ymLabel(prevYm)+'에 저장된 투입이 없습니다.');
+  moDraft.assigns=prev.map(a=>({staffId:a.staffId,mm:a.mm}));
+  refreshMoLive();
+};
+document.getElementById('btnMoAddYm').onclick=()=>{
+  const ym=document.getElementById('moAddYm').value;
+  const p=curProject();if(!p)return alert('프로젝트를 먼저 선택하세요.');
+  if(!/^\d{4}-\d{2}$/.test(ym))return alert('추가할 월을 선택하세요.');
+  curYm=ym;initMoDraft();renderMonthly();
+};
+document.getElementById('btnMoSave').onclick=async()=>{
+  const p=curProject();if(!p||!curYm||!moDraft)return;
+  const s=document.getElementById('moStatus');const btn=document.getElementById('btnMoSave');
+  const assigns=moDraft.assigns.filter(a=>a.staffId&&a.mm>0);
+  btn.disabled=true;s.className='status';s.textContent='저장 중…';
+  try{
+    await api('/projects/'+p.id+'/assignments/'+curYm,{method:'PUT',body:JSON.stringify(assigns)});
+    await api('/projects/'+p.id+'/records/'+curYm,{method:'PUT',body:JSON.stringify({
+      revenue:moDraft.rec.revenue,costLabor:0,costOut:moDraft.rec.costOut,costEtc:moDraft.rec.costEtc,note:moDraft.rec.note||null})});
+    await refreshAll(false);
+    initMoDraft();renderMonthly();
+    s.textContent='✓ '+ymLabel(curYm)+' 투입·실적이 저장되었습니다.';setTimeout(()=>s.textContent='',2500);
+  }catch(err){s.className='status err';s.textContent='✗ 저장 실패: '+err.message;}
+  finally{btn.disabled=false;}
+};
+document.getElementById('btnMoExport').onclick=()=>{
+  const p=curProject();if(!p)return;
+  const d=moSeriesData();const pm=planMarginOf(p);
+  const rows=[['월','인원','MM','인건비','외주비','부대비','매출','수익','수익률(%)','견적수익률(%)','견적대비(%p)']];
+  d.months.forEach((ym,i)=>{
+    const a=d.acts[i];if(!a.hasData)return;
+    rows.push([ym,a.heads,a.mm.toFixed(2),Math.round(a.labor),a.rec.costOut,a.rec.costEtc,Math.round(a.revenue),Math.round(a.profit),
+      a.margin!=null?a.margin.toFixed(2):'',pm!=null?pm.toFixed(2):'',(a.margin!=null&&pm!=null)?(a.margin-pm).toFixed(2):'']);
+  });
+  const csv='﻿'+rows.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download='H9_월별수익률_'+p.name+'.csv';a.click();
+};
+
+// ── 프로젝트 · 견적 기준 ──────────────────────────────
+function pjFormData(){
+  return {
+    name:document.getElementById('pjName').value.trim(),
+    client:document.getElementById('pjClient').value.trim(),
+    status:document.getElementById('pjStatus').value,
+    budget:parseNum(document.getElementById('pjBudget').value),
+    startYm:document.getElementById('pjStart').value||null,
+    endYm:document.getElementById('pjEnd').value||null,
+    memo:document.getElementById('pjMemo').value.trim(),
+  };
+}
+function pjFormReset(){
+  editPjId=null;
+  document.getElementById('pjFormTitle').textContent='새 프로젝트 등록';
+  document.getElementById('btnCancelEdit').classList.add('hidden');
+  ['pjName','pjClient','pjMemo'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('pjStatus').value='진행중';
+  document.getElementById('pjBudget').value='0';
+  document.getElementById('pjStart').value='';document.getElementById('pjEnd').value='';
+}
+document.getElementById('btnSavePj').onclick=async()=>{
+  const d=pjFormData();const s=document.getElementById('pjStatusMsg');
+  if(!d.name){s.className='status err';s.textContent='✗ 프로젝트명을 입력하세요.';return;}
+  if(d.startYm&&d.endYm&&d.startYm>d.endYm){s.className='status err';s.textContent='✗ 종료월이 시작월보다 빠릅니다.';return;}
+  const btn=document.getElementById('btnSavePj');btn.disabled=true;
+  s.className='status';s.textContent='저장 중…';
+  try{
+    if(editPjId){
+      const old=projects.find(p=>p.id===editPjId)||{};
+      await api('/projects/'+editPjId,{method:'PUT',body:JSON.stringify({...old,...d})});
+    }else{
+      const created=await api('/projects',{method:'POST',body:JSON.stringify(d)});
+      curPjId=created.id;planPjId=created.id;
+    }
+    pjFormReset();await refreshAll();
+    s.textContent='✓ 저장되었습니다.';setTimeout(()=>s.textContent='',2500);
+  }catch(err){s.className='status err';s.textContent='✗ 저장 실패: '+err.message;}
+  finally{btn.disabled=false;}
+};
+document.getElementById('btnCancelEdit').onclick=pjFormReset;
+
+function planProject(){return projects.find(p=>p.id===planPjId)||null;}
+function initPlanDraft(){
+  const p=planProject();if(!p){planDraft=null;return;}
+  const rows=allPlans.filter(r=>r.projectId===p.id).map(r=>({role:r.role,grade:r.grade,mm:r.mm,rate:r.rate}));
+  planDraft={rows,out:p.planCostOut,etc:p.planCostEtc};
+}
+function renderPlan(){
+  const sel=document.getElementById('planProject');
+  sel.innerHTML=projects.map(p=>'<option value="'+p.id+'" '+(p.id===planPjId?'selected':'')+'>'+p.name+'</option>').join('');
+  sel.onchange=()=>{planPjId=+sel.value;initPlanDraft();renderPlan();};
+  const p=planProject();
+  const body=document.getElementById('planBody');
+  document.getElementById('planPjName').textContent=p?p.name:'';
+  if(!p){body.innerHTML='<tr><td colspan="6" class="empty">프로젝트를 먼저 등록하세요.</td></tr>';
+    document.getElementById('planCards').innerHTML='';document.getElementById('planFoot').innerHTML='';return;}
+  if(!planDraft)initPlanDraft();
+  const roles=Object.keys(rates);
+  if(!planDraft.rows.length){
+    body.innerHTML='<tr><td colspan="6" class="empty">[+ 직군 행 추가]로 견적 기준 투입계획을 구성하세요.</td></tr>';
+  }else{
+    body.innerHTML=planDraft.rows.map((r,i)=>
+      '<tr><td><select data-i="'+i+'" data-f="role">'+roles.map(x=>'<option '+(x===r.role?'selected':'')+'>'+x+'</option>').join('')+'</select></td>'+
+      '<td><select data-i="'+i+'" data-f="grade">'+GRADES.map((g,gi)=>'<option value="'+gi+'" '+(gi===r.grade?'selected':'')+'>'+g+'</option>').join('')+'</select></td>'+
+      '<td><input class="num" data-i="'+i+'" data-f="rate" value="'+r.rate+'" inputmode="numeric"></td>'+
+      '<td><input class="num" data-i="'+i+'" data-f="mm" value="'+r.mm+'" inputmode="decimal"></td>'+
+      '<td class="right">'+won(r.rate*r.mm)+'</td>'+
+      '<td><span class="del-x" data-del="'+i+'">×</span></td></tr>').join('');
+  }
+  document.getElementById('planOut').value=planDraft.out||0;
+  document.getElementById('planEtc').value=planDraft.etc||0;
+  let labor=0,mm=0;planDraft.rows.forEach(r=>{labor+=r.rate*r.mm;mm+=r.mm;});
+  const cost=labor+(planDraft.out||0)+(planDraft.etc||0);
+  const margin=p.budget>0?(p.budget-cost)/p.budget*100:null;
+  document.getElementById('planFoot').innerHTML='<td>계획 합계</td><td></td><td></td><td class="right">'+mm.toFixed(2)+'</td><td class="right">'+won(labor)+'</td><td></td>';
+  document.getElementById('planCards').innerHTML=
+    '<div class="card"><div class="lbl">계약액 (VAT 제외)</div><div class="val">'+won(p.budget)+'</div><div class="foot">'+ymLabel(p.startYm)+' ~ '+ymLabel(p.endYm)+'</div></div>'+
+    '<div class="card"><div class="lbl">견적 투입원가</div><div class="val">'+won(cost)+'</div><div class="foot">인건 '+won(labor)+' + 외주·부대 '+won((planDraft.out||0)+(planDraft.etc||0))+'</div></div>'+
+    '<div class="card"><div class="lbl">견적 순익</div><div class="val '+(p.budget-cost>=0?'good':'bad')+'">'+won(p.budget-cost)+'</div><div class="foot">총 '+mm.toFixed(2)+' MM</div></div>'+
+    '<div class="card hl"><div class="lbl">견적 기준 수익률</div><div class="val '+(margin!=null?cls(margin):'')+'">'+(margin!=null?margin.toFixed(1)+'%':'-')+'</div><div class="foot">저장 시 이 값이 비교 기준으로 고정됩니다</div></div>';
+  body.querySelectorAll('select[data-f="role"]').forEach(el=>el.onchange=e=>{
+    const i=+e.target.dataset.i;const r=planDraft.rows[i];
+    r.role=e.target.value;r.rate=rateOf(r.role,r.grade);renderPlan();
+  });
+  body.querySelectorAll('select[data-f="grade"]').forEach(el=>el.onchange=e=>{
+    const i=+e.target.dataset.i;const r=planDraft.rows[i];
+    r.grade=+e.target.value;r.rate=rateOf(r.role,r.grade);renderPlan();
+  });
+  body.querySelectorAll('input[data-f]').forEach(el=>el.onchange=e=>{
+    const i=+e.target.dataset.i;planDraft.rows[i][e.target.dataset.f]=parseNum(e.target.value);renderPlan();
+  });
+  body.querySelectorAll('[data-del]').forEach(x=>x.onclick=e=>{planDraft.rows.splice(+e.target.dataset.del,1);renderPlan();});
+}
+document.getElementById('planOut').onchange=e=>{if(planDraft){planDraft.out=parseNum(e.target.value);renderPlan();}};
+document.getElementById('planEtc').onchange=e=>{if(planDraft){planDraft.etc=parseNum(e.target.value);renderPlan();}};
+document.getElementById('btnPlanAddRow').onclick=()=>{
+  if(!planDraft)return;
+  const role=Object.keys(rates)[0]||'';
+  planDraft.rows.push({role,grade:1,mm:1,rate:rateOf(role,1)});renderPlan();
+};
+document.getElementById('btnSavePlan').onclick=async()=>{
+  const p=planProject();if(!p||!planDraft)return;
+  const s=document.getElementById('planStatus');const btn=document.getElementById('btnSavePlan');
+  btn.disabled=true;s.className='status';s.textContent='저장 중…';
+  try{
+    await api('/projects/'+p.id+'/plan',{method:'PUT',body:JSON.stringify(planDraft.rows.filter(r=>r.mm>0))});
+    await api('/projects/'+p.id,{method:'PUT',body:JSON.stringify({...p,planCostOut:planDraft.out,planCostEtc:planDraft.etc})});
+    await refreshAll(false);
+    initPlanDraft();renderPlan();renderDash();
+    s.textContent='✓ 견적 기준이 저장(확정)되었습니다.';setTimeout(()=>s.textContent='',2500);
+  }catch(err){s.className='status err';s.textContent='✗ 저장 실패: '+err.message;}
+  finally{btn.disabled=false;}
+};
+function renderPjList(){
+  document.getElementById('pjListCount').textContent=projects.length+'건';
+  const list=document.getElementById('pjList');
+  if(!projects.length){list.innerHTML='<div class="empty">등록된 프로젝트가 없습니다.</div>';return;}
+  list.innerHTML=projects.slice().reverse().map(p=>{
+    const pm=planMarginOf(p);
+    return '<div class="pj-item"><div><div style="font-weight:700">'+p.name+' <span class="pill '+(p.status==='진행중'?'good':p.status==='완료'?'flat':'warn')+'">'+p.status+'</span>'+
+      (pm!=null?' <span class="pill '+cls(pm)+'">견적 '+pm.toFixed(1)+'%</span>':' <span class="pill flat">견적 미확정</span>')+'</div>'+
+      '<div class="meta">'+(p.client||'-')+' · 계약 '+won(p.budget)+'원 · '+ymLabel(p.startYm)+'~'+ymLabel(p.endYm)+(p.memo?' · '+p.memo:'')+'</div></div>'+
+      '<div class="actions"><button class="ghost sm" data-plan="'+p.id+'">견적 기준</button>'+
+      '<button class="ghost sm" data-rec="'+p.id+'">월별 투입</button>'+
+      '<button class="ghost sm" data-edit="'+p.id+'">수정</button>'+
+      '<button class="danger sm" data-del="'+p.id+'">삭제</button></div></div>';
+  }).join('');
+  list.querySelectorAll('[data-plan]').forEach(b=>b.onclick=e=>{planPjId=+e.target.dataset.plan;initPlanDraft();renderPlan();window.scrollTo({top:0,behavior:'smooth'});});
+  list.querySelectorAll('[data-rec]').forEach(b=>b.onclick=e=>{curPjId=+e.target.dataset.rec;curYm=null;moDraft=null;switchTab('monthly');renderMonthly();});
+  list.querySelectorAll('[data-edit]').forEach(b=>b.onclick=e=>{
+    const p=projects.find(x=>x.id==e.target.dataset.edit);if(!p)return;
+    editPjId=p.id;
+    document.getElementById('pjFormTitle').textContent='프로젝트 수정 — '+p.name;
+    document.getElementById('btnCancelEdit').classList.remove('hidden');
+    document.getElementById('pjName').value=p.name;document.getElementById('pjClient').value=p.client||'';
+    document.getElementById('pjStatus').value=p.status;document.getElementById('pjBudget').value=p.budget;
+    document.getElementById('pjStart').value=p.startYm||'';document.getElementById('pjEnd').value=p.endYm||'';
+    document.getElementById('pjMemo').value=p.memo||'';
+    window.scrollTo({top:0,behavior:'smooth'});
+  });
+  list.querySelectorAll('[data-del]').forEach(b=>b.onclick=async e=>{
+    const p=projects.find(x=>x.id==e.target.dataset.del);if(!p)return;
+    if(!confirm('"'+p.name+'" 프로젝트와 모든 투입·실적을 삭제할까요? 되돌릴 수 없습니다.'))return;
+    try{
+      await api('/projects/'+p.id,{method:'DELETE'});
+      if(curPjId===p.id){curPjId=null;moDraft=null;}
+      if(planPjId===p.id){planPjId=null;planDraft=null;}
+      await refreshAll();
+    }catch(err){alert('삭제 실패: '+err.message);}
+  });
+}
+
+// ── 인력 · 단가 ───────────────────────────────────────
+function renderStaff(){
+  document.getElementById('staffCount').textContent=staff.length+'명';
+  const roles=Object.keys(rates);
+  const body=document.getElementById('staffBody');
+  if(!staff.length){body.innerHTML='<tr><td colspan="7" class="empty">인력이 없습니다. 아래에서 추가하거나 구글시트에서 붙여넣기로 일괄 등록하세요.</td></tr>';}
+  else{
+    body.innerHTML=staff.map(s=>
+      '<tr'+(s.active?'':' style="opacity:.5"')+'><td><input data-id="'+s.id+'" data-f="name" value="'+s.name.replace(/"/g,'&quot;')+'"></td>'+
+      '<td><select data-id="'+s.id+'" data-f="role">'+roles.map(r=>'<option '+(r===s.role?'selected':'')+'>'+r+'</option>').join('')+(roles.includes(s.role)?'':'<option selected>'+s.role+'</option>')+'</select></td>'+
+      '<td><select data-id="'+s.id+'" data-f="grade">'+GRADES.map((g,i)=>'<option value="'+i+'" '+(i===s.grade?'selected':'')+'>'+g+'</option>').join('')+'</select></td>'+
+      '<td class="right">'+won(rateOf(s.role,s.grade))+'</td>'+
+      '<td style="text-align:center"><input type="checkbox" style="width:auto" data-id="'+s.id+'" data-f="active" '+(s.active?'checked':'')+'></td>'+
+      '<td><input data-id="'+s.id+'" data-f="memo" value="'+String(s.memo||'').replace(/"/g,'&quot;')+'"></td>'+
+      '<td><span class="del-x" data-del="'+s.id+'">×</span></td></tr>').join('');
+  }
+  body.querySelectorAll('[data-f]').forEach(el=>el.onchange=async e=>{
+    const id=+e.target.dataset.id,f=e.target.dataset.f;
+    const s=staff.find(x=>x.id===id);if(!s)return;
+    if(f==='grade')s.grade=+e.target.value;
+    else if(f==='active')s.active=e.target.checked;
+    else s[f]=e.target.value;
+    try{
+      await api('/staff/'+id,{method:'PUT',body:JSON.stringify(s)});
+      renderStaff();renderDash();
+      if(document.getElementById('tab-monthly').classList.contains('hidden')===false)renderMonthly();
+    }catch(err){alert('저장 실패: '+err.message);}
+  });
+  body.querySelectorAll('[data-del]').forEach(x=>x.onclick=async e=>{
+    const id=+e.target.dataset.del;const s=staff.find(x2=>x2.id===id);
+    if(!confirm('"'+(s?s.name:id)+'" 인력을 삭제할까요? 이 인력의 모든 월별 투입 기록도 함께 삭제됩니다.'))return;
+    try{await api('/staff/'+id,{method:'DELETE'});await refreshAll();}
+    catch(err){alert('삭제 실패: '+err.message);}
+  });
+  // 추가 폼 셀렉트
+  document.getElementById('stRole').innerHTML=roles.map(r=>'<option>'+r+'</option>').join('');
+  document.getElementById('stGrade').innerHTML=GRADES.map((g,i)=>'<option value="'+i+'" '+(i===1?'selected':'')+'>'+g+'</option>').join('');
+}
+document.getElementById('btnAddStaff').onclick=async()=>{
+  const name=document.getElementById('stName').value.trim();
+  const s=document.getElementById('staffStatus');
+  if(!name){s.className='status err';s.textContent='✗ 이름을 입력하세요.';return;}
+  try{
+    await api('/staff',{method:'POST',body:JSON.stringify({
+      name,role:document.getElementById('stRole').value,grade:+document.getElementById('stGrade').value})});
+    document.getElementById('stName').value='';
+    await refreshAll(false);renderStaff();
+    s.className='status';s.textContent='✓ 추가되었습니다.';setTimeout(()=>s.textContent='',2000);
+  }catch(err){s.className='status err';s.textContent='✗ '+err.message;}
+};
+// 일괄 등록 모달
+const bulkModal=document.getElementById('bulkModal');
+document.getElementById('btnBulkOpen').onclick=()=>{document.getElementById('bulkText').value='';document.getElementById('bulkMsg').textContent='';bulkModal.classList.add('show');};
+document.getElementById('bulkCancel').onclick=()=>bulkModal.classList.remove('show');
+bulkModal.onclick=e=>{if(e.target===bulkModal)bulkModal.classList.remove('show');};
+document.getElementById('bulkSubmit').onclick=async()=>{
+  const msg=document.getElementById('bulkMsg');msg.className='msg';
+  const lines=document.getElementById('bulkText').value.split('\n').map(l=>l.trim()).filter(Boolean);
+  const list=[];
+  for(const line of lines){
+    const parts=line.split(/\t|,/).map(x=>x.trim());
+    if(!parts[0])continue;
+    const gi=GRADES.indexOf(parts[2]);
+    list.push({name:parts[0],role:parts[1]||'',grade:gi>=0?gi:1});
+  }
+  if(!list.length){msg.classList.add('err');msg.textContent='등록할 인력이 없습니다.';return;}
+  try{
+    const r=await api('/staff/bulk',{method:'POST',body:JSON.stringify(list)});
+    msg.classList.add('ok');msg.textContent='✓ '+r.count+'명 등록되었습니다.';
+    await refreshAll(false);renderStaff();
+    setTimeout(()=>bulkModal.classList.remove('show'),1000);
+  }catch(err){msg.classList.add('err');msg.textContent='✗ '+err.message;}
+};
+// 단가표
+function renderRates(){
+  const body=document.getElementById('rateBody');
+  body.innerHTML=Object.keys(rates).map(role=>
+    '<tr><td>'+role+'</td>'+
+    rates[role].map((v,gi)=>'<td><input class="num" data-role="'+role+'" data-g="'+gi+'" value="'+v+'" inputmode="numeric"></td>').join('')+
+    '<td><span class="del-x" data-delrole="'+role+'">×</span></td></tr>').join('');
+  body.querySelectorAll('input.num').forEach(inp=>inp.oninput=e=>{rates[e.target.dataset.role][+e.target.dataset.g]=parseNum(e.target.value);});
+  body.querySelectorAll('[data-delrole]').forEach(x=>x.onclick=e=>{if(Object.keys(rates).length<=1)return;delete rates[e.target.dataset.delrole];renderRates();});
+}
+document.getElementById('btnAddRole').onclick=()=>{const n=document.getElementById('newRole').value.trim();if(!n||rates[n])return;rates[n]=[0,0,0,0];document.getElementById('newRole').value='';renderRates();};
+document.getElementById('btnSaveRates').onclick=async()=>{
+  const s=document.getElementById('rateStatus');s.className='status';s.textContent='저장 중…';
+  try{await api('/rates',{method:'PUT',body:JSON.stringify(rates)});
+    s.textContent='✓ 단가표가 저장되었습니다.';setTimeout(()=>s.textContent='',2500);
+    renderStaff();renderDash();}
+  catch(err){s.className='status err';s.textContent='✗ 저장 실패: '+err.message;}
+};
+
+// ── 탭/공통 ───────────────────────────────────────────
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
+  ['dash','monthly','plan','staff'].forEach(n=>document.getElementById('tab-'+n).classList.toggle('hidden',n!==name));
+}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  switchTab(t.dataset.tab);
+  if(t.dataset.tab==='monthly'){if(curPjId==null&&projects.length)curPjId=projects[0].id;moDraft=null;renderMonthly();}
+  if(t.dataset.tab==='plan'){if(planPjId==null&&projects.length)planPjId=projects[0].id;planDraft=null;renderPlan();}
+});
+
+async function refreshAll(rerender=true){
+  [projects,staff,rates,allPlans,allAssigns,allRecords]=await Promise.all([
+    api('/projects'),api('/staff'),api('/rates'),api('/plans'),api('/assignments'),api('/records')]);
+  if(curPjId==null&&projects.length)curPjId=projects[0].id;
+  if(planPjId==null&&projects.length)planPjId=projects[0].id;
+  renderDash();renderPjList();renderStaff();renderRates();
+  if(rerender){
+    moDraft=null;planDraft=null;
+    renderMonthly();renderPlan();
+  }
+}
+
+document.getElementById('btnLogout').onclick=async()=>{
+  try{await fetch('/logout',{method:'POST'});}catch(e){}
+  location.href='/login.html';
+};
+
+// 비밀번호 변경 모달
+const pwModal=document.getElementById('pwModal'),pwMsg=document.getElementById('pwMsg');
+function openPwModal(){['pwCur','pwNew','pwNew2'].forEach(id=>document.getElementById(id).value='');pwMsg.textContent='';pwMsg.className='msg';pwModal.classList.add('show');document.getElementById('pwCur').focus();}
+function closePwModal(){pwModal.classList.remove('show');}
+document.getElementById('btnChangePw').onclick=openPwModal;
+document.getElementById('pwCancel').onclick=closePwModal;
+pwModal.onclick=e=>{if(e.target===pwModal)closePwModal();};
+document.getElementById('pwForm').onsubmit=async(e)=>{
+  e.preventDefault();
+  const cur=document.getElementById('pwCur').value,nw=document.getElementById('pwNew').value,nw2=document.getElementById('pwNew2').value;
+  pwMsg.className='msg';
+  if(nw.length<4){pwMsg.classList.add('err');pwMsg.textContent='새 비밀번호는 4자 이상이어야 합니다.';return;}
+  if(nw!==nw2){pwMsg.classList.add('err');pwMsg.textContent='새 비밀번호가 서로 일치하지 않습니다.';return;}
+  const btn=document.getElementById('pwSubmit');btn.disabled=true;pwMsg.textContent='변경 중…';
+  try{
+    await api('/change-password',{method:'POST',body:JSON.stringify({current:cur,next:nw})});
+    pwMsg.classList.add('ok');pwMsg.textContent='✓ 비밀번호가 변경되었습니다.';
+    setTimeout(closePwModal,1200);
+  }catch(err){pwMsg.classList.add('err');pwMsg.textContent='✗ '+err.message;}
+  finally{btn.disabled=false;}
+};
+
+// ── 초기화 ────────────────────────────────────────────
+(async function(){
+  try{
+    const me=await fetch('/api/me').then(r=>r.json()).catch(()=>({}));
+    if(me.authEnabled){document.getElementById('btnLogout').style.display='inline-block';document.getElementById('btnChangePw').style.display='inline-block';}
+  }catch(e){}
+  try{
+    await refreshAll();
+    setConn(true,'DB 연결됨');
+  }catch(err){
+    setConn(false,'DB 연결 실패 — '+err.message);
+    document.getElementById('dashBody').innerHTML='<tr><td colspan="10" class="empty">DB에 연결할 수 없습니다. 서버 설정(.env)과 npm run setup 실행 여부를 확인하세요.</td></tr>';
+    console.error(err);
+  }
+})();
+</script>
+</body>
+</html>

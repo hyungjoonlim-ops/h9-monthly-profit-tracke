@@ -218,23 +218,56 @@ app.post('/api/staff', async (req, res) => {
 });
 
 // 일괄 등록 (구글시트 붙여넣기): [{dept1, dept2, name, position, gradeSw, gradeSds, gradeLg}]
+// 명부를 통째로 대체한다: 같은 이름은 업데이트, 새 이름은 추가,
+// 목록에 없는 기존 인력은 삭제(월별 투입 기록이 있으면 기록 보존을 위해 재직 해제만).
 app.post('/api/staff/bulk', async (req, res) => {
   const list = Array.isArray(req.body) ? req.body : [];
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    let n = 0;
+    const existing = await client.query('SELECT id, name FROM mt_staff');
+    const byName = new Map(existing.rows.map((r) => [r.name.trim(), Number(r.id)]));
+    const keptIds = new Set();
+    let added = 0, changed = 0;
     for (const s of list) {
       if (!s.name || !String(s.name).trim()) continue;
-      await client.query(
-        `INSERT INTO mt_staff (name, dept1, dept2, job_title, grade_sw, grade_sds, grade_lg, active, memo)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,true,$8)`,
-        [...staffParams(s), s.memo || null]
-      );
-      n++;
+      const name = String(s.name).trim();
+      const found = byName.get(name);
+      if (found && !keptIds.has(found)) {
+        const [, dept1, dept2, jobTitle, gSw, gSds, gLg] = staffParams(s);
+        await client.query(
+          `UPDATE mt_staff SET dept1=$1, dept2=$2, job_title=$3,
+                  grade_sw=$4, grade_sds=$5, grade_lg=$6, active=true WHERE id=$7`,
+          [dept1, dept2, jobTitle, gSw, gSds, gLg, found]
+        );
+        keptIds.add(found);
+        changed++;
+      } else {
+        const ins = await client.query(
+          `INSERT INTO mt_staff (name, dept1, dept2, job_title, grade_sw, grade_sds, grade_lg, active, memo)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,true,$8) RETURNING id`,
+          [...staffParams(s), s.memo || null]
+        );
+        keptIds.add(Number(ins.rows[0].id));
+        added++;
+      }
+    }
+    // 목록에 없는 기존 인력 정리
+    let removed = 0, deactivated = 0;
+    for (const r of existing.rows) {
+      const id = Number(r.id);
+      if (keptIds.has(id)) continue;
+      const used = await client.query('SELECT 1 FROM mt_assignments WHERE staff_id=$1 LIMIT 1', [id]);
+      if (used.rows.length) {
+        await client.query('UPDATE mt_staff SET active=false WHERE id=$1', [id]);
+        deactivated++;
+      } else {
+        await client.query('DELETE FROM mt_staff WHERE id=$1', [id]);
+        removed++;
+      }
     }
     await client.query('COMMIT');
-    res.json({ ok: true, count: n });
+    res.json({ ok: true, count: added + changed, added, changed, removed, deactivated });
   } catch (e) {
     await client.query('ROLLBACK');
     res.status(500).json({ error: e.message });

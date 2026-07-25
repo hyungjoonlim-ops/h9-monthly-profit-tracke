@@ -118,6 +118,7 @@
 <div class="tabs">
   <div class="tab active" data-tab="dash">대시보드</div>
   <div class="tab" data-tab="monthly">월별 투입 · 수익률</div>
+  <div class="tab" data-tab="analysis">계약 대비 변동 분석</div>
   <div class="tab" data-tab="plan">프로젝트 · 견적 기준</div>
   <div class="tab" data-tab="staff">인력 · 단가</div>
 </div>
@@ -220,6 +221,62 @@
       <tbody id="moSummary"></tbody>
     </table>
     </div>
+  </div>
+</section>
+
+<!-- ══════════ 계약 대비 변동 분석 ══════════ -->
+<section id="tab-analysis" class="hidden">
+  <div class="panel">
+    <div class="toolbar">
+      <h2>계약 기준 vs 실제 투입 변동 분석 <span class="tag" id="anPjName"></span></h2>
+      <div class="field" style="min-width:280px"><select id="anProject"></select></div>
+    </div>
+    <div class="cards" id="anCards"></div>
+  </div>
+
+  <div class="panel">
+    <h2>파트별 투입 MM 변동 <span class="tag">계약 기준 대비</span></h2>
+    <div class="tablewrap">
+    <table>
+      <thead><tr>
+        <th style="min-width:140px">파트 (직군)</th><th>계약 MM</th><th>실투입 누적 MM</th><th>차이</th>
+        <th>계획 인건비</th><th>실제 인건비</th><th>인건비 차이</th>
+      </tr></thead>
+      <tbody id="anPartBody"></tbody>
+      <tfoot><tr style="font-weight:700" id="anPartFoot"></tr></tfoot>
+    </table>
+    </div>
+    <div class="hint">실투입 파트는 투입 인력의 부서(팀)를 계약 파트와 이름으로 매칭합니다. 매칭되지 않는 팀은 "기타"로 묶입니다.</div>
+  </div>
+
+  <div class="panel">
+    <h2>실제 투입 인력 상세 <span class="tag">이름 · 등급 · 누적 MM</span></h2>
+    <div class="tablewrap">
+    <table>
+      <thead><tr>
+        <th style="min-width:110px">인력명</th><th>팀 / 부서</th><th>직급</th><th>적용 등급</th>
+        <th>단가/MM</th><th>누적 MM</th><th>누적 인건비</th><th style="min-width:130px">투입 월</th>
+      </tr></thead>
+      <tbody id="anStaffBody"></tbody>
+    </table>
+    </div>
+    <div class="hint">등급·단가는 이 프로젝트의 단가 기준(SW/SDS/LG)에 해당하는 현재 값입니다. 인력 탭에서 등급을 바꾸면 즉시 반영됩니다.</div>
+  </div>
+
+  <div class="panel">
+    <h2>월별 인력 변동 체크 <span class="tag">전월 대비 자동 감지</span></h2>
+    <div id="anMoves"></div>
+  </div>
+
+  <div class="panel">
+    <h2>월별 투입 MM: 실제 vs 계약 균등 계획</h2>
+    <div class="chartwrap" id="anChart"><div class="empty">데이터가 없습니다.</div></div>
+    <div class="legend" id="anLegend"></div>
+  </div>
+
+  <div class="panel">
+    <h2>수익률 변동 원인 분석 <span class="tag">자동 분석</span></h2>
+    <div id="anCause"></div>
   </div>
 </section>
 
@@ -535,6 +592,7 @@ function lineChart(el,labels,series,opts={}){
   if(!labels.length||!series.some(s=>s.data.some(v=>v!=null))){
     box.innerHTML='<div class="empty">'+(opts.emptyMsg||'표시할 데이터가 없습니다.')+'</div>';return;
   }
+  const unit=opts.unit!=null?opts.unit:'%';
   const W=Math.max(560,labels.length*64),H=260,L=52,R=16,T=16,B=40;
   const vals=[];series.forEach(s=>s.data.forEach(v=>{if(v!=null)vals.push(v);}));
   let lo=Math.min(0,...vals),hi=Math.max(10,...vals);
@@ -546,7 +604,7 @@ function lineChart(el,labels,series,opts={}){
   for(let i=0;i<=4;i++){
     const v=lo+step*i,y=Y(v);
     g+='<line x1="'+L+'" y1="'+y+'" x2="'+(W-R)+'" y2="'+y+'" stroke="#3a4d63" stroke-width="1" stroke-dasharray="3,4"/>';
-    g+='<text x="'+(L-8)+'" y="'+(y+4)+'" text-anchor="end" font-size="11" fill="#9db0c6">'+v.toFixed(0)+'%</text>';
+    g+='<text x="'+(L-8)+'" y="'+(y+4)+'" text-anchor="end" font-size="11" fill="#9db0c6">'+v.toFixed(0)+unit+'</text>';
   }
   if(lo<0&&hi>0){const y=Y(0);g+='<line x1="'+L+'" y1="'+y+'" x2="'+(W-R)+'" y2="'+y+'" stroke="#9db0c6" stroke-width="1"/>';}
   const skip=Math.ceil(labels.length/12);
@@ -563,7 +621,7 @@ function lineChart(el,labels,series,opts={}){
     g+='<path d="'+path+'" fill="none" stroke="'+s.color+'" stroke-width="2.5" '+(s.dash?'stroke-dasharray="6,5"':'')+' stroke-linejoin="round" stroke-linecap="round"/>';
     if(!s.noDots)s.data.forEach((v,i)=>{
       if(v==null)return;
-      g+='<circle cx="'+X(i)+'" cy="'+Y(v)+'" r="3.5" fill="'+s.color+'"><title>'+ymLabel(labels[i])+' · '+s.name+' '+v.toFixed(1)+'%</title></circle>';
+      g+='<circle cx="'+X(i)+'" cy="'+Y(v)+'" r="3.5" fill="'+s.color+'"><title>'+ymLabel(labels[i])+' · '+s.name+' '+v.toFixed(1)+unit+'</title></circle>';
     });
   });
   box.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="max-height:300px">'+g+'</svg>';
@@ -1196,6 +1254,165 @@ function renderPjList(){
   });
 }
 
+// ── 계약 대비 변동 분석 ───────────────────────────────
+let anPjId=null;
+const anProjectOf=()=>projects.find(p=>p.id===anPjId)||null;
+const mmDelta=d=>Math.abs(d)<0.005?'<span class="delta flat">±0</span>':
+  (d>0?'<span class="delta" style="color:var(--bad)">▲ +'+d.toFixed(2)+' MM</span>'
+      :'<span class="delta" style="color:var(--good)">▼ '+d.toFixed(2)+' MM</span>');
+function renderAnalysis(){
+  const sel=document.getElementById('anProject');
+  sel.innerHTML=projects.map(p=>'<option value="'+p.id+'" '+(p.id===anPjId?'selected':'')+'>'+p.name+'</option>').join('');
+  sel.onchange=()=>{anPjId=+sel.value;renderAnalysis();};
+  const p=anProjectOf();
+  document.getElementById('anPjName').textContent=p?p.name:'';
+  const cards=document.getElementById('anCards'),body=document.getElementById('anPartBody'),
+        foot=document.getElementById('anPartFoot'),cause=document.getElementById('anCause');
+  if(!p){cards.innerHTML='';body.innerHTML='<tr><td colspan="7" class="empty">프로젝트를 먼저 등록하세요.</td></tr>';
+    foot.innerHTML='';cause.innerHTML='';
+    document.getElementById('anStaffBody').innerHTML='';document.getElementById('anMoves').innerHTML='';
+    lineChart('anChart',[],[]);legendHtml('anLegend',[]);return;}
+
+  // 계약(견적) 기준 vs 실제 누적
+  const planRows=allPlans.filter(r=>r.projectId===p.id);
+  let planMM=0,planLabor=0;planRows.forEach(r=>{planMM+=r.mm;planLabor+=r.mm*r.rate;});
+  const pm=planMarginOf(p);
+  const s=projectSeries(p);
+  let actMM=0,actLabor=0,actOut=0,actEtc=0,activeMonths=0;
+  s.acts.forEach(a=>{if(a.hasData){actMM+=a.mm;actLabor+=a.labor;actOut+=a.rec.costOut||0;actEtc+=a.rec.costEtc||0;activeMonths++;}});
+  const cum=s.cumRev>0?(s.cumRev-s.cumCost)/s.cumRev*100:null;
+  const range=ymRange(p.startYm,p.endYm);
+  const totalMonths=range.length||activeMonths||1;
+  const ratio=Math.min(1,activeMonths/totalMonths);
+  const d=(pm!=null&&cum!=null)?cum-pm:null;
+
+  cards.innerHTML=
+    '<div class="card"><div class="lbl">계약 기준 투입</div><div class="val">'+planMM.toFixed(2)+' MM</div><div class="foot">계획 인건비 '+won(planLabor)+'</div></div>'+
+    '<div class="card"><div class="lbl">실투입 누적</div><div class="val">'+actMM.toFixed(2)+' MM</div><div class="foot">'+mmDelta(actMM-planMM)+' · 실제 인건비 '+won(actLabor)+'</div></div>'+
+    '<div class="card"><div class="lbl">견적 기준 수익률 (고정)</div><div class="val '+(pm!=null?cls(pm):'')+'">'+(pm!=null?pm.toFixed(1)+'%':'-')+'</div><div class="foot">계약액 '+won(p.budget)+'</div></div>'+
+    '<div class="card hl"><div class="lbl">현재 누적 수익률</div><div class="val '+(cum!=null?cls(cum):'')+'">'+(cum!=null?cum.toFixed(1)+'%':'-')+'</div><div class="foot">견적 대비 '+(d!=null?deltaHtml(d):'–')+'</div></div>';
+
+  // 파트별 비교 (실투입은 인력의 팀/부서를 계약 파트와 매칭)
+  const norm=t=>String(t||'').replace(/\s|\(.*?\)/g,'').toLowerCase();
+  const planBy=new Map();
+  planRows.forEach(r=>{const o=planBy.get(r.role)||{mm:0,labor:0};o.mm+=r.mm;o.labor+=r.mm*r.rate;planBy.set(r.role,o);});
+  const actBy=new Map();
+  allAssigns.filter(a=>a.projectId===p.id).forEach(a=>{
+    const st=staffById(a.staffId);
+    const team=st?(st.dept2||st.dept1||'기타'):'기타';
+    let key=[...planBy.keys()].find(k=>{const nk=norm(k),nt=norm(team);return nk===nt||nk.includes(nt)||nt.includes(nk);})||team||'기타';
+    const rate=st?staffRate(st.id,p.rateStd||'SW'):0;
+    const o=actBy.get(key)||{mm:0,labor:0};o.mm+=a.mm;o.labor+=a.mm*rate;actBy.set(key,o);
+  });
+  const keys=[...new Set([...planBy.keys(),...actBy.keys()])];
+  const partDiffs=[];
+  body.innerHTML=keys.length?keys.map(k=>{
+    const pl=planBy.get(k)||{mm:0,labor:0},ac=actBy.get(k)||{mm:0,labor:0};
+    const dm=ac.mm-pl.mm,dl=ac.labor-pl.labor;
+    if(Math.abs(dm)>=0.01)partDiffs.push({k,dm});
+    return '<tr><td style="font-weight:700">'+k+'</td><td class="right">'+pl.mm.toFixed(2)+'</td><td class="right">'+ac.mm.toFixed(2)+'</td>'+
+      '<td>'+mmDelta(dm)+'</td>'+
+      '<td class="right">'+won(pl.labor)+'</td><td class="right">'+won(ac.labor)+'</td>'+
+      '<td class="right" style="color:'+(dl>0?'var(--bad)':dl<0?'var(--good)':'inherit')+'">'+(dl>0?'+':'')+won(dl)+'</td></tr>';
+  }).join(''):'<tr><td colspan="7" class="empty">계약 기준 투입계획과 월별 실투입을 먼저 입력/가져오기 하세요.</td></tr>';
+  foot.innerHTML=keys.length?'<td>합계</td><td class="right">'+planMM.toFixed(2)+'</td><td class="right">'+actMM.toFixed(2)+'</td><td>'+mmDelta(actMM-planMM)+'</td>'+
+    '<td class="right">'+won(planLabor)+'</td><td class="right">'+won(actLabor)+'</td>'+
+    '<td class="right" style="color:'+(actLabor-planLabor>0?'var(--bad)':'var(--good)')+'">'+(actLabor-planLabor>0?'+':'')+won(actLabor-planLabor)+'</td>':'';
+
+  // 실제 투입 인력 상세 (이름·등급·누적 MM)
+  const std=p.rateStd||'SW';
+  const perStaff=new Map();
+  allAssigns.filter(a=>a.projectId===p.id).forEach(a=>{
+    const o=perStaff.get(a.staffId)||{mm:0,yms:[]};
+    o.mm+=a.mm;if(a.mm>0)o.yms.push(a.ym);perStaff.set(a.staffId,o);
+  });
+  const staffBody=document.getElementById('anStaffBody');
+  staffBody.innerHTML=perStaff.size?[...perStaff.entries()].sort((a,b)=>b[1].mm-a[1].mm).map(([sid,o])=>{
+    const st=staffById(sid);
+    const g=st?gradeOf(st,std):null;
+    const rate=st?staffRate(sid,std):0;
+    const yms=o.yms.sort();
+    return '<tr><td style="font-weight:700">'+(st?st.name:'(삭제된 인력 #'+sid+')')+'</td>'+
+      '<td>'+(st?deptLabel(st)||'-':'-')+'</td><td>'+(st?st.position||'-':'-')+'</td>'+
+      '<td>'+(g!=null?'<span class="pill flat">'+std+' '+GRADES[g]+'</span>':'<span class="pill warn">'+std+' 등급없음</span>')+'</td>'+
+      '<td class="right">'+won(rate)+'</td><td class="right">'+o.mm.toFixed(2)+'</td>'+
+      '<td class="right">'+won(o.mm*rate)+'</td>'+
+      '<td>'+(yms.length?ymLabel(yms[0])+' ~ '+ymLabel(yms[yms.length-1])+' ('+yms.length+'개월)':'-')+'</td></tr>';
+  }).join(''):'<tr><td colspan="8" class="empty">월별 실투입 데이터가 없습니다.</td></tr>';
+
+  // 월별 인력 변동 체크 (전월 대비: 신규/제외/MM 변경)
+  const movesBox=document.getElementById('anMoves');
+  const dataMonths=s.months.filter((ym,i)=>s.acts[i].hasData&&s.acts[i].mm>0);
+  const byYm=ym=>{const m=new Map();allAssigns.filter(a=>a.projectId===p.id&&a.ym===ym&&a.mm>0).forEach(a=>m.set(a.staffId,a.mm));return m;};
+  const moveRows=[];
+  dataMonths.forEach((ym,i)=>{
+    const cur=byYm(ym),prev=i>0?byYm(dataMonths[i-1]):new Map();
+    const evs=[];
+    const nm=sid=>{const st=staffById(sid);return st?st.name+(gradeOf(st,std)!=null?'('+GRADES[gradeOf(st,std)]+')':''):'#'+sid;};
+    cur.forEach((mm,sid)=>{
+      if(!prev.has(sid))evs.push({c:'good',t:(i>0?'신규 투입':'투입 시작')+': '+nm(sid)+' +'+mm.toFixed(2)+'MM'});
+      else if(Math.abs(mm-prev.get(sid))>=0.005){const dd=mm-prev.get(sid);
+        evs.push({c:dd>0?'warn':'flat',t:'MM 변경: '+nm(sid)+' '+prev.get(sid).toFixed(2)+'→'+mm.toFixed(2)});}
+    });
+    if(i>0)prev.forEach((mm,sid)=>{if(!cur.has(sid))evs.push({c:'bad',t:'투입 제외: '+nm(sid)+' (-'+mm.toFixed(2)+'MM)'});});
+    if(evs.length)moveRows.push({ym,evs});
+  });
+  movesBox.innerHTML=moveRows.length?moveRows.map(r=>
+    '<div style="padding:8px 4px;border-bottom:1px solid var(--line)"><b style="margin-right:8px">'+ymLabel(r.ym)+'</b> '+
+    r.evs.map(e=>'<span class="pill '+e.c+'" style="margin:2px 6px 2px 0;display:inline-block">'+e.t+'</span>').join('')+'</div>').join('')
+    :'<div class="empty">월별 실투입이 2개월 이상 쌓이면 전월 대비 인력 변동이 자동으로 표시됩니다.</div>';
+
+  // 월별 MM 차트: 실제 vs 계약 균등
+  const evenMM=range.length&&planMM>0?planMM/range.length:null;
+  const series=[{name:'월별 실투입 MM',color:'#3ea6ff',data:s.acts.map(a=>a.hasData?a.mm:null)}];
+  if(evenMM!=null)series.push({name:'계약 균등 '+evenMM.toFixed(2)+' MM/월',color:'#f2c14e',dash:true,noDots:true,
+    data:s.months.map(ym=>range.includes(ym)?evenMM:null)});
+  lineChart('anChart',s.months,series,{unit:'',emptyMsg:'월별 투입을 입력하거나 시트에서 가져오면 표시됩니다.'});
+  legendHtml('anLegend',s.months.length?series:[]);
+
+  // 원인 자동 분석
+  const bullets=[];
+  if(d!=null){
+    bullets.push({icon:d>=0?'✅':'⚠️',bold:true,
+      t:'수익률: 견적 기준 '+pm.toFixed(1)+'% → 현재 누적 '+cum.toFixed(1)+'% ('+(d>=0?'+':'')+d.toFixed(1)+'%p '+(d>=0?'개선':'악화')+')'});
+  }
+  if(planMM>0){
+    bullets.push({icon:'📊',t:'투입 진행률: 계약 '+planMM.toFixed(2)+' MM 중 '+actMM.toFixed(2)+' MM 투입 ('+(actMM/planMM*100).toFixed(0)+'%) · 잔여 '+(planMM-actMM).toFixed(2)+' MM'
+      +(range.length?' · 기간 진행률 '+(ratio*100).toFixed(0)+'%':'')});
+    const expMM=planMM*ratio;
+    const over=actMM-expMM;
+    if(Math.abs(over)>=0.3)bullets.push({icon:over>0?'🔺':'🔻',
+      t:'기간 진행률 대비 투입이 '+(over>0?'+':'')+over.toFixed(2)+' MM '+(over>0?'초과 — 이 추세면 계약 MM을 넘어 인건비가 견적을 초과할 위험':'미달 — 인건비 절감 또는 투입 지연')});
+  }
+  if(partDiffs.length){
+    const top=partDiffs.sort((a,b)=>Math.abs(b.dm)-Math.abs(a.dm)).slice(0,4);
+    bullets.push({icon:'👥',t:'파트별 변동(계약 대비): '+top.map(x=>x.k+' '+(x.dm>0?'+':'')+x.dm.toFixed(2)+'MM').join(', ')});
+  }
+  const avgPlan=planMM>0?planLabor/planMM:0,avgAct=actMM>0?actLabor/actMM:0;
+  if(avgPlan>0&&avgAct>0&&Math.abs(avgAct-avgPlan)/avgPlan>0.02){
+    const dd=avgAct-avgPlan;
+    bullets.push({icon:dd>0?'💸':'💰',t:'평균 투입 단가: 실제 '+won(avgAct)+'/MM vs 계획 '+won(avgPlan)+'/MM ('+(dd>0?'+':'')+won(dd)+') — '
+      +(dd>0?'계획보다 높은 등급 인력 투입 비중이 커서 원가 상승 요인':'낮은 등급 중심 투입으로 원가 절감 요인')});
+  }
+  const expOut=(p.planCostOut||0)*ratio,expEtc=(p.planCostEtc||0)*ratio;
+  if(actOut||expOut){const dv=actOut-expOut;if(Math.abs(dv)>Math.max(100000,expOut*0.1))
+    bullets.push({icon:'🏭',t:'외주비: 누적 '+won(actOut)+' vs 기간 기준 견적 '+won(expOut)+' ('+(dv>0?'+':'')+won(dv)+(dv>0?' 초과':' 절감')+')'});}
+  if(actEtc||expEtc){const dv=actEtc-expEtc;if(Math.abs(dv)>Math.max(100000,expEtc*0.1))
+    bullets.push({icon:'🧾',t:'부대비: 누적 '+won(actEtc)+' vs 기간 기준 견적 '+won(expEtc)+' ('+(dv>0?'+':'')+won(dv)+(dv>0?' 초과':' 절감')+')'});}
+  if(p.budget>0&&s.cumRev>0&&range.length){
+    const expRev=p.budget*ratio,dv=s.cumRev-expRev;
+    if(Math.abs(dv)>p.budget*0.03)bullets.push({icon:'📈',t:'매출 인식: 누적 '+won(s.cumRev)+' vs 기간 균등 기준 '+won(expRev)+' ('+(dv>0?'+':'')+won(dv)+')'});
+  }
+  if(d!=null&&d<0){
+    const cand=[['인건비 증가',actLabor-planLabor*ratio],['외주비 증가',actOut-expOut],['부대비 증가',actEtc-expEtc]];
+    cand.sort((a,b)=>b[1]-a[1]);
+    if(cand[0][1]>0)bullets.push({icon:'🔍',bold:true,t:'주요 악화 원인(기간 기준 견적 대비 초과분): '+cand.filter(c=>c[1]>0).map(c=>c[0]+' +'+won(c[1])).join(', ')});
+  }
+  cause.innerHTML=bullets.length?bullets.map(b=>
+    '<div style="padding:8px 4px;border-bottom:1px solid var(--line);'+(b.bold?'font-weight:700':'')+'">'+b.icon+' '+b.t+'</div>').join('')
+    :'<div class="empty">계약 기준(견적 투입계획)과 월별 실투입을 입력하면 자동으로 분석됩니다.</div>';
+}
+
 // ── 인력 · 단가 ───────────────────────────────────────
 const gradeSelect=(v,attrs)=>'<select '+attrs+'><option value="">—</option>'+
   GRADES.map((g,i)=>'<option value="'+i+'" '+(i===v?'selected':'')+'>'+g+'</option>').join('')+'</select>';
@@ -1455,12 +1672,13 @@ document.getElementById('btnSaveRates').onclick=async()=>{
 // ── 탭/공통 ───────────────────────────────────────────
 function switchTab(name){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
-  ['dash','monthly','plan','staff'].forEach(n=>document.getElementById('tab-'+n).classList.toggle('hidden',n!==name));
+  ['dash','monthly','analysis','plan','staff'].forEach(n=>document.getElementById('tab-'+n).classList.toggle('hidden',n!==name));
 }
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   switchTab(t.dataset.tab);
   if(t.dataset.tab==='monthly'){if(curPjId==null&&projects.length)curPjId=projects[0].id;moDraft=null;renderMonthly();}
   if(t.dataset.tab==='plan'){if(planPjId==null&&projects.length)planPjId=projects[0].id;planDraft=null;renderPlan();}
+  if(t.dataset.tab==='analysis'){if(anPjId==null&&projects.length)anPjId=(curPjId!=null?curPjId:projects[0].id);renderAnalysis();}
 });
 
 async function refreshAll(rerender=true){
@@ -1469,6 +1687,7 @@ async function refreshAll(rerender=true){
   if(curPjId==null&&projects.length)curPjId=projects[0].id;
   if(planPjId==null&&projects.length)planPjId=projects[0].id;
   renderDash();renderPjList();renderStaff();renderRates();
+  if(!document.getElementById('tab-analysis').classList.contains('hidden'))renderAnalysis();
   if(rerender){
     moDraft=null;planDraft=null;
     renderMonthly();renderPlan();

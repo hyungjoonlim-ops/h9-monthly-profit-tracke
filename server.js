@@ -255,6 +255,62 @@ app.put('/api/staff/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── 견적 투입계획 일괄 가져오기 ───────────────────────
+// [{name, client, budget, startYm, endYm, rateStd, planCostOut, planCostEtc, rows:[{role,grade,mm,rate}]}]
+// 프로젝트명이 같으면 업데이트, 없으면 새로 생성하고 투입계획을 통째로 교체한다.
+app.post('/api/plan/import', async (req, res) => {
+  const list = Array.isArray(req.body) ? req.body : [];
+  if (!list.length) return res.status(400).json({ error: '가져올 프로젝트가 없습니다.' });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    let created = 0, updated = 0;
+    for (const p of list) {
+      const name = String(p.name || '').trim();
+      if (!name) continue;
+      const found = await client.query('SELECT id FROM mt_projects WHERE name=$1', [name]);
+      let pid;
+      if (found.rows[0]) {
+        pid = Number(found.rows[0].id);
+        await client.query(
+          `UPDATE mt_projects SET client=COALESCE($1,client), budget=CASE WHEN $2>0 THEN $2 ELSE budget END,
+                  start_ym=COALESCE($3,start_ym), end_ym=COALESCE($4,end_ym),
+                  plan_cost_out=$5, plan_cost_etc=$6, rate_std=COALESCE($7,rate_std)
+           WHERE id=$8`,
+          [p.client || null, num(p.budget), YM.test(p.startYm) ? p.startYm : null,
+           YM.test(p.endYm) ? p.endYm : null, num(p.planCostOut), num(p.planCostEtc),
+           p.rateStd || null, pid]
+        );
+        updated++;
+      } else {
+        const ins = await client.query(
+          `INSERT INTO mt_projects (name, client, budget, start_ym, end_ym, plan_cost_out, plan_cost_etc, rate_std, status)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'진행중') RETURNING id`,
+          [name, p.client || null, num(p.budget), YM.test(p.startYm) ? p.startYm : null,
+           YM.test(p.endYm) ? p.endYm : null, num(p.planCostOut), num(p.planCostEtc), p.rateStd || 'SW']
+        );
+        pid = Number(ins.rows[0].id);
+        created++;
+      }
+      await client.query('DELETE FROM mt_plan_rows WHERE project_id=$1', [pid]);
+      let i = 0;
+      for (const r of (Array.isArray(p.rows) ? p.rows : [])) {
+        if (!(num(r.mm) > 0)) continue;
+        await client.query(
+          `INSERT INTO mt_plan_rows (project_id, role, grade, mm, rate, sort_order)
+           VALUES ($1,$2,$3,$4,$5,$6)`,
+          [pid, r.role || '', Math.max(0, Math.min(3, num(r.grade))), num(r.mm), num(r.rate), i++]
+        );
+      }
+    }
+    await client.query('COMMIT');
+    res.json({ ok: true, created, updated });
+  } catch (e) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: e.message });
+  } finally { client.release(); }
+});
+
 // ── 견적서 첨부파일 ───────────────────────────────────
 app.get('/api/projects/:id/quote-files', async (req, res) => {
   try {

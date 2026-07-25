@@ -242,7 +242,10 @@
   <div class="panel">
     <div class="toolbar">
       <h2>견적(계약) 기준 투입 계획 <span class="tag" id="planPjName"></span></h2>
-      <div class="field" style="min-width:260px"><select id="planProject"></select></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="ghost sm" id="btnPlanImpOpen">구글시트 일괄 가져오기</button>
+        <div class="field" style="min-width:260px"><select id="planProject"></select></div>
+      </div>
     </div>
     <div class="cards" id="planCards"></div>
     <div class="tablewrap">
@@ -361,6 +364,27 @@
     <div class="btns">
       <button type="button" class="ghost" id="bulkCancel">취소</button>
       <button type="button" id="bulkSubmit">등록</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="planImpModal">
+  <div class="modal" style="max-width:900px">
+    <h3>견적(계약) 투입계획 일괄 가져오기 (구글시트)</h3>
+    <div class="row" style="margin-bottom:10px;align-items:flex-end">
+      <div class="field grow"><label>구글시트 링크 (공유: 링크가 있는 모든 사용자 – 뷰어)</label>
+        <input id="planImpUrl" placeholder="https://docs.google.com/spreadsheets/d/…"></div>
+      <button type="button" class="ghost" id="planImpFetch">시트에서 불러오기</button>
+    </div>
+    <p class="hint" style="margin-bottom:10px">또는 시트에서 <b>머리글 행을 포함해</b> 범위를 복사해 붙여넣으세요.
+      머리글에서 <b>프로젝트명 · 상태(진행) · 발주처 · 계약액 · 시작/종료월 · 직군별 MM</b>(단가표의 직군명과 같은 열)을 자동 인식하고,
+      상태에 <b>"진행"이 포함된 행만</b> 가져옵니다. 등급은 기본 중급으로 넣고 아래 화면에서 조정하면 됩니다.</p>
+    <textarea id="planImpText" rows="8" placeholder="프로젝트명	상태	발주처	계약액	DT개발	서비스개발	UX	Visual&#10;CTMS 리뉴얼	계약진행중	SK에코플랜트	250000000	6	3	2	2"></textarea>
+    <div id="planImpPreview" style="margin-top:10px"></div>
+    <div class="msg" id="planImpMsg"></div>
+    <div class="btns">
+      <button type="button" class="ghost" id="planImpCancel">취소</button>
+      <button type="button" id="planImpSubmit" disabled>등록 (수익률 확정)</button>
     </div>
   </div>
 </div>
@@ -1077,6 +1101,97 @@ document.getElementById('bulkSubmit').onclick=async()=>{
     await refreshAll(false);renderStaff();
     setTimeout(()=>bulkModal.classList.remove('show'),1000);
   }catch(err){msg.classList.add('err');msg.textContent='✗ '+err.message;}
+};
+// ── 견적 투입계획 일괄 가져오기 (구글시트) ────────────
+const planImpModal=document.getElementById('planImpModal');
+let planImpParsed=null;
+function ymNorm(s){const m=String(s||'').match(/(\d{4})\s*[.\-\/년]\s*(\d{1,2})/);return m?m[1]+'-'+String(+m[2]).padStart(2,'0'):null;}
+function parsePlanImp(text){
+  const raw=text.split('\n').map(l=>l.replace(/\s+$/,'')).filter(l=>l.trim());
+  if(raw.length<2)return {error:'머리글 행과 데이터 행이 최소 1줄씩 필요합니다.'};
+  const delim=text.includes('\t')?'\t':',';
+  const grid=raw.map(l=>l.split(delim).map(x=>x.trim()));
+  const header=grid[0];
+  const roleKeys=Object.keys(rates);
+  const find=re=>header.findIndex(h=>re.test(h));
+  const nameIdx=find(/프로젝트|사업명|과제|건명/);
+  if(nameIdx<0)return {error:'머리글에서 "프로젝트명" 열을 찾지 못했습니다. 머리글 행을 포함해 복사했는지 확인하세요.'};
+  const statusIdx=find(/상태|진행|구분/);
+  const clientIdx=find(/발주|고객|클라이언트/);
+  const budgetIdx=find(/계약액|계약금|금액|수주/);
+  const startIdx=find(/시작|착수/);
+  const endIdx=find(/종료|마감/);
+  const used=[nameIdx,statusIdx,clientIdx,budgetIdx,startIdx,endIdx];
+  const mmCols=[];
+  header.forEach((h,i)=>{
+    if(used.includes(i))return;
+    const hh=h.replace(/\s|\(.*?\)|MM|공수/gi,'');if(!hh)return;
+    const role=roleKeys.find(r=>{const rr=r.replace(/\s|\(.*?\)/g,'');return rr&&(hh.includes(rr)||rr.includes(hh));});
+    if(role)mmCols.push({i,role,label:h});
+  });
+  if(!mmCols.length)return {error:'단가표의 직군명과 일치하는 MM 열을 찾지 못했습니다. 시트의 열 이름이 단가표 직군명(DT개발·서비스개발·UX 등)과 같아야 합니다.'};
+  const items=[],skipped=[];
+  for(const row of grid.slice(1)){
+    const name=row[nameIdx];if(!name)continue;
+    const status=statusIdx>=0?(row[statusIdx]||''):'';
+    if(statusIdx>=0&&!/진행/.test(status)){skipped.push(name);continue;}
+    const rows=[];
+    mmCols.forEach(c=>{const mm=parseNum(row[c.i]);if(mm>0)rows.push({role:c.role,grade:1,mm,rate:rateOf(c.role,1)});});
+    items.push({name,client:clientIdx>=0?row[clientIdx]||'':'',budget:budgetIdx>=0?parseNum(row[budgetIdx]):0,
+      startYm:startIdx>=0?ymNorm(row[startIdx]):null,endYm:endIdx>=0?ymNorm(row[endIdx]):null,rows,status});
+  }
+  return {items,skipped,mmCols,hasStatus:statusIdx>=0};
+}
+function renderPlanImpPreview(){
+  const box=document.getElementById('planImpPreview');const msg=document.getElementById('planImpMsg');
+  msg.className='msg';msg.textContent='';
+  const text=document.getElementById('planImpText').value;
+  planImpParsed=null;document.getElementById('planImpSubmit').disabled=true;
+  if(!text.trim()){box.innerHTML='';return;}
+  const r=parsePlanImp(text);
+  if(r.error){box.innerHTML='';msg.classList.add('err');msg.textContent='✗ '+r.error;return;}
+  if(!r.items.length){box.innerHTML='';msg.classList.add('err');
+    msg.textContent='✗ 가져올 진행중 프로젝트가 없습니다.'+(r.skipped.length?' (상태에 "진행"이 없는 '+r.skipped.length+'건 제외)':'');return;}
+  planImpParsed=r.items;
+  box.innerHTML='<div class="tablewrap"><table><thead><tr><th>프로젝트</th><th>상태</th><th>발주처</th><th>계약액</th>'+
+    '<th>총 MM</th><th>계획 인건비</th><th>견적 수익률</th></tr></thead><tbody>'+
+    r.items.map(it=>{
+      let mm=0,labor=0;it.rows.forEach(x=>{mm+=x.mm;labor+=x.mm*x.rate;});
+      const margin=it.budget>0?(it.budget-labor)/it.budget*100:null;
+      return '<tr><td style="font-weight:700">'+it.name+'</td><td>'+(it.status||'-')+'</td><td>'+(it.client||'-')+'</td>'+
+        '<td class="right">'+won(it.budget)+'</td><td class="right">'+mm.toFixed(2)+'</td><td class="right">'+won(labor)+'</td>'+
+        '<td>'+(margin!=null?'<span class="pill '+cls(margin)+'">'+margin.toFixed(1)+'%</span>':'-')+'</td></tr>';
+    }).join('')+'</tbody></table></div>'+
+    '<div class="hint">MM 인식 열: '+r.mmCols.map(c=>c.label).join(', ')+' (등급 기본 중급)'+
+    (r.skipped.length?' · 진행중이 아니어서 제외: '+r.skipped.length+'건':'')+'</div>';
+  document.getElementById('planImpSubmit').disabled=false;
+}
+document.getElementById('btnPlanImpOpen').onclick=()=>{document.getElementById('planImpMsg').textContent='';planImpModal.classList.add('show');};
+document.getElementById('planImpCancel').onclick=()=>planImpModal.classList.remove('show');
+planImpModal.onclick=e=>{if(e.target===planImpModal)planImpModal.classList.remove('show');};
+document.getElementById('planImpText').oninput=renderPlanImpPreview;
+document.getElementById('planImpFetch').onclick=async()=>{
+  const msg=document.getElementById('planImpMsg');msg.className='msg';
+  const url=document.getElementById('planImpUrl').value.trim();
+  if(!url){msg.classList.add('err');msg.textContent='구글시트 링크를 입력하세요.';return;}
+  const btn=document.getElementById('planImpFetch');btn.disabled=true;msg.textContent='시트를 읽는 중…';
+  try{
+    const r=await api('/import/sheet',{method:'POST',body:JSON.stringify({url})});
+    document.getElementById('planImpText').value=r.rows.map(row=>row.join('\t')).join('\n');
+    renderPlanImpPreview();
+  }catch(err){msg.classList.add('err');msg.textContent='✗ '+err.message;}
+  finally{btn.disabled=false;}
+};
+document.getElementById('planImpSubmit').onclick=async()=>{
+  if(!planImpParsed||!planImpParsed.length)return;
+  const msg=document.getElementById('planImpMsg');msg.className='msg';
+  const btn=document.getElementById('planImpSubmit');btn.disabled=true;msg.textContent='등록 중…';
+  try{
+    const r=await api('/plan/import',{method:'POST',body:JSON.stringify(planImpParsed)});
+    msg.classList.add('ok');msg.textContent='✓ 신규 '+r.created+'건 · 업데이트 '+r.updated+'건 — 프로젝트별 견적 수익률이 확정되었습니다.';
+    await refreshAll();
+    setTimeout(()=>planImpModal.classList.remove('show'),1500);
+  }catch(err){msg.classList.add('err');msg.textContent='✗ '+err.message;btn.disabled=false;}
 };
 // 단가표
 function renderRates(){

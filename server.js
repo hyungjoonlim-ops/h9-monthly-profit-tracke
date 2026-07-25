@@ -113,16 +113,33 @@ function mapProject(r) {
     id: Number(r.id), name: r.name, client: r.client,
     budget: num(r.budget), startYm: r.start_ym, endYm: r.end_ym,
     planMargin: num(r.plan_margin), planCostOut: num(r.plan_cost_out), planCostEtc: num(r.plan_cost_etc),
+    rateStd: r.rate_std || 'SW',
     status: r.status, memo: r.memo,
     createdAt: r.created_at,
   };
 }
+const gradeOrNull = (v) => {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.max(0, Math.min(3, Math.round(n))) : null;
+};
 function mapStaff(r) {
   return {
-    id: Number(r.id), name: r.name, role: r.role, grade: Number(r.grade),
+    id: Number(r.id), name: r.name,
+    dept1: r.dept1 || '', dept2: r.dept2 || '', position: r.job_title || '',
+    gradeSw: r.grade_sw == null ? null : Number(r.grade_sw),
+    gradeSds: r.grade_sds == null ? null : Number(r.grade_sds),
+    gradeLg: r.grade_lg == null ? null : Number(r.grade_lg),
     active: !!r.active, memo: r.memo || '',
   };
 }
+const staffParams = (s) => [
+  String(s.name).trim(),
+  s.dept1 ? String(s.dept1).trim() : null,
+  s.dept2 ? String(s.dept2).trim() : null,
+  s.position ? String(s.position).trim() : null,
+  gradeOrNull(s.gradeSw), gradeOrNull(s.gradeSds), gradeOrNull(s.gradeLg),
+];
 function mapPlanRow(r) {
   return {
     id: Number(r.id), projectId: Number(r.project_id), role: r.role,
@@ -182,7 +199,7 @@ app.put('/api/rates', async (req, res) => {
 // ── 인력 명부 ─────────────────────────────────────────
 app.get('/api/staff', async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT * FROM mt_staff ORDER BY role, grade DESC, name');
+    const { rows } = await pool.query('SELECT * FROM mt_staff ORDER BY dept1 NULLS LAST, dept2 NULLS LAST, name');
     res.json(rows.map(mapStaff));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -192,14 +209,15 @@ app.post('/api/staff', async (req, res) => {
   if (!s.name || !String(s.name).trim()) return res.status(400).json({ error: '이름은 필수입니다.' });
   try {
     const { rows } = await pool.query(
-      `INSERT INTO mt_staff (name, role, grade, active, memo) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-      [String(s.name).trim(), s.role || '', Math.max(0, Math.min(3, num(s.grade))), s.active !== false, s.memo || null]
+      `INSERT INTO mt_staff (name, dept1, dept2, job_title, grade_sw, grade_sds, grade_lg, active, memo)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      [...staffParams(s), s.active !== false, s.memo || null]
     );
     res.json(mapStaff(rows[0]));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 일괄 등록 (구글시트 붙여넣기): [{name, role, grade}]
+// 일괄 등록 (구글시트 붙여넣기): [{dept1, dept2, name, position, gradeSw, gradeSds, gradeLg}]
 app.post('/api/staff/bulk', async (req, res) => {
   const list = Array.isArray(req.body) ? req.body : [];
   const client = await pool.connect();
@@ -209,8 +227,9 @@ app.post('/api/staff/bulk', async (req, res) => {
     for (const s of list) {
       if (!s.name || !String(s.name).trim()) continue;
       await client.query(
-        `INSERT INTO mt_staff (name, role, grade, active, memo) VALUES ($1,$2,$3,true,$4)`,
-        [String(s.name).trim(), s.role || '', Math.max(0, Math.min(3, num(s.grade))), s.memo || null]
+        `INSERT INTO mt_staff (name, dept1, dept2, job_title, grade_sw, grade_sds, grade_lg, active, memo)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,true,$8)`,
+        [...staffParams(s), s.memo || null]
       );
       n++;
     }
@@ -227,12 +246,113 @@ app.put('/api/staff/:id', async (req, res) => {
   if (!s.name || !String(s.name).trim()) return res.status(400).json({ error: '이름은 필수입니다.' });
   try {
     const { rows } = await pool.query(
-      `UPDATE mt_staff SET name=$1, role=$2, grade=$3, active=$4, memo=$5 WHERE id=$6 RETURNING *`,
-      [String(s.name).trim(), s.role || '', Math.max(0, Math.min(3, num(s.grade))), s.active !== false, s.memo || null, req.params.id]
+      `UPDATE mt_staff SET name=$1, dept1=$2, dept2=$3, job_title=$4,
+              grade_sw=$5, grade_sds=$6, grade_lg=$7, active=$8, memo=$9 WHERE id=$10 RETURNING *`,
+      [...staffParams(s), s.active !== false, s.memo || null, req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: '인력을 찾을 수 없습니다.' });
     res.json(mapStaff(rows[0]));
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── 견적서 첨부파일 ───────────────────────────────────
+app.get('/api/projects/:id/quote-files', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT id, filename, mime, size, created_at FROM mt_quote_files WHERE project_id=$1 ORDER BY created_at DESC',
+      [req.params.id]
+    );
+    res.json(rows.map((r) => ({
+      id: Number(r.id), filename: r.filename, mime: r.mime,
+      size: Number(r.size), createdAt: r.created_at,
+    })));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/projects/:id/quote-files',
+  express.raw({ type: () => true, limit: '15mb' }),
+  async (req, res) => {
+    try {
+      if (!Buffer.isBuffer(req.body) || !req.body.length) {
+        return res.status(400).json({ error: '파일 내용이 비어 있습니다.' });
+      }
+      const filename = String(req.query.filename || '견적서').slice(0, 300);
+      const mime = req.headers['content-type'] || 'application/octet-stream';
+      const { rows } = await pool.query(
+        `INSERT INTO mt_quote_files (project_id, filename, mime, size, data)
+         VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+        [req.params.id, filename, mime, req.body.length, req.body]
+      );
+      res.json({ ok: true, id: Number(rows[0].id) });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+app.get('/api/quote-files/:fid', async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM mt_quote_files WHERE id=$1', [req.params.fid]);
+    if (!rows[0]) return res.status(404).json({ error: '파일을 찾을 수 없습니다.' });
+    const f = rows[0];
+    res.setHeader('Content-Type', f.mime || 'application/octet-stream');
+    res.setHeader('Content-Disposition',
+      `attachment; filename*=UTF-8''${encodeURIComponent(f.filename)}`);
+    res.send(f.data);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/quote-files/:fid', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM mt_quote_files WHERE id=$1', [req.params.fid]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── 구글시트 가져오기 ─────────────────────────────────
+// 시트를 "링크가 있는 모든 사용자(뷰어)"로 공유해두면 서버가 CSV로 직접 읽어온다.
+function parseCsv(text) {
+  const rows = [];
+  let row = [], cell = '', inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else inQ = false; }
+      else cell += c;
+    } else if (c === '"') inQ = true;
+    else if (c === ',') { row.push(cell); cell = ''; }
+    else if (c === '\n' || c === '\r') {
+      if (c === '\r' && text[i + 1] === '\n') i++;
+      row.push(cell); cell = '';
+      if (row.some((x) => x.trim() !== '')) rows.push(row);
+      row = [];
+    } else cell += c;
+  }
+  row.push(cell);
+  if (row.some((x) => x.trim() !== '')) rows.push(row);
+  return rows;
+}
+
+app.post('/api/import/sheet', async (req, res) => {
+  try {
+    const url = String((req.body || {}).url || '').trim();
+    const m = url.match(/^https:\/\/docs\.google\.com\/spreadsheets\/d\/([A-Za-z0-9_-]+)/);
+    if (!m) {
+      return res.status(400).json({ error: '구글시트 링크 형식이 아닙니다. https://docs.google.com/spreadsheets/d/… 링크를 붙여넣어 주세요.' });
+    }
+    const gid = (url.match(/[#?&]gid=(\d+)/) || [])[1] || '0';
+    const r = await fetch(
+      `https://docs.google.com/spreadsheets/d/${m[1]}/export?format=csv&gid=${gid}`,
+      { redirect: 'follow' }
+    );
+    const ct = r.headers.get('content-type') || '';
+    if (!r.ok || ct.includes('text/html')) {
+      return res.status(400).json({
+        error: '시트를 읽을 수 없습니다 (HTTP ' + r.status + '). 시트 공유 설정이 "링크가 있는 모든 사용자 – 뷰어"인지 확인하세요.',
+      });
+    }
+    const text = await r.text();
+    res.json({ rows: parseCsv(text.replace(/^﻿/, '')) });
+  } catch (e) {
+    res.status(500).json({ error: '시트 가져오기 실패: ' + e.message });
+  }
 });
 
 app.delete('/api/staff/:id', async (req, res) => {
@@ -255,11 +375,11 @@ app.post('/api/projects', async (req, res) => {
   if (!p.name || !String(p.name).trim()) return res.status(400).json({ error: '프로젝트명은 필수입니다.' });
   try {
     const { rows } = await pool.query(
-      `INSERT INTO mt_projects (name, client, budget, start_ym, end_ym, plan_margin, plan_cost_out, plan_cost_etc, status, memo)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+      `INSERT INTO mt_projects (name, client, budget, start_ym, end_ym, plan_margin, plan_cost_out, plan_cost_etc, rate_std, status, memo)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
       [String(p.name).trim(), p.client || null, num(p.budget),
        YM.test(p.startYm) ? p.startYm : null, YM.test(p.endYm) ? p.endYm : null,
-       num(p.planMargin), num(p.planCostOut), num(p.planCostEtc), p.status || '진행중', p.memo || null]
+       num(p.planMargin), num(p.planCostOut), num(p.planCostEtc), p.rateStd || 'SW', p.status || '진행중', p.memo || null]
     );
     res.json(mapProject(rows[0]));
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -271,11 +391,11 @@ app.put('/api/projects/:id', async (req, res) => {
   try {
     const { rows } = await pool.query(
       `UPDATE mt_projects SET name=$1, client=$2, budget=$3, start_ym=$4, end_ym=$5,
-              plan_margin=$6, plan_cost_out=$7, plan_cost_etc=$8, status=$9, memo=$10
-       WHERE id=$11 RETURNING *`,
+              plan_margin=$6, plan_cost_out=$7, plan_cost_etc=$8, rate_std=$9, status=$10, memo=$11
+       WHERE id=$12 RETURNING *`,
       [String(p.name).trim(), p.client || null, num(p.budget),
        YM.test(p.startYm) ? p.startYm : null, YM.test(p.endYm) ? p.endYm : null,
-       num(p.planMargin), num(p.planCostOut), num(p.planCostEtc), p.status || '진행중', p.memo || null, req.params.id]
+       num(p.planMargin), num(p.planCostOut), num(p.planCostEtc), p.rateStd || 'SW', p.status || '진행중', p.memo || null, req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: '프로젝트를 찾을 수 없습니다.' });
     res.json(mapProject(rows[0]));
@@ -430,23 +550,27 @@ app.delete('/api/projects/:id/records/:ym', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
-// 시작 시 스키마 자동 생성 — 테이블이 없으면 만들고, 단가표가 비어 있으면 기본값 시딩
+// 시작 시 스키마 자동 생성 — 테이블이 없으면 만들고, 단가 기준(SW/SDS/LG)이 없으면 시딩
 try {
   const schema = await readFile(join(__dirname, 'db', 'schema.sql'), 'utf8');
   await pool.query(schema);
-  await pool.query(`
-    insert into mt_rate_cards (role, junior, mid, senior, expert, sort_order)
-    select * from (values
-      ('DT개발',        5200000, 6800000, 8900000, 9400000, 0),
-      ('TF (수원,SDS)', 4900000, 6300000, 7700000, 9100000, 1),
-      ('서비스개발',    4700000, 5500000, 7200000, 9500000, 2),
-      ('PM',            5100000, 5600000, 6700000, 7400000, 3),
-      ('Interaction',   4900000, 5700000, 6300000, 9000000, 4),
-      ('UX',            4800000, 5900000, 7000000, 7500000, 5),
-      ('Visual',        4900000, 5700000, 6200000, 9100000, 6)
-    ) as v(role, junior, mid, senior, expert, sort_order)
-    where not exists (select 1 from mt_rate_cards)
-  `);
+  const { rows } = await pool.query(
+    "SELECT COUNT(*)::int AS n FROM mt_rate_cards WHERE role IN ('SW','SDS','LG')"
+  );
+  if (rows[0].n === 0) {
+    // 구버전 직군 기반 기본 시드는 제거하고 기준(SW/SDS/LG) 단가로 전환
+    await pool.query(
+      `DELETE FROM mt_rate_cards WHERE role IN
+       ('DT개발','TF (수원,SDS)','서비스개발','PM','Interaction','UX','Visual')`
+    );
+    await pool.query(`
+      insert into mt_rate_cards (role, junior, mid, senior, expert, sort_order) values
+        ('SW',  4900000, 6300000, 7700000, 9100000, 0),
+        ('SDS', 4900000, 6300000, 7700000, 9100000, 1),
+        ('LG',  4700000, 5500000, 7200000, 9500000, 2)
+      on conflict (role) do nothing
+    `);
+  }
   console.log('✓ DB 스키마 확인/생성 완료');
 } catch (e) {
   console.error('❌ DB 스키마 초기화 실패 — 접속 정보(PGHOST/PGUSER/PGPASSWORD)를 확인하세요:', e.message);

@@ -15,7 +15,7 @@ export const pool = new pg.Pool({
   user: process.env.PGUSER,
   password: process.env.PGPASSWORD,
   database: process.env.PGDATABASE,
-  ssl: { rejectUnauthorized: false },
+  ssl: process.env.PGSSL === 'disable' ? false : { rejectUnauthorized: false },
   max: 5,
   connectionTimeoutMillis: 10000,
 });

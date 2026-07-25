@@ -8,9 +8,9 @@ create table if not exists mt_app_settings (
   updated_at timestamptz not null default now()
 );
 
--- 직군별·등급별 단가표 (원/MM) : 초급/중급/고급/특급
+-- 기준별·등급별 단가표 (원/MM) : 기준(SW/SDS/LG) × 초급/중급/고급/특급
 create table if not exists mt_rate_cards (
-  role       text primary key,
+  role       text primary key,              -- 단가 기준명 (SW / SDS / LG)
   junior     integer not null default 0,   -- 초급
   mid        integer not null default 0,   -- 중급
   senior     integer not null default 0,   -- 고급
@@ -19,16 +19,30 @@ create table if not exists mt_rate_cards (
   updated_at timestamptz not null default now()
 );
 
--- H9 인력 명부 (직군/등급) — 등급을 바꾸면 투입 원가에 자동 반영
+-- H9 인력 명부 — 부서(실/팀)·직급·기준별 기술등급(SW/SDS/LG)
+-- 등급을 바꾸면 이 인력이 투입된 모든 월의 인건비·수익률에 자동 반영
 create table if not exists mt_staff (
   id         bigserial primary key,
   name       text not null,
-  role       text not null,                -- 직군 (단가표의 role)
-  grade      integer not null default 1,   -- 0=초급 1=중급 2=고급 3=특급
+  role       text not null default '',     -- (구버전 호환 — 미사용)
+  grade      integer not null default 1,   -- (구버전 호환 — 미사용)
+  dept1      text,                         -- 부서(실)
+  dept2      text,                         -- 부서(팀)
+  job_title  text,                         -- 직급 (책임/선임 등)
+  grade_sw   integer,                      -- SW 기술등급  0=초급 1=중급 2=고급 3=특급, null=없음
+  grade_sds  integer,                      -- SDS 기술등급
+  grade_lg   integer,                      -- LG 기술등급
   active     boolean not null default true,
   memo       text,
   created_at timestamptz not null default now()
 );
+alter table mt_staff alter column role set default '';
+alter table mt_staff add column if not exists dept1 text;
+alter table mt_staff add column if not exists dept2 text;
+alter table mt_staff add column if not exists job_title text;
+alter table mt_staff add column if not exists grade_sw integer;
+alter table mt_staff add column if not exists grade_sds integer;
+alter table mt_staff add column if not exists grade_lg integer;
 
 -- 프로젝트 마스터
 create table if not exists mt_projects (
@@ -41,14 +55,28 @@ create table if not exists mt_projects (
   plan_margin   numeric not null default 0,   -- (계획 수익률 % — 투입계획 없을 때 수동 기준)
   plan_cost_out numeric not null default 0,   -- 견적 기준 외주비 합계
   plan_cost_etc numeric not null default 0,   -- 견적 기준 부대비 합계
+  rate_std      text not null default 'SW',   -- 단가·기술등급 기준 (SW/SDS/LG)
   status        text not null default '진행중', -- 진행중 / 완료 / 보류
   memo          text,
   created_at    timestamptz not null default now()
 );
 alter table mt_projects add column if not exists plan_cost_out numeric not null default 0;
 alter table mt_projects add column if not exists plan_cost_etc numeric not null default 0;
+alter table mt_projects add column if not exists rate_std text not null default 'SW';
 
--- 견적(계약) 기준 투입 계획 — 직군×등급×MM, 단가는 견적 시점 스냅샷
+-- 견적서 첨부파일 — Render 디스크는 재배포 시 초기화되므로 DB에 저장
+create table if not exists mt_quote_files (
+  id         bigserial primary key,
+  project_id bigint not null references mt_projects(id) on delete cascade,
+  filename   text not null,
+  mime       text,
+  size       integer not null default 0,
+  data       bytea not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_mt_qf_project on mt_quote_files(project_id);
+
+-- 견적(계약) 기준 투입 계획 — 기준×등급×MM, 단가는 견적 시점 스냅샷
 create table if not exists mt_plan_rows (
   id         bigserial primary key,
   project_id bigint not null references mt_projects(id) on delete cascade,

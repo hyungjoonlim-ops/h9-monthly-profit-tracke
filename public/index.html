@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>H9 프로젝트별 월간 수익률 변동 관리</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📈</text></svg>">
 <style>
   :root{
     --bg:#1b2735; --panel:#243343; --panel2:#2c3d50; --line:#3a4d63;
@@ -171,7 +172,7 @@
     <div class="tablewrap">
     <table>
       <thead><tr>
-        <th style="min-width:160px">인력 (이름)</th><th>직군</th><th>등급</th>
+        <th style="min-width:160px">인력 (이름)</th><th>부서 · 직급</th><th>적용 등급</th>
         <th style="min-width:100px">단가/MM</th><th style="width:90px">투입 MM</th>
         <th style="min-width:110px">인건비</th><th style="width:30px"></th>
       </tr></thead>
@@ -189,7 +190,7 @@
       <button id="btnMoSave">이 달 투입·실적 저장</button>
       <span class="status" id="moStatus"></span>
     </div>
-    <div class="hint">인력을 선택하면 인력 DB의 직군·등급·단가가 자동으로 따라오고, 인력 탭에서 등급을 바꾸면 여기 원가도 함께 바뀝니다. 매출 인식액을 0으로 두면 계약액 ÷ 계약개월수로 균등 인식합니다.</div>
+    <div class="hint">인력을 선택하면 이 프로젝트의 단가 기준(SW/SDS/LG)에 해당하는 기술등급·단가가 자동으로 따라오고, 인력 탭에서 등급을 바꾸면 여기 원가도 함께 바뀝니다. 매출 인식액을 0으로 두면 계약액 ÷ 계약개월수로 균등 인식합니다.</div>
   </div>
 
   <div class="panel">
@@ -222,6 +223,7 @@
     <div class="row">
       <div class="field grow"><label>프로젝트명 *</label><input id="pjName" placeholder="예: SK에코플랜트 26년 CTMS 리뉴얼"></div>
       <div class="field"><label>발주처</label><input id="pjClient" placeholder="발주처"></div>
+      <div class="field"><label>단가 기준</label><select id="pjStd"><option>SW</option><option>SDS</option><option>LG</option></select></div>
       <div class="field"><label>상태</label><select id="pjStatus"><option>진행중</option><option>완료</option><option>보류</option></select></div>
     </div>
     <div class="row" style="margin-top:12px">
@@ -246,7 +248,7 @@
     <div class="tablewrap">
     <table>
       <thead><tr class="grade-head">
-        <th style="min-width:150px">직군</th><th style="width:90px">등급</th>
+        <th style="min-width:150px">단가 기준</th><th style="width:90px">등급</th>
         <th style="min-width:105px">단가/MM</th><th style="width:90px">계획 MM</th>
         <th style="min-width:110px">계획 인건비</th><th style="width:30px"></th>
       </tr></thead>
@@ -255,7 +257,7 @@
     </table>
     </div>
     <div class="addline">
-      <button class="ghost sm" id="btnPlanAddRow">+ 직군 행 추가</button>
+      <button class="ghost sm" id="btnPlanAddRow">+ 투입 행 추가</button>
       <div class="field"><label>견적 외주비</label><input id="planOut" class="num" inputmode="numeric" value="0"></div>
       <div class="field"><label>견적 부대비</label><input id="planEtc" class="num" inputmode="numeric" value="0"></div>
     </div>
@@ -264,6 +266,12 @@
       <span class="status" id="planStatus"></span>
     </div>
     <div class="hint">저장 시점의 단가가 스냅샷으로 고정되어, 이후 단가표가 바뀌어도 견적 수익률 기준은 변하지 않습니다. 이 기준이 월별 실적과 실시간 비교됩니다.</div>
+    <div class="addline" style="margin-top:14px;align-items:flex-end">
+      <div class="field grow"><label>견적서 등록 (PDF·엑셀 등 · 15MB 이하)</label><input type="file" id="quoteFile"></div>
+      <button class="ghost" id="btnQuoteUpload">견적서 등록</button>
+      <span class="status" id="quoteStatus"></span>
+    </div>
+    <div id="quoteList" class="hint" style="margin-top:6px"></div>
   </div>
 
   <div class="panel">
@@ -282,33 +290,39 @@
     <div class="tablewrap">
     <table>
       <thead><tr>
-        <th style="min-width:140px">이름</th><th style="min-width:140px">직군</th><th style="width:90px">등급</th>
-        <th>단가/MM</th><th style="width:70px">재직</th><th style="min-width:140px">메모</th><th style="width:30px"></th>
+        <th style="min-width:100px">부서(실)</th><th style="min-width:100px">부서(팀)</th>
+        <th style="min-width:110px">이름</th><th style="min-width:80px">직급</th>
+        <th style="width:92px">SW등급</th><th style="width:92px">SDS등급</th><th style="width:92px">LG등급</th>
+        <th style="width:60px">재직</th><th style="min-width:110px">메모</th><th style="width:30px"></th>
       </tr></thead>
       <tbody id="staffBody"></tbody>
     </table>
     </div>
     <div class="addline">
+      <div class="field"><label>부서(실)</label><input id="stDept1" placeholder="DX실"></div>
+      <div class="field"><label>부서(팀)</label><input id="stDept2" placeholder="1팀"></div>
       <div class="field"><label>이름</label><input id="stName" placeholder="홍길동"></div>
-      <div class="field"><label>직군</label><select id="stRole"></select></div>
-      <div class="field"><label>등급</label><select id="stGrade"></select></div>
+      <div class="field"><label>직급</label><input id="stPosition" placeholder="책임"></div>
+      <div class="field"><label>SW등급</label><select id="stGradeSw"></select></div>
+      <div class="field"><label>SDS등급</label><select id="stGradeSds"></select></div>
+      <div class="field"><label>LG등급</label><select id="stGradeLg"></select></div>
       <button class="ghost" id="btnAddStaff">인력 추가</button>
       <span class="status" id="staffStatus"></span>
     </div>
-    <div class="hint">등급을 바꾸면 이 인력이 투입된 모든 월의 인건비·수익률이 자동으로 다시 계산됩니다.</div>
+    <div class="hint">기술등급은 SW / SDS / LG 기준별로 따로 관리됩니다. 프로젝트의 단가 기준에 해당하는 등급이 그 프로젝트의 투입 단가에 적용되며, 등급을 바꾸면 투입된 모든 월의 인건비·수익률이 자동으로 다시 계산됩니다.</div>
   </div>
 
   <div class="panel">
-    <h2>직군별·등급별 단가표 <span class="tag">원/MM</span></h2>
+    <h2>기준별·등급별 단가표 <span class="tag">원/MM · SW/SDS/LG</span></h2>
     <div class="tablewrap">
     <table>
-      <thead><tr class="grade-head"><th style="min-width:150px">직군</th><th>초급</th><th>중급</th><th>고급</th><th>특급</th><th style="width:30px"></th></tr></thead>
+      <thead><tr class="grade-head"><th style="min-width:150px">단가 기준</th><th>초급</th><th>중급</th><th>고급</th><th>특급</th><th style="width:30px"></th></tr></thead>
       <tbody id="rateBody"></tbody>
     </table>
     </div>
     <div class="addline">
-      <div class="field grow"><label>새 직군명</label><input id="newRole" placeholder="예: QA실"></div>
-      <button class="ghost" id="btnAddRole">직군 추가</button>
+      <div class="field grow"><label>새 기준명</label><input id="newRole" placeholder="예: 자체"></div>
+      <button class="ghost" id="btnAddRole">기준 추가</button>
     </div>
     <div class="savebar">
       <button id="btnSaveRates">단가표 저장</button>
@@ -334,10 +348,15 @@
 </div>
 
 <div class="modal-bg" id="bulkModal">
-  <div class="modal" style="max-width:520px">
-    <h3>인력 일괄 등록 (구글시트 붙여넣기)</h3>
-    <p class="hint" style="margin-bottom:10px">시트에서 <b>이름 · 직군 · 등급</b> 3개 열을 복사해 붙여넣으세요. (탭/쉼표 구분, 한 줄당 한 명, 등급: 초급/중급/고급/특급)</p>
-    <textarea id="bulkText" rows="10" placeholder="홍길동	DT개발	고급&#10;김철수	UX	중급"></textarea>
+  <div class="modal" style="max-width:640px">
+    <h3>인력 일괄 등록 (구글시트)</h3>
+    <div class="row" style="margin-bottom:10px;align-items:flex-end">
+      <div class="field grow"><label>구글시트 링크 (공유: 링크가 있는 모든 사용자 – 뷰어)</label>
+        <input id="bulkSheetUrl" placeholder="https://docs.google.com/spreadsheets/d/…"></div>
+      <button type="button" class="ghost" id="bulkFetch">시트에서 불러오기</button>
+    </div>
+    <p class="hint" style="margin-bottom:10px">또는 시트에서 <b>부서(실) · 부서(팀) · 이름 · 직급 · SW등급 · SDS등급 · LG등급</b> 7개 열을 복사해 붙여넣으세요. (탭/쉼표 구분, 한 줄당 한 명, 등급: 초급/중급/고급/특급 — 없으면 빈칸, 제목 줄은 자동으로 건너뜁니다)</p>
+    <textarea id="bulkText" rows="10" placeholder="DX실	1팀	홍길동	책임	고급	고급	중급&#10;DX실	2팀	김철수	선임	중급		중급"></textarea>
     <div class="msg" id="bulkMsg"></div>
     <div class="btns">
       <button type="button" class="ghost" id="bulkCancel">취소</button>
@@ -382,9 +401,14 @@ function ymRange(a,b){
   return out;
 }
 const ymLabel=ym=>ym?ym.replace('-','.'):'-';
-const rateOf=(role,gi)=>(rates[role]&&rates[role][gi]!=null)?rates[role][gi]:0;
+const rateOf=(std,gi)=>(rates[std]&&rates[std][gi]!=null)?rates[std][gi]:0;
 const staffById=id=>staff.find(s=>s.id===id)||null;
-function staffRate(id){const s=staffById(id);return s?rateOf(s.role,s.grade):0;}
+// 기술등급은 기준(SW/SDS/LG)별로 따로 관리 — 프로젝트의 단가 기준에 맞는 등급이 적용된다
+const STDS=['SW','SDS','LG'];
+const GKEY={SW:'gradeSw',SDS:'gradeSds',LG:'gradeLg'};
+function gradeOf(s,std){if(!s||!GKEY[std])return null;const v=s[GKEY[std]];return v==null?null:v;}
+function staffRate(id,std){const s=staffById(id);const g=gradeOf(s,std);return g!=null?rateOf(std,g):0;}
+const deptLabel=s=>[s.dept1,s.dept2].filter(Boolean).join(' ');
 
 // ── 계산 코어 ─────────────────────────────────────────
 // 견적(계약) 기준: 프로젝트의 계획 행 + 견적 외주/부대비 → 고정 기준 수익률
@@ -407,7 +431,7 @@ function monthActual(p,ym,ovAssigns,ovRec){
   const assigns=ovAssigns||allAssigns.filter(a=>a.projectId===p.id&&a.ym===ym);
   const rec=ovRec||allRecords.find(r=>r.projectId===p.id&&r.ym===ym)||{revenue:0,costOut:0,costEtc:0,note:''};
   let labor=0,mm=0;
-  assigns.forEach(a=>{labor+=staffRate(a.staffId)*a.mm;mm+=a.mm;});
+  assigns.forEach(a=>{labor+=staffRate(a.staffId,p.rateStd||'SW')*a.mm;mm+=a.mm;});
   const inRange=(!p.startYm||ym>=p.startYm)&&(!p.endYm||ym<=p.endYm);
   const revAuto=rec.revenue>0?false:inRange;
   const revenue=rec.revenue>0?rec.revenue:(inRange?evenRevenue(p):0);
@@ -593,10 +617,12 @@ function renderMoVs(){
     '<div style="margin-left:auto"><div class="lbl">프로젝트 누적 수익률</div><div class="big" style="font-size:20px" >'+(cum!=null?'<span class="pill '+cls(cum)+'" style="font-size:14px">'+cum.toFixed(1)+'%</span>':'-')+
     (cum!=null&&pm!=null?' '+deltaHtml(cum-pm):'')+'</div></div>';
 }
-function staffOptions(sel){
+function staffOptions(sel,std){
   const list=staff.filter(s=>s.active||s.id===sel);
-  return '<option value="">— 선택 —</option>'+list.map(s=>
-    '<option value="'+s.id+'" '+(s.id===sel?'selected':'')+'>'+s.name+' ('+s.role+' '+GRADES[s.grade]+')</option>').join('');
+  return '<option value="">— 선택 —</option>'+list.map(s=>{
+    const g=gradeOf(s,std);
+    return '<option value="'+s.id+'" '+(s.id===sel?'selected':'')+'>'+s.name+' ('+[deptLabel(s),s.position].filter(Boolean).join(' · ')+(g!=null?' · '+GRADES[g]:' · 등급없음')+')</option>';
+  }).join('');
 }
 function renderMoEditor(){
   const p=curProject();
@@ -606,12 +632,14 @@ function renderMoEditor(){
   if(!moDraft.assigns.length){
     body.innerHTML='<tr><td colspan="7" class="empty">투입 인력이 없습니다. [+ 인력 추가] 또는 [← 전월 투입 복사]를 누르세요.</td></tr>';
   }else{
+    const std=p.rateStd||'SW';
     body.innerHTML=moDraft.assigns.map((a,i)=>{
       const s=staffById(a.staffId);
-      const rate=a.staffId?staffRate(a.staffId):0;
-      return '<tr><td><select data-i="'+i+'" data-f="staff">'+staffOptions(a.staffId)+'</select></td>'+
-        '<td>'+(s?s.role:'-')+'</td>'+
-        '<td>'+(s?'<span class="pill flat">'+GRADES[s.grade]+'</span>':'-')+'</td>'+
+      const g=s?gradeOf(s,std):null;
+      const rate=a.staffId?staffRate(a.staffId,std):0;
+      return '<tr><td><select data-i="'+i+'" data-f="staff">'+staffOptions(a.staffId,std)+'</select></td>'+
+        '<td>'+(s?[deptLabel(s),s.position].filter(Boolean).join(' · ')||'-':'-')+'</td>'+
+        '<td>'+(s?(g!=null?'<span class="pill flat">'+std+' '+GRADES[g]+'</span>':'<span class="pill warn">'+std+' 등급없음</span>'):'-')+'</td>'+
         '<td class="right">'+won(rate)+'</td>'+
         '<td><input class="num" data-i="'+i+'" data-f="mm" value="'+a.mm+'" inputmode="decimal"></td>'+
         '<td class="right">'+won(rate*a.mm)+'</td>'+
@@ -754,6 +782,7 @@ function pjFormData(){
   return {
     name:document.getElementById('pjName').value.trim(),
     client:document.getElementById('pjClient').value.trim(),
+    rateStd:document.getElementById('pjStd').value,
     status:document.getElementById('pjStatus').value,
     budget:parseNum(document.getElementById('pjBudget').value),
     startYm:document.getElementById('pjStart').value||null,
@@ -766,6 +795,7 @@ function pjFormReset(){
   document.getElementById('pjFormTitle').textContent='새 프로젝트 등록';
   document.getElementById('btnCancelEdit').classList.add('hidden');
   ['pjName','pjClient','pjMemo'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('pjStd').value='SW';
   document.getElementById('pjStatus').value='진행중';
   document.getElementById('pjBudget').value='0';
   document.getElementById('pjStart').value='';document.getElementById('pjEnd').value='';
@@ -809,7 +839,7 @@ function renderPlan(){
   if(!planDraft)initPlanDraft();
   const roles=Object.keys(rates);
   if(!planDraft.rows.length){
-    body.innerHTML='<tr><td colspan="6" class="empty">[+ 직군 행 추가]로 견적 기준 투입계획을 구성하세요.</td></tr>';
+    body.innerHTML='<tr><td colspan="6" class="empty">[+ 투입 행 추가]로 견적 기준 투입계획을 구성하세요.</td></tr>';
   }else{
     body.innerHTML=planDraft.rows.map((r,i)=>
       '<tr><td><select data-i="'+i+'" data-f="role">'+roles.map(x=>'<option '+(x===r.role?'selected':'')+'>'+x+'</option>').join('')+'</select></td>'+
@@ -842,12 +872,52 @@ function renderPlan(){
     const i=+e.target.dataset.i;planDraft.rows[i][e.target.dataset.f]=parseNum(e.target.value);renderPlan();
   });
   body.querySelectorAll('[data-del]').forEach(x=>x.onclick=e=>{planDraft.rows.splice(+e.target.dataset.del,1);renderPlan();});
+  renderQuoteFiles();
 }
+// 견적서 첨부파일
+let quoteListPjId=null;
+async function renderQuoteFiles(force){
+  const p=planProject();const box=document.getElementById('quoteList');
+  if(!p){box.innerHTML='';quoteListPjId=null;return;}
+  if(!force&&quoteListPjId===p.id)return;
+  quoteListPjId=p.id;
+  try{
+    const files=await api('/projects/'+p.id+'/quote-files');
+    box.innerHTML=files.length?files.map(f=>
+      '<div style="margin:2px 0">📎 <a href="/api/quote-files/'+f.id+'" style="color:var(--accent)">'+String(f.filename).replace(/</g,'&lt;')+'</a>'+
+      ' <span class="muted">('+(f.size>=1048576?(f.size/1048576).toFixed(1)+'MB':Math.max(1,Math.round(f.size/1024))+'KB')+' · '+String(f.createdAt).slice(0,10)+')</span>'+
+      ' <span class="del-x" data-qdel="'+f.id+'">×</span></div>').join('')
+      :'등록된 견적서가 없습니다.';
+    box.querySelectorAll('[data-qdel]').forEach(x=>x.onclick=async e=>{
+      if(!confirm('이 견적서 파일을 삭제할까요?'))return;
+      try{await api('/quote-files/'+e.target.dataset.qdel,{method:'DELETE'});renderQuoteFiles(true);}
+      catch(err){alert('삭제 실패: '+err.message);}
+    });
+  }catch(e){box.innerHTML='';}
+}
+document.getElementById('btnQuoteUpload').onclick=async()=>{
+  const p=planProject();const inp=document.getElementById('quoteFile');const s=document.getElementById('quoteStatus');
+  s.className='status';
+  if(!p){s.className='status err';s.textContent='✗ 프로젝트를 먼저 선택하세요.';return;}
+  const f=inp.files&&inp.files[0];
+  if(!f){s.className='status err';s.textContent='✗ 파일을 선택하세요.';return;}
+  if(f.size>15*1024*1024){s.className='status err';s.textContent='✗ 15MB 이하 파일만 등록할 수 있습니다.';return;}
+  const btn=document.getElementById('btnQuoteUpload');btn.disabled=true;s.textContent='업로드 중…';
+  try{
+    const r=await fetch('/api/projects/'+p.id+'/quote-files?filename='+encodeURIComponent(f.name),
+      {method:'POST',headers:{'Content-Type':f.type||'application/octet-stream'},body:f});
+    if(!r.ok){let m='업로드 실패';try{m=(await r.json()).error||m;}catch(e){}throw new Error(m);}
+    inp.value='';s.textContent='✓ 견적서가 등록되었습니다.';setTimeout(()=>s.textContent='',2500);
+    renderQuoteFiles(true);
+  }catch(err){s.className='status err';s.textContent='✗ '+err.message;}
+  finally{btn.disabled=false;}
+};
 document.getElementById('planOut').onchange=e=>{if(planDraft){planDraft.out=parseNum(e.target.value);renderPlan();}};
 document.getElementById('planEtc').onchange=e=>{if(planDraft){planDraft.etc=parseNum(e.target.value);renderPlan();}};
 document.getElementById('btnPlanAddRow').onclick=()=>{
   if(!planDraft)return;
-  const role=Object.keys(rates)[0]||'';
+  const p=planProject();
+  const role=(p&&p.rateStd)||Object.keys(rates)[0]||'';
   planDraft.rows.push({role,grade:1,mm:1,rate:rateOf(role,1)});renderPlan();
 };
 document.getElementById('btnSavePlan').onclick=async()=>{
@@ -871,7 +941,7 @@ function renderPjList(){
     const pm=planMarginOf(p);
     return '<div class="pj-item"><div><div style="font-weight:700">'+p.name+' <span class="pill '+(p.status==='진행중'?'good':p.status==='완료'?'flat':'warn')+'">'+p.status+'</span>'+
       (pm!=null?' <span class="pill '+cls(pm)+'">견적 '+pm.toFixed(1)+'%</span>':' <span class="pill flat">견적 미확정</span>')+'</div>'+
-      '<div class="meta">'+(p.client||'-')+' · 계약 '+won(p.budget)+'원 · '+ymLabel(p.startYm)+'~'+ymLabel(p.endYm)+(p.memo?' · '+p.memo:'')+'</div></div>'+
+      '<div class="meta">'+(p.client||'-')+' · 기준 '+(p.rateStd||'SW')+' · 계약 '+won(p.budget)+'원 · '+ymLabel(p.startYm)+'~'+ymLabel(p.endYm)+(p.memo?' · '+p.memo:'')+'</div></div>'+
       '<div class="actions"><button class="ghost sm" data-plan="'+p.id+'">견적 기준</button>'+
       '<button class="ghost sm" data-rec="'+p.id+'">월별 투입</button>'+
       '<button class="ghost sm" data-edit="'+p.id+'">수정</button>'+
@@ -885,6 +955,7 @@ function renderPjList(){
     document.getElementById('pjFormTitle').textContent='프로젝트 수정 — '+p.name;
     document.getElementById('btnCancelEdit').classList.remove('hidden');
     document.getElementById('pjName').value=p.name;document.getElementById('pjClient').value=p.client||'';
+    document.getElementById('pjStd').value=p.rateStd||'SW';
     document.getElementById('pjStatus').value=p.status;document.getElementById('pjBudget').value=p.budget;
     document.getElementById('pjStart').value=p.startYm||'';document.getElementById('pjEnd').value=p.endYm||'';
     document.getElementById('pjMemo').value=p.memo||'';
@@ -903,25 +974,26 @@ function renderPjList(){
 }
 
 // ── 인력 · 단가 ───────────────────────────────────────
+const gradeSelect=(v,attrs)=>'<select '+attrs+'><option value="">—</option>'+
+  GRADES.map((g,i)=>'<option value="'+i+'" '+(i===v?'selected':'')+'>'+g+'</option>').join('')+'</select>';
 function renderStaff(){
   document.getElementById('staffCount').textContent=staff.length+'명';
-  const roles=Object.keys(rates);
   const body=document.getElementById('staffBody');
-  if(!staff.length){body.innerHTML='<tr><td colspan="7" class="empty">인력이 없습니다. 아래에서 추가하거나 구글시트에서 붙여넣기로 일괄 등록하세요.</td></tr>';}
+  if(!staff.length){body.innerHTML='<tr><td colspan="10" class="empty">인력이 없습니다. 아래에서 추가하거나 구글시트에서 일괄 등록하세요.</td></tr>';}
   else{
+    const txt=(s,f)=>'<input data-id="'+s.id+'" data-f="'+f+'" value="'+String(s[f]||'').replace(/"/g,'&quot;')+'">';
     body.innerHTML=staff.map(s=>
-      '<tr'+(s.active?'':' style="opacity:.5"')+'><td><input data-id="'+s.id+'" data-f="name" value="'+s.name.replace(/"/g,'&quot;')+'"></td>'+
-      '<td><select data-id="'+s.id+'" data-f="role">'+roles.map(r=>'<option '+(r===s.role?'selected':'')+'>'+r+'</option>').join('')+(roles.includes(s.role)?'':'<option selected>'+s.role+'</option>')+'</select></td>'+
-      '<td><select data-id="'+s.id+'" data-f="grade">'+GRADES.map((g,i)=>'<option value="'+i+'" '+(i===s.grade?'selected':'')+'>'+g+'</option>').join('')+'</select></td>'+
-      '<td class="right">'+won(rateOf(s.role,s.grade))+'</td>'+
+      '<tr'+(s.active?'':' style="opacity:.5"')+'>'+
+      '<td>'+txt(s,'dept1')+'</td><td>'+txt(s,'dept2')+'</td><td>'+txt(s,'name')+'</td><td>'+txt(s,'position')+'</td>'+
+      STDS.map(std=>'<td>'+gradeSelect(gradeOf(s,std),'data-id="'+s.id+'" data-f="'+GKEY[std]+'"')+'</td>').join('')+
       '<td style="text-align:center"><input type="checkbox" style="width:auto" data-id="'+s.id+'" data-f="active" '+(s.active?'checked':'')+'></td>'+
-      '<td><input data-id="'+s.id+'" data-f="memo" value="'+String(s.memo||'').replace(/"/g,'&quot;')+'"></td>'+
+      '<td>'+txt(s,'memo')+'</td>'+
       '<td><span class="del-x" data-del="'+s.id+'">×</span></td></tr>').join('');
   }
   body.querySelectorAll('[data-f]').forEach(el=>el.onchange=async e=>{
     const id=+e.target.dataset.id,f=e.target.dataset.f;
     const s=staff.find(x=>x.id===id);if(!s)return;
-    if(f==='grade')s.grade=+e.target.value;
+    if(f==='gradeSw'||f==='gradeSds'||f==='gradeLg')s[f]=e.target.value===''?null:+e.target.value;
     else if(f==='active')s.active=e.target.checked;
     else s[f]=e.target.value;
     try{
@@ -936,18 +1008,23 @@ function renderStaff(){
     try{await api('/staff/'+id,{method:'DELETE'});await refreshAll();}
     catch(err){alert('삭제 실패: '+err.message);}
   });
-  // 추가 폼 셀렉트
-  document.getElementById('stRole').innerHTML=roles.map(r=>'<option>'+r+'</option>').join('');
-  document.getElementById('stGrade').innerHTML=GRADES.map((g,i)=>'<option value="'+i+'" '+(i===1?'selected':'')+'>'+g+'</option>').join('');
+  // 추가 폼 등급 셀렉트
+  [['stGradeSw'],['stGradeSds'],['stGradeLg']].forEach(([id])=>{
+    const el=document.getElementById(id);
+    if(!el.options.length)el.innerHTML='<option value="">—</option>'+GRADES.map((g,i)=>'<option value="'+i+'">'+g+'</option>').join('');
+  });
 }
 document.getElementById('btnAddStaff').onclick=async()=>{
   const name=document.getElementById('stName').value.trim();
   const s=document.getElementById('staffStatus');
   if(!name){s.className='status err';s.textContent='✗ 이름을 입력하세요.';return;}
+  const gv=id=>{const v=document.getElementById(id).value;return v===''?null:+v;};
   try{
     await api('/staff',{method:'POST',body:JSON.stringify({
-      name,role:document.getElementById('stRole').value,grade:+document.getElementById('stGrade').value})});
-    document.getElementById('stName').value='';
+      name,dept1:document.getElementById('stDept1').value.trim(),dept2:document.getElementById('stDept2').value.trim(),
+      position:document.getElementById('stPosition').value.trim(),
+      gradeSw:gv('stGradeSw'),gradeSds:gv('stGradeSds'),gradeLg:gv('stGradeLg')})});
+    ['stName','stDept1','stDept2','stPosition'].forEach(id=>document.getElementById(id).value='');
     await refreshAll(false);renderStaff();
     s.className='status';s.textContent='✓ 추가되었습니다.';setTimeout(()=>s.textContent='',2000);
   }catch(err){s.className='status err';s.textContent='✗ '+err.message;}
@@ -957,17 +1034,44 @@ const bulkModal=document.getElementById('bulkModal');
 document.getElementById('btnBulkOpen').onclick=()=>{document.getElementById('bulkText').value='';document.getElementById('bulkMsg').textContent='';bulkModal.classList.add('show');};
 document.getElementById('bulkCancel').onclick=()=>bulkModal.classList.remove('show');
 bulkModal.onclick=e=>{if(e.target===bulkModal)bulkModal.classList.remove('show');};
-document.getElementById('bulkSubmit').onclick=async()=>{
-  const msg=document.getElementById('bulkMsg');msg.className='msg';
-  const lines=document.getElementById('bulkText').value.split('\n').map(l=>l.trim()).filter(Boolean);
+// 등급 문자 해석: "초급/중급/고급/특급" (초/중/고/특 축약 허용), 빈칸·기타 → 없음(null)
+function parseGrade(txt){
+  const t=String(txt||'').trim();
+  if(!t)return null;
+  const i=['초','중','고','특'].indexOf(t[0]);
+  return i>=0?i:null;
+}
+function parseBulkLines(text){
+  const lines=text.split('\n').map(l=>l.replace(/\s+$/,'')).filter(l=>l.trim());
   const list=[];
   for(const line of lines){
-    const parts=line.split(/\t|,/).map(x=>x.trim());
-    if(!parts[0])continue;
-    const gi=GRADES.indexOf(parts[2]);
-    list.push({name:parts[0],role:parts[1]||'',grade:gi>=0?gi:1});
+    const c=(line.includes('\t')?line.split('\t'):line.split(',')).map(x=>x.trim());
+    // 제목 줄 건너뛰기 (부서/이름/직급/등급 등의 헤더)
+    if(c.some(x=>/^(부서|이름|직급|기술등급|성명)/.test(x)))continue;
+    const name=c[2];
+    if(!name)continue;
+    list.push({dept1:c[0]||'',dept2:c[1]||'',name,position:c[3]||'',
+      gradeSw:parseGrade(c[4]),gradeSds:parseGrade(c[5]),gradeLg:parseGrade(c[6])});
   }
-  if(!list.length){msg.classList.add('err');msg.textContent='등록할 인력이 없습니다.';return;}
+  return list;
+}
+document.getElementById('bulkFetch').onclick=async()=>{
+  const msg=document.getElementById('bulkMsg');msg.className='msg';
+  const url=document.getElementById('bulkSheetUrl').value.trim();
+  if(!url){msg.classList.add('err');msg.textContent='구글시트 링크를 입력하세요.';return;}
+  const btn=document.getElementById('bulkFetch');btn.disabled=true;msg.textContent='시트를 읽는 중…';
+  try{
+    const r=await api('/import/sheet',{method:'POST',body:JSON.stringify({url})});
+    document.getElementById('bulkText').value=r.rows.map(row=>row.join('\t')).join('\n');
+    const n=parseBulkLines(document.getElementById('bulkText').value).length;
+    msg.classList.add('ok');msg.textContent='✓ 시트에서 '+r.rows.length+'행을 불러왔습니다 (등록 대상 '+n+'명). 내용 확인 후 [등록]을 누르세요.';
+  }catch(err){msg.classList.add('err');msg.textContent='✗ '+err.message;}
+  finally{btn.disabled=false;}
+};
+document.getElementById('bulkSubmit').onclick=async()=>{
+  const msg=document.getElementById('bulkMsg');msg.className='msg';
+  const list=parseBulkLines(document.getElementById('bulkText').value);
+  if(!list.length){msg.classList.add('err');msg.textContent='등록할 인력이 없습니다. 열 순서(부서(실)·부서(팀)·이름·직급·SW·SDS·LG)를 확인하세요.';return;}
   try{
     const r=await api('/staff/bulk',{method:'POST',body:JSON.stringify(list)});
     msg.classList.add('ok');msg.textContent='✓ '+r.count+'명 등록되었습니다.';
@@ -1055,7 +1159,16 @@ document.getElementById('pwForm').onsubmit=async(e)=>{
     setConn(true,'DB 연결됨');
   }catch(err){
     setConn(false,'DB 연결 실패 — '+err.message);
-    document.getElementById('dashBody').innerHTML='<tr><td colspan="10" class="empty">DB에 연결할 수 없습니다. 서버 설정(.env)과 npm run setup 실행 여부를 확인하세요.</td></tr>';
+    const m=String(err.message||'알 수 없는 오류');
+    let hint='Render 대시보드 → 서비스 → Logs에서 자세한 원인을 확인하세요.';
+    if(/password authentication|SASL|SCRAM/i.test(m))hint='DB 비밀번호(PGPASSWORD)가 올바르지 않습니다. Render → Environment에서 PGPASSWORD를 수정하세요(저장 시 자동 재배포).';
+    else if(/tenant or user not found/i.test(m))hint='PGUSER 또는 PGHOST 값이 잘못되었습니다. PGUSER는 postgres.프로젝트ID 형식, PGHOST는 Supabase의 Session pooler 주소여야 합니다.';
+    else if(/timeout|ETIMEDOUT|ECONNREFUSED|ENOTFOUND|EHOSTUNREACH/i.test(m))hint='DB 서버에 연결할 수 없습니다. PGHOST 오타 여부와 Supabase 프로젝트가 일시중지(Paused) 상태인지 확인하세요. 무료 플랜은 일정 기간 미사용 시 자동 일시중지되며 대시보드에서 Restore 하면 됩니다.';
+    else if(/does not exist/i.test(m))hint='테이블/컬럼이 아직 없습니다. 최신 코드로 재배포하면 서버가 시작하면서 자동 생성합니다.';
+    const tr=document.createElement('tr'),td=document.createElement('td');
+    td.colSpan=10;td.className='empty';
+    td.textContent='DB 오류: '+m+' — 👉 '+hint;
+    const body=document.getElementById('dashBody');body.innerHTML='';tr.appendChild(td);body.appendChild(tr);
     console.error(err);
   }
 })();

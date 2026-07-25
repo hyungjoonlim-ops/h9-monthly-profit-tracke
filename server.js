@@ -344,6 +344,69 @@ app.post('/api/plan/import', async (req, res) => {
   } finally { client.release(); }
 });
 
+// ── 월별 실투입 MM 일괄 가져오기 (MM 변동 시트) ───────
+// [{projectName, rows:[{name, team, grade, months:{'YYYY-MM': mm}}]}]
+// 프로젝트/인력은 이름으로 매칭(없으면 생성), 시트에 있는 (프로젝트,월)의 투입은 시트 내용으로 교체.
+app.post('/api/import/monthly', async (req, res) => {
+  const items = Array.isArray(req.body) ? req.body : [];
+  if (!items.length) return res.status(400).json({ error: '가져올 데이터가 없습니다.' });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    let projectsCreated = 0, staffCreated = 0, monthsUpdated = 0;
+    for (const item of items) {
+      const pname = String(item.projectName || '').trim();
+      if (!pname) continue;
+      let pr = await client.query('SELECT id FROM mt_projects WHERE name=$1', [pname]);
+      let pid;
+      if (pr.rows[0]) pid = Number(pr.rows[0].id);
+      else {
+        pr = await client.query(
+          `INSERT INTO mt_projects (name, status) VALUES ($1,'진행중') RETURNING id`, [pname]);
+        pid = Number(pr.rows[0].id);
+        projectsCreated++;
+      }
+      const ymMap = new Map(); // ym -> Map(staffId -> mm)
+      for (const r of (Array.isArray(item.rows) ? item.rows : [])) {
+        const sname = String(r.name || '').trim();
+        if (!sname) continue;
+        let sr = await client.query('SELECT id FROM mt_staff WHERE name=$1 LIMIT 1', [sname]);
+        let sid;
+        if (sr.rows[0]) sid = Number(sr.rows[0].id);
+        else {
+          const g = gradeOrNull(r.grade);
+          sr = await client.query(
+            `INSERT INTO mt_staff (name, dept2, grade_sw, grade_sds, grade_lg, active)
+             VALUES ($1,$2,$3,$3,$3,true) RETURNING id`,
+            [sname, r.team ? String(r.team).trim() : null, g]);
+          sid = Number(sr.rows[0].id);
+          staffCreated++;
+        }
+        for (const [ym, mm] of Object.entries(r.months || {})) {
+          if (!YM.test(ym) || !(num(mm) > 0)) continue;
+          if (!ymMap.has(ym)) ymMap.set(ym, new Map());
+          const m = ymMap.get(ym);
+          m.set(sid, (m.get(sid) || 0) + num(mm));
+        }
+      }
+      for (const [ym, m] of ymMap) {
+        await client.query('DELETE FROM mt_assignments WHERE project_id=$1 AND ym=$2', [pid, ym]);
+        for (const [sid, mm] of m) {
+          await client.query(
+            `INSERT INTO mt_assignments (project_id, ym, staff_id, mm) VALUES ($1,$2,$3,$4)`,
+            [pid, ym, sid, mm]);
+        }
+        monthsUpdated++;
+      }
+    }
+    await client.query('COMMIT');
+    res.json({ ok: true, projects: items.length, projectsCreated, staffCreated, monthsUpdated });
+  } catch (e) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: e.message });
+  } finally { client.release(); }
+});
+
 // ── 수익률 변동 히스토리 ──────────────────────────────
 app.get('/api/projects/:id/history', async (req, res) => {
   try {

@@ -98,7 +98,7 @@
   @media(max-width:760px){.cards{grid-template-columns:1fr 1fr}}
   .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
   .modal-bg.show{display:flex}
-  .modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;width:100%;max-width:360px}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;width:100%;max-width:360px;max-height:calc(100vh - 40px);overflow-y:auto}
   .modal h3{font-size:16px;margin-bottom:16px}
   .modal .field{margin-bottom:12px}
   .modal .field label{display:block;color:var(--muted);font-size:12px;font-weight:600;margin-bottom:5px}
@@ -154,6 +154,7 @@
       <div class="field grow"><label>프로젝트 선택</label><select id="moProject"></select></div>
       <div class="field"><label>월 추가</label><input type="month" id="moAddYm"></div>
       <button class="ghost" id="btnMoAddYm">+ 월 추가</button>
+      <button class="ghost" id="btnMoImpOpen">구글시트 MM 가져오기</button>
     </div>
     <div class="hint" id="moProjectInfo"></div>
     <div class="months" id="moChips"></div>
@@ -375,6 +376,27 @@
   </div>
 </div>
 
+<div class="modal-bg" id="moImpModal">
+  <div class="modal" style="max-width:920px">
+    <h3>월별 실투입 MM 일괄 가져오기 (MM 변동 시트)</h3>
+    <div class="row" style="margin-bottom:10px;align-items:flex-end">
+      <div class="field grow"><label>구글시트 링크 (월별 인력 투입 현황 시트)</label>
+        <input id="moImpUrl" placeholder="https://docs.google.com/spreadsheets/d/…"></div>
+      <button type="button" class="ghost" id="moImpFetch">시트에서 불러오기</button>
+    </div>
+    <p class="hint" style="margin-bottom:10px"><b>프로젝트명 · 팀 · 이름 · 등급 · 1월~12월</b> 구조의 "월별 인력 투입 현황" 시트를 인식합니다
+      (제목·연도 행, 병합 셀, 다음 해로 이어지는 월도 자동 처리). 붙여넣을 때는 <b>머리글 행들을 포함해</b> 복사하세요.<br>
+      ⚠ 가져오면 시트에 있는 <b>(프로젝트 × 월)의 투입 인력이 시트 내용으로 교체</b>됩니다. 인력 DB에 없는 이름은 자동 등록됩니다(팀·등급 반영).</p>
+    <textarea id="moImpText" rows="8" placeholder="PMO그룹 - 월별 인력 투입 현황 (2026년)&#10;프로젝트명	팀	이름	등급	1월	2월	3월	…"></textarea>
+    <div id="moImpPreview" style="margin-top:10px;max-height:300px;overflow:auto"></div>
+    <div class="msg" id="moImpMsg"></div>
+    <div class="btns">
+      <button type="button" class="ghost" id="moImpCancel">취소</button>
+      <button type="button" id="moImpSubmit" disabled>가져오기 (월별 투입 교체)</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="moHistModal">
   <div class="modal" style="max-width:820px">
     <h3>수익률 변동 히스토리 <span class="tag" id="moHistTitle"></span></h3>
@@ -400,7 +422,7 @@
       ② <b>가로 형식</b> — 프로젝트명 · 상태 · 발주처 · 계약액 · 직군별 MM 열<br>
       두 형식 모두 상태에 <b>"진행"이 포함된 계약만</b> 가져오며, 등급은 기본 중급으로 넣고 견적 기준 화면에서 조정하면 됩니다.</p>
     <textarea id="planImpText" rows="8" placeholder="계약번호	고객사	계약명	형태	상태	계약시작	계약종료	계약MM	투입MM	파트&#10;C-2601	SK에코플랜트	CTMS 리뉴얼	SI	진행중	2026-08-01	2026-12-31	6	5.5	DT개발&#10;			 	 	 	 	3	3	서비스개발"></textarea>
-    <div id="planImpPreview" style="margin-top:10px"></div>
+    <div id="planImpPreview" style="margin-top:10px;max-height:320px;overflow:auto"></div>
     <div class="msg" id="planImpMsg"></div>
     <div class="btns">
       <button type="button" class="ghost" id="planImpCancel">취소</button>
@@ -813,6 +835,126 @@ document.getElementById('btnMoSave').onclick=async()=>{
   }catch(err){s.className='status err';s.textContent='✗ 저장 실패: '+err.message;}
   finally{btn.disabled=false;}
 };
+// ── 월별 실투입 MM 가져오기 (MM 변동 시트) ────────────
+const moImpModal=document.getElementById('moImpModal');
+let moImpParsed=null;
+function parseMonthlyImp(text){
+  const raw=text.split('\n').map(l=>l.replace(/[\r\s]+$/,''));
+  const delim=text.includes('\t')?'\t':',';
+  const grid=raw.map(l=>l.split(delim).map(x=>x.trim())).filter(r=>r.some(c=>c!==''));
+  if(grid.length<2)return {error:'머리글과 데이터가 필요합니다.'};
+  const isMon=c=>/^(\d{1,2})\s*월$/.exec(String(c||'').trim());
+  // 월(1월~12월) 라벨이 6개 이상 있는 행 = 열 지도
+  let mrow=-1;
+  for(let i=0;i<Math.min(grid.length,12);i++){
+    if(grid[i].filter(c=>isMon(c)).length>=6){mrow=i;break;}
+  }
+  if(mrow<0)return {error:'월(1월~12월) 머리글 행을 찾지 못했습니다. 머리글 행들을 포함해 복사했는지 확인하세요.'};
+  // 라벨 열 찾기 (머리글이 여러 행에 나뉘어 있어도 전체에서 탐색)
+  let nameIdx=-1,teamIdx=-1,staffIdx=-1,gradeIdx=-1;
+  for(let i=0;i<=mrow;i++)grid[i].forEach((c,j)=>{
+    if(nameIdx<0&&/프로젝트/.test(c))nameIdx=j;
+    if(teamIdx<0&&/^팀$/.test(c))teamIdx=j;
+    if(staffIdx<0&&/^이름$/.test(c))staffIdx=j;
+    if(gradeIdx<0&&/^등급$/.test(c))gradeIdx=j;
+  });
+  if(nameIdx<0)nameIdx=0;
+  if(staffIdx<0)return {error:'"이름" 열을 찾지 못했습니다. 머리글 행들을 포함해 복사했는지 확인하세요.'};
+  // 연도: 제목/연도 행의 "20XX년" 표시 + 12월→1월 넘어가면 +1
+  const monthCols=[];grid[mrow].forEach((c,j)=>{const m=isMon(c);if(m)monthCols.push({col:j,mon:+m[1]});});
+  const marks=[];let baseYear=null;
+  for(let i=0;i<=mrow;i++)grid[i].forEach((c,j)=>{
+    const m=/(20\d{2})\s*년/.exec(c);if(!m)return;
+    if(j>=monthCols[0].col)marks.push({col:j,year:+m[1]});
+    else if(baseYear==null)baseYear=+m[1];
+  });
+  if(baseYear==null)baseYear=marks.length?marks[0].year:new Date().getFullYear();
+  let year=baseYear,prev=0;
+  monthCols.forEach(mc=>{
+    const mk=marks.filter(k=>k.col<=mc.col).pop();
+    if(mk&&mk.year!==year&&mc.mon<=prev)year=mk.year;
+    else if(mc.mon<prev)year++;
+    prev=mc.mon;
+    mc.ym=year+'-'+String(mc.mon).padStart(2,'0');
+  });
+  // 데이터 행: 프로젝트명 병합 셀 → 이전 값 유지
+  const items=new Map();let curName=null;
+  for(const row of grid.slice(mrow+1)){
+    let nm=(row[nameIdx]||'').trim();
+    if(/자동입력/.test(nm))nm='';
+    if(nm)curName=nm;
+    const person=(row[staffIdx]||'').trim();
+    if(!curName||!person||/자동입력/.test(person))continue;
+    const months={};let tot=0;
+    monthCols.forEach(mc=>{const v=parseNum(row[mc.col]);if(v>0){months[mc.ym]=v;tot+=v;}});
+    if(!(tot>0))continue;
+    let it=items.get(curName);
+    if(!it){it={projectName:curName,rows:[]};items.set(curName,it);}
+    it.rows.push({name:person,team:teamIdx>=0?(row[teamIdx]||'').trim():'',
+      grade:parseGrade(gradeIdx>=0?row[gradeIdx]:''),months});
+  }
+  const list=[...items.values()];
+  if(!list.length)return {error:'가져올 투입 데이터가 없습니다. 프로젝트명·이름·월별 MM이 입력된 행이 있는지 확인하세요.'};
+  return {items:list,months:monthCols.map(m=>m.ym)};
+}
+function renderMoImpPreview(){
+  const box=document.getElementById('moImpPreview');const msg=document.getElementById('moImpMsg');
+  msg.className='msg';msg.textContent='';
+  moImpParsed=null;document.getElementById('moImpSubmit').disabled=true;
+  const text=document.getElementById('moImpText').value;
+  if(!text.trim()){box.innerHTML='';return;}
+  const r=parseMonthlyImp(text);
+  if(r.error){box.innerHTML='';msg.classList.add('err');msg.textContent='✗ '+r.error;return;}
+  moImpParsed=r.items;
+  const newStaff=new Set();
+  r.items.forEach(it=>it.rows.forEach(x=>{if(!staff.some(s=>s.name===x.name))newStaff.add(x.name);}));
+  box.innerHTML='<div class="tablewrap"><table><thead><tr><th>프로젝트</th><th>매칭</th><th>인원</th><th>투입 월</th><th>총 MM</th></tr></thead><tbody>'+
+    r.items.map(it=>{
+      const exists=projects.some(p=>p.name===it.projectName);
+      const yms=new Set();let tot=0;
+      it.rows.forEach(x=>Object.entries(x.months).forEach(([ym,v])=>{yms.add(ym);tot+=v;}));
+      const arr=[...yms].sort();
+      return '<tr><td style="font-weight:700">'+it.projectName+'</td>'+
+        '<td>'+(exists?'<span class="pill good">기존</span>':'<span class="pill warn">신규 생성</span>')+'</td>'+
+        '<td class="right">'+it.rows.length+'</td>'+
+        '<td>'+(arr.length?ymLabel(arr[0])+' ~ '+ymLabel(arr[arr.length-1])+' ('+arr.length+'개월)':'-')+'</td>'+
+        '<td class="right">'+tot.toFixed(2)+'</td></tr>';
+    }).join('')+'</tbody></table></div>'+
+    '<div class="hint">'+(newStaff.size?'⚠ 인력 DB에 없어 자동 등록될 인력 '+newStaff.size+'명: '+[...newStaff].join(', ')+'<br>':'')+
+    '가져오면 위 프로젝트들의 해당 월 투입이 시트 내용으로 교체되고, 각 월의 수익률이 다시 계산됩니다.</div>';
+  document.getElementById('moImpSubmit').disabled=false;
+}
+document.getElementById('btnMoImpOpen').onclick=()=>{document.getElementById('moImpMsg').textContent='';moImpModal.classList.add('show');};
+document.getElementById('moImpCancel').onclick=()=>moImpModal.classList.remove('show');
+moImpModal.onclick=e=>{if(e.target===moImpModal)moImpModal.classList.remove('show');};
+document.getElementById('moImpText').oninput=renderMoImpPreview;
+document.getElementById('moImpFetch').onclick=async()=>{
+  const msg=document.getElementById('moImpMsg');msg.className='msg';
+  const url=document.getElementById('moImpUrl').value.trim();
+  if(!url){msg.classList.add('err');msg.textContent='구글시트 링크를 입력하세요.';return;}
+  const btn=document.getElementById('moImpFetch');btn.disabled=true;msg.textContent='시트를 읽는 중…';
+  try{
+    const r=await api('/import/sheet',{method:'POST',body:JSON.stringify({url})});
+    document.getElementById('moImpText').value=r.rows.map(row=>row.join('\t')).join('\n');
+    renderMoImpPreview();
+  }catch(err){msg.classList.add('err');msg.textContent='✗ '+err.message;}
+  finally{btn.disabled=false;}
+};
+document.getElementById('moImpSubmit').onclick=async()=>{
+  if(!moImpParsed||!moImpParsed.length)return;
+  const msg=document.getElementById('moImpMsg');msg.className='msg';
+  const btn=document.getElementById('moImpSubmit');btn.disabled=true;msg.textContent='가져오는 중…';
+  try{
+    const r=await api('/import/monthly',{method:'POST',body:JSON.stringify(moImpParsed)});
+    msg.classList.add('ok');
+    msg.textContent='✓ 프로젝트 '+r.projects+'건 · 월별 투입 '+r.monthsUpdated+'건 교체'+
+      (r.projectsCreated?' · 프로젝트 신규 '+r.projectsCreated+'건':'')+
+      (r.staffCreated?' · 인력 자동 등록 '+r.staffCreated+'명':'')+' — 수익률이 다시 계산되었습니다.';
+    await refreshAll();
+    setTimeout(()=>moImpModal.classList.remove('show'),1800);
+  }catch(err){msg.classList.add('err');msg.textContent='✗ '+err.message;btn.disabled=false;}
+};
+
 // 변동 히스토리 팝업
 const moHistModal=document.getElementById('moHistModal');
 document.getElementById('moHistClose').onclick=()=>moHistModal.classList.remove('show');

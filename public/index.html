@@ -186,6 +186,9 @@
       <div class="field grow"><label>당월 부대비</label><input id="moCostEtc" class="num" inputmode="numeric" value="0"></div>
       <div class="field grow"><label>비고</label><input id="moNote"></div>
     </div>
+    <div class="row" style="margin-top:10px">
+      <div class="field grow"><label>수익률 변동 사유 (저장 시 히스토리에 기록)</label><input id="moReason" placeholder="예: 고급 인력 1명 추가 투입으로 인건비 증가"></div>
+    </div>
     <div class="savebar">
       <button id="btnMoSave">이 달 투입·실적 저장</button>
       <span class="status" id="moStatus"></span>
@@ -202,7 +205,10 @@
   <div class="panel">
     <div class="toolbar">
       <h2>월별 요약 <span class="tag">원 단위 · VAT 제외</span></h2>
-      <button class="ghost sm" id="btnMoExport">CSV 내보내기</button>
+      <div style="display:flex;gap:8px">
+        <button class="ghost sm" id="btnMoHistory">변동 히스토리</button>
+        <button class="ghost sm" id="btnMoExport">CSV 내보내기</button>
+      </div>
     </div>
     <div class="tablewrap">
     <table>
@@ -369,6 +375,17 @@
   </div>
 </div>
 
+<div class="modal-bg" id="moHistModal">
+  <div class="modal" style="max-width:820px">
+    <h3>수익률 변동 히스토리 <span class="tag" id="moHistTitle"></span></h3>
+    <p class="hint" style="margin-bottom:10px">월별 투입·실적을 저장할 때마다 그 시점의 수익률과 변동 사유가 기록됩니다.</p>
+    <div id="moHistBody" style="max-height:420px;overflow:auto"></div>
+    <div class="btns">
+      <button type="button" class="ghost" id="moHistClose">닫기</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="planImpModal">
   <div class="modal" style="max-width:900px">
     <h3>견적(계약) 투입계획 일괄 가져오기 (구글시트)</h3>
@@ -377,10 +394,12 @@
         <input id="planImpUrl" placeholder="https://docs.google.com/spreadsheets/d/…"></div>
       <button type="button" class="ghost" id="planImpFetch">시트에서 불러오기</button>
     </div>
-    <p class="hint" style="margin-bottom:10px">또는 시트에서 <b>머리글 행을 포함해</b> 범위를 복사해 붙여넣으세요.
-      머리글에서 <b>프로젝트명 · 상태(진행) · 발주처 · 계약액 · 시작/종료월 · 직군별 MM</b>(단가표의 직군명과 같은 열)을 자동 인식하고,
-      상태에 <b>"진행"이 포함된 행만</b> 가져옵니다. 등급은 기본 중급으로 넣고 아래 화면에서 조정하면 됩니다.</p>
-    <textarea id="planImpText" rows="8" placeholder="프로젝트명	상태	발주처	계약액	DT개발	서비스개발	UX	Visual&#10;CTMS 리뉴얼	계약진행중	SK에코플랜트	250000000	6	3	2	2"></textarea>
+    <p class="hint" style="margin-bottom:10px">시트에서 <b>머리글 행을 포함해</b> 범위를 복사해 붙여넣으세요. 두 가지 형식을 자동 인식합니다:<br>
+      ① <b>계약 관리 시트</b> — <b>계약번호 · 고객사 · 계약명 · 형태 · 상태 · 계약시작 · 계약종료 · 계약MM · 투입MM · 파트 · 1월~12월 · 합계</b>
+      (계약명으로 파트 행들을 묶고, 파트별 <b>계약MM</b>으로 견적 기준을 만듭니다. 계약명이 병합 셀이라 아랫줄이 비어 있어도 됩니다)<br>
+      ② <b>가로 형식</b> — 프로젝트명 · 상태 · 발주처 · 계약액 · 직군별 MM 열<br>
+      두 형식 모두 상태에 <b>"진행"이 포함된 계약만</b> 가져오며, 등급은 기본 중급으로 넣고 견적 기준 화면에서 조정하면 됩니다.</p>
+    <textarea id="planImpText" rows="8" placeholder="계약번호	고객사	계약명	형태	상태	계약시작	계약종료	계약MM	투입MM	파트&#10;C-2601	SK에코플랜트	CTMS 리뉴얼	SI	진행중	2026-08-01	2026-12-31	6	5.5	DT개발&#10;			 	 	 	 	3	3	서비스개발"></textarea>
     <div id="planImpPreview" style="margin-top:10px"></div>
     <div class="msg" id="planImpMsg"></div>
     <div class="btns">
@@ -782,11 +801,49 @@ document.getElementById('btnMoSave').onclick=async()=>{
     await api('/projects/'+p.id+'/assignments/'+curYm,{method:'PUT',body:JSON.stringify(assigns)});
     await api('/projects/'+p.id+'/records/'+curYm,{method:'PUT',body:JSON.stringify({
       revenue:moDraft.rec.revenue,costLabor:0,costOut:moDraft.rec.costOut,costEtc:moDraft.rec.costEtc,note:moDraft.rec.note||null})});
+    // 수익률 스냅샷 + 변동 사유를 히스토리에 기록
+    const act=monthActual(p,curYm,assigns,moDraft.rec);
+    await api('/projects/'+p.id+'/history',{method:'POST',body:JSON.stringify({
+      ym:curYm,margin:act.margin,planMargin:planMarginOf(p),
+      reason:document.getElementById('moReason').value.trim()})});
+    document.getElementById('moReason').value='';
     await refreshAll(false);
     initMoDraft();renderMonthly();
     s.textContent='✓ '+ymLabel(curYm)+' 투입·실적이 저장되었습니다.';setTimeout(()=>s.textContent='',2500);
   }catch(err){s.className='status err';s.textContent='✗ 저장 실패: '+err.message;}
   finally{btn.disabled=false;}
+};
+// 변동 히스토리 팝업
+const moHistModal=document.getElementById('moHistModal');
+document.getElementById('moHistClose').onclick=()=>moHistModal.classList.remove('show');
+moHistModal.onclick=e=>{if(e.target===moHistModal)moHistModal.classList.remove('show');};
+document.getElementById('btnMoHistory').onclick=async()=>{
+  const p=curProject();if(!p)return;
+  document.getElementById('moHistTitle').textContent=p.name;
+  const box=document.getElementById('moHistBody');
+  box.innerHTML='<div class="empty">불러오는 중…</div>';
+  moHistModal.classList.add('show');
+  try{
+    const logs=await api('/projects/'+p.id+'/history');
+    if(!logs.length){box.innerHTML='<div class="empty">기록이 없습니다. 월별 투입·실적을 저장하면 그 시점의 수익률과 변동 사유가 여기에 쌓입니다.</div>';return;}
+    box.innerHTML='<div class="tablewrap"><table><thead><tr>'+
+      '<th>기록 시각</th><th>대상 월</th><th>당시 수익률</th><th>견적 기준</th><th>견적 대비</th><th>변동 사유</th><th style="width:30px"></th>'+
+      '</tr></thead><tbody>'+logs.map(l=>{
+        const t=String(l.createdAt).replace('T',' ').slice(0,16);
+        const d=(l.margin!=null&&l.planMargin!=null)?l.margin-l.planMargin:null;
+        return '<tr><td class="muted">'+t+'</td><td style="font-weight:700">'+ymLabel(l.ym)+'</td>'+
+          '<td>'+(l.margin!=null?'<span class="pill '+cls(l.margin)+'">'+l.margin.toFixed(1)+'%</span>':'-')+'</td>'+
+          '<td>'+(l.planMargin!=null?l.planMargin.toFixed(1)+'%':'-')+'</td>'+
+          '<td>'+(d!=null?deltaHtml(d):'–')+'</td>'+
+          '<td>'+(l.reason?String(l.reason).replace(/</g,'&lt;'):'<span class="muted">-</span>')+'</td>'+
+          '<td><span class="del-x" data-hdel="'+l.id+'">×</span></td></tr>';
+      }).join('')+'</tbody></table></div>';
+    box.querySelectorAll('[data-hdel]').forEach(x=>x.onclick=async e=>{
+      if(!confirm('이 히스토리 기록을 삭제할까요?'))return;
+      try{await api('/history/'+e.target.dataset.hdel,{method:'DELETE'});document.getElementById('btnMoHistory').click();}
+      catch(err){alert('삭제 실패: '+err.message);}
+    });
+  }catch(err){box.innerHTML='<div class="empty">'+err.message+'</div>';}
 };
 document.getElementById('btnMoExport').onclick=()=>{
   const p=curProject();if(!p)return;
@@ -1117,13 +1174,45 @@ function parsePlanImp(text){
   const header=grid[0];
   const roleKeys=Object.keys(rates);
   const find=re=>header.findIndex(h=>re.test(h));
-  const nameIdx=find(/프로젝트|사업명|과제|건명/);
-  if(nameIdx<0)return {error:'머리글에서 "프로젝트명" 열을 찾지 못했습니다. 머리글 행을 포함해 복사했는지 확인하세요.'};
+  const nameIdx=find(/계약명|프로젝트|사업명|과제|건명/);
+  if(nameIdx<0)return {error:'머리글에서 "계약명(프로젝트명)" 열을 찾지 못했습니다. 머리글 행을 포함해 복사했는지 확인하세요.'};
   const statusIdx=find(/상태|진행|구분/);
   const clientIdx=find(/발주|고객|클라이언트/);
   const budgetIdx=find(/계약액|계약금|금액|수주/);
   const startIdx=find(/시작|착수/);
   const endIdx=find(/종료|마감/);
+  const partIdx=find(/파트|부문/);
+  const roleFor=t=>{const hh=String(t||'').replace(/\s|\(.*?\)/g,'');if(!hh)return null;
+    return roleKeys.find(r=>{const rr=r.replace(/\s|\(.*?\)/g,'');return rr&&(hh.includes(rr)||rr.includes(hh));})||null;};
+
+  // 세로 형식: 한 계약이 파트별 여러 행 (계약번호·고객사·계약명·형태·상태·계약시작·계약종료·계약MM·투입MM·파트·1월~12월·합계)
+  if(partIdx>=0){
+    let cmmIdx=find(/계약\s*MM/i);if(cmmIdx<0)cmmIdx=find(/합계/);
+    if(cmmIdx<0)return {error:'"계약MM" 열을 찾지 못했습니다.'};
+    const map=new Map();const skippedSet=new Set();const unknownParts=new Set();
+    let ctx=null;
+    for(const row of grid.slice(1)){
+      const rawName=row[nameIdx]||'';
+      if(rawName){ // 새 계약 블록 시작 (병합 셀로 아랫줄이 비어 있으면 이전 값 유지)
+        ctx={name:rawName,client:clientIdx>=0?row[clientIdx]||'':'',status:statusIdx>=0?row[statusIdx]||'':'',
+             startYm:startIdx>=0?ymNorm(row[startIdx]):null,endYm:endIdx>=0?ymNorm(row[endIdx]):null,
+             budget:budgetIdx>=0?parseNum(row[budgetIdx]):0};
+      }
+      if(!ctx)continue;
+      const part=row[partIdx];if(!part)continue;
+      if(statusIdx>=0&&ctx.status&&!/진행/.test(ctx.status)){skippedSet.add(ctx.name);continue;}
+      const mm=parseNum(row[cmmIdx]);if(!(mm>0))continue;
+      let it=map.get(ctx.name);
+      if(!it){it={name:ctx.name,client:ctx.client,budget:ctx.budget,startYm:ctx.startYm,endYm:ctx.endYm,rows:[],status:ctx.status||'진행중'};map.set(ctx.name,it);}
+      const role=roleFor(part);
+      if(!role)unknownParts.add(part);
+      it.rows.push({role:role||String(part).trim(),grade:1,mm,rate:role?rateOf(role,1):0});
+    }
+    const items=[...map.values()].filter(it=>it.rows.length);
+    if(!items.length&&!skippedSet.size)return {error:'가져올 데이터 행이 없습니다. 파트와 계약MM이 입력된 행이 있는지 확인하세요.'};
+    return {items,skipped:[...skippedSet],mmCols:null,unknownParts:[...unknownParts],longFormat:true};
+  }
+
   const used=[nameIdx,statusIdx,clientIdx,budgetIdx,startIdx,endIdx];
   const mmCols=[];
   header.forEach((h,i)=>{
@@ -1156,6 +1245,7 @@ function renderPlanImpPreview(){
   if(!r.items.length){box.innerHTML='';msg.classList.add('err');
     msg.textContent='✗ 가져올 진행중 프로젝트가 없습니다.'+(r.skipped.length?' (상태에 "진행"이 없는 '+r.skipped.length+'건 제외)':'');return;}
   planImpParsed=r.items;
+  const noBudget=r.items.every(it=>!(it.budget>0));
   box.innerHTML='<div class="tablewrap"><table><thead><tr><th>프로젝트</th><th>상태</th><th>발주처</th><th>계약액</th>'+
     '<th>총 MM</th><th>계획 인건비</th><th>견적 수익률</th></tr></thead><tbody>'+
     r.items.map(it=>{
@@ -1165,8 +1255,13 @@ function renderPlanImpPreview(){
         '<td class="right">'+won(it.budget)+'</td><td class="right">'+mm.toFixed(2)+'</td><td class="right">'+won(labor)+'</td>'+
         '<td>'+(margin!=null?'<span class="pill '+cls(margin)+'">'+margin.toFixed(1)+'%</span>':'-')+'</td></tr>';
     }).join('')+'</tbody></table></div>'+
-    '<div class="hint">MM 인식 열: '+r.mmCols.map(c=>c.label).join(', ')+' (등급 기본 중급)'+
-    (r.skipped.length?' · 진행중이 아니어서 제외: '+r.skipped.length+'건':'')+'</div>';
+    '<div class="hint">'+
+    (r.longFormat?'파트별 계약MM을 계약명 기준으로 묶어 인식했습니다 (등급 기본 중급)':
+      'MM 인식 열: '+r.mmCols.map(c=>c.label).join(', ')+' (등급 기본 중급)')+
+    (r.skipped.length?' · 진행중이 아니어서 제외: '+r.skipped.length+'건':'')+
+    (r.unknownParts&&r.unknownParts.length?'<br>⚠ 단가표에 없는 파트 → 단가 0으로 등록됨: <b>'+r.unknownParts.join(', ')+'</b> — 단가표에 같은 이름의 직군을 추가한 뒤 견적 기준 화면에서 단가를 다시 선택하세요.':'')+
+    (noBudget?'<br>⚠ 계약액 열이 없어 0으로 등록됩니다. 등록 후 프로젝트 수정에서 계약액을 입력하면 견적 수익률이 계산됩니다.':'')+
+    '</div>';
   document.getElementById('planImpSubmit').disabled=false;
 }
 document.getElementById('btnPlanImpOpen').onclick=()=>{document.getElementById('planImpMsg').textContent='';planImpModal.classList.add('show');};

@@ -344,6 +344,45 @@ app.post('/api/plan/import', async (req, res) => {
   } finally { client.release(); }
 });
 
+// ── 수익률 변동 히스토리 ──────────────────────────────
+app.get('/api/projects/:id/history', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT * FROM mt_change_logs WHERE project_id=$1 ORDER BY created_at DESC LIMIT 500',
+      [req.params.id]
+    );
+    res.json(rows.map((r) => ({
+      id: Number(r.id), ym: r.ym,
+      margin: r.margin == null ? null : Number(r.margin),
+      planMargin: r.plan_margin == null ? null : Number(r.plan_margin),
+      reason: r.reason || '', createdAt: r.created_at,
+    })));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/projects/:id/history', async (req, res) => {
+  const b = req.body || {};
+  if (!YM.test(b.ym || '')) return res.status(400).json({ error: '월(YYYY-MM)이 필요합니다.' });
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO mt_change_logs (project_id, ym, margin, plan_margin, reason)
+       VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+      [req.params.id, b.ym,
+       b.margin == null ? null : num(b.margin),
+       b.planMargin == null ? null : num(b.planMargin),
+       (b.reason || '').trim() || null]
+    );
+    res.json({ ok: true, id: Number(rows[0].id) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/history/:id', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM mt_change_logs WHERE id=$1', [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── 견적서 첨부파일 ───────────────────────────────────
 app.get('/api/projects/:id/quote-files', async (req, res) => {
   try {

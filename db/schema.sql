@@ -64,6 +64,18 @@ alter table mt_projects add column if not exists plan_cost_out numeric not null 
 alter table mt_projects add column if not exists plan_cost_etc numeric not null default 0;
 alter table mt_projects add column if not exists rate_std text not null default 'SW';
 
+-- 수익률 변동 히스토리 — 월별 투입·실적을 저장할 때마다 수익률 스냅샷과 변동 사유를 기록
+create table if not exists mt_change_logs (
+  id          bigserial primary key,
+  project_id  bigint not null references mt_projects(id) on delete cascade,
+  ym          text not null,               -- 대상 월 'YYYY-MM'
+  margin      numeric,                     -- 저장 시점의 당월 수익률(%)
+  plan_margin numeric,                     -- 저장 시점의 견적 기준 수익률(%)
+  reason      text,                        -- 변동 사유
+  created_at  timestamptz not null default now()
+);
+create index if not exists idx_mt_logs_project on mt_change_logs(project_id, created_at desc);
+
 -- 견적서 첨부파일 — Render 디스크는 재배포 시 초기화되므로 DB에 저장
 create table if not exists mt_quote_files (
   id         bigserial primary key,

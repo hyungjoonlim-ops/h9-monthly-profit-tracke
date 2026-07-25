@@ -437,9 +437,10 @@
   <div class="modal" style="max-width:920px">
     <h3>월별 실투입 MM 일괄 가져오기 (MM 변동 시트)</h3>
     <div class="row" style="margin-bottom:10px;align-items:flex-end">
-      <div class="field grow"><label>구글시트 링크 (월별 인력 투입 현황 시트)</label>
+      <div class="field grow"><label>구글시트 링크 — <b>"모든 탭 일괄"</b>은 각 실의 탭을 한 번에 모두 가져옵니다</label>
         <input id="moImpUrl" placeholder="https://docs.google.com/spreadsheets/d/…"></div>
-      <button type="button" class="ghost" id="moImpFetch">시트에서 불러오기</button>
+      <button type="button" class="ghost" id="moImpFetch">현재 탭만</button>
+      <button type="button" id="moImpFetchAll">모든 탭 일괄</button>
     </div>
     <p class="hint" style="margin-bottom:10px"><b>프로젝트명 · 팀 · 이름 · 등급 · 1월~12월</b> 구조의 "월별 인력 투입 현황" 시트를 인식합니다
       (제목·연도 행, 병합 셀, 다음 해로 이어지는 월도 자동 처리). 붙여넣을 때는 <b>머리글 행들을 포함해</b> 복사하세요.<br>
@@ -471,7 +472,8 @@
     <div class="row" style="margin-bottom:10px;align-items:flex-end">
       <div class="field grow"><label>구글시트 링크 (공유: 링크가 있는 모든 사용자 – 뷰어)</label>
         <input id="planImpUrl" placeholder="https://docs.google.com/spreadsheets/d/…"></div>
-      <button type="button" class="ghost" id="planImpFetch">시트에서 불러오기</button>
+      <button type="button" class="ghost" id="planImpFetch">현재 탭만</button>
+      <button type="button" id="planImpFetchAll">모든 탭 일괄</button>
     </div>
     <p class="hint" style="margin-bottom:10px">시트에서 <b>머리글 행을 포함해</b> 범위를 복사해 붙여넣으세요. 두 가지 형식을 자동 인식합니다:<br>
       ① <b>계약 관리 시트</b> — <b>계약번호 · 고객사 · 계약명 · 형태 · 상태 · 계약시작 · 계약종료 · 계약MM · 투입MM · 파트 · 1월~12월 · 합계</b>
@@ -955,15 +957,12 @@ function parseMonthlyImp(text){
   if(!list.length)return {error:'가져올 투입 데이터가 없습니다. 프로젝트명·이름·월별 MM이 입력된 행이 있는지 확인하세요.'};
   return {items:list,months:monthCols.map(m=>m.ym)};
 }
-function renderMoImpPreview(){
+function showMoImpPreview(r,extraNote){
   const box=document.getElementById('moImpPreview');const msg=document.getElementById('moImpMsg');
-  msg.className='msg';msg.textContent='';
   moImpParsed=null;document.getElementById('moImpSubmit').disabled=true;
-  const text=document.getElementById('moImpText').value;
-  if(!text.trim()){box.innerHTML='';return;}
-  const r=parseMonthlyImp(text);
   if(r.error){box.innerHTML='';msg.classList.add('err');msg.textContent='✗ '+r.error;return;}
   moImpParsed=r.items;
+  const extra=extraNote?'<br>'+extraNote:'';
   const newStaff=new Set();
   r.items.forEach(it=>it.rows.forEach(x=>{if(!staff.some(s=>s.name===x.name))newStaff.add(x.name);}));
   box.innerHTML='<div class="tablewrap"><table><thead><tr><th>프로젝트</th><th>매칭</th><th>인원</th><th>투입 월</th><th>총 MM</th></tr></thead><tbody>'+
@@ -979,8 +978,15 @@ function renderMoImpPreview(){
         '<td class="right">'+tot.toFixed(2)+'</td></tr>';
     }).join('')+'</tbody></table></div>'+
     '<div class="hint">'+(newStaff.size?'⚠ 인력 DB에 없어 자동 등록될 인력 '+newStaff.size+'명: '+[...newStaff].join(', ')+'<br>':'')+
-    '가져오면 위 프로젝트들의 해당 월 투입이 시트 내용으로 교체되고, 각 월의 수익률이 다시 계산됩니다.</div>';
+    '가져오면 위 프로젝트들의 해당 월 투입이 시트 내용으로 교체되고, 각 월의 수익률이 다시 계산됩니다.'+extra+'</div>';
   document.getElementById('moImpSubmit').disabled=false;
+}
+function renderMoImpPreview(){
+  const msg=document.getElementById('moImpMsg');msg.className='msg';msg.textContent='';
+  const text=document.getElementById('moImpText').value;
+  if(!text.trim()){document.getElementById('moImpPreview').innerHTML='';
+    moImpParsed=null;document.getElementById('moImpSubmit').disabled=true;return;}
+  showMoImpPreview(parseMonthlyImp(text));
 }
 document.getElementById('btnMoImpOpen').onclick=()=>{document.getElementById('moImpMsg').textContent='';moImpModal.classList.add('show');};
 document.getElementById('moImpCancel').onclick=()=>moImpModal.classList.remove('show');
@@ -995,6 +1001,42 @@ document.getElementById('moImpFetch').onclick=async()=>{
     const r=await api('/import/sheet',{method:'POST',body:JSON.stringify({url})});
     document.getElementById('moImpText').value=r.rows.map(row=>row.join('\t')).join('\n');
     renderMoImpPreview();
+  }catch(err){msg.classList.add('err');msg.textContent='✗ '+err.message;}
+  finally{btn.disabled=false;}
+};
+// 모든 탭 일괄 가져오기 — 각 실이 탭을 나눠 쓰는 구조 지원
+document.getElementById('moImpFetchAll').onclick=async()=>{
+  const msg=document.getElementById('moImpMsg');msg.className='msg';
+  const url=document.getElementById('moImpUrl').value.trim();
+  if(!url){msg.classList.add('err');msg.textContent='구글시트 링크를 입력하세요.';return;}
+  const btn=document.getElementById('moImpFetchAll');btn.disabled=true;
+  msg.textContent='모든 탭을 읽는 중… (탭이 많으면 20초 이상 걸릴 수 있습니다)';
+  try{
+    const r=await api('/import/sheet-all',{method:'POST',body:JSON.stringify({url})});
+    const merged=new Map();const ok=[],skip=[];
+    for(const sh of r.sheets){
+      const text=sh.rows.map(row=>row.join('\t')).join('\n');
+      const p=parseMonthlyImp(text);
+      if(p.error||!p.items||!p.items.length){skip.push(sh.name);continue;}
+      ok.push(sh.name+'('+p.items.length+')');
+      // 같은 프로젝트가 여러 탭(각 실)에 있으면 인력 행을 합친다
+      for(const it of p.items){
+        const cur=merged.get(it.projectName);
+        if(cur)cur.rows.push(...it.rows);
+        else merged.set(it.projectName,{projectName:it.projectName,rows:[...it.rows]});
+      }
+    }
+    const items=[...merged.values()];
+    if(!items.length){
+      msg.classList.add('err');
+      msg.textContent='✗ 모든 탭에서 투입 데이터를 찾지 못했습니다 ('+r.sheets.length+'개 탭 확인). 탭에 프로젝트명·이름·월별 MM 구조가 있는지 확인하세요.';
+      return;
+    }
+    document.getElementById('moImpText').value='';
+    showMoImpPreview({items},'📑 인식된 탭 '+ok.length+'/'+r.sheets.length+'개: '+ok.join(', ')+
+      (skip.length?'<br>· 구조가 달라 건너뛴 탭: '+skip.join(', '):''));
+    msg.classList.add('ok');
+    msg.textContent='✓ '+ok.length+'개 탭에서 프로젝트 '+items.length+'건을 모았습니다. 아래 미리보기 확인 후 [가져오기]를 누르세요.';
   }catch(err){msg.classList.add('err');msg.textContent='✗ '+err.message;}
   finally{btn.disabled=false;}
 };
@@ -1593,13 +1635,14 @@ function parsePlanImp(text){
   }
   return {items,skipped,mmCols,hasStatus:statusIdx>=0};
 }
-function renderPlanImpPreview(){
+function renderPlanImpPreview(pre,extraNote){
   const box=document.getElementById('planImpPreview');const msg=document.getElementById('planImpMsg');
-  msg.className='msg';msg.textContent='';
+  if(!pre){msg.className='msg';msg.textContent='';}
   const text=document.getElementById('planImpText').value;
   planImpParsed=null;document.getElementById('planImpSubmit').disabled=true;
-  if(!text.trim()){box.innerHTML='';return;}
-  const r=parsePlanImp(text);
+  if(!pre&&!text.trim()){box.innerHTML='';return;}
+  const r=pre||parsePlanImp(text);
+  const extra=extraNote?'<br>'+extraNote:'';
   if(r.error){box.innerHTML='';msg.classList.add('err');msg.textContent='✗ '+r.error;return;}
   if(!r.items.length){box.innerHTML='';msg.classList.add('err');
     msg.textContent='✗ 가져올 진행중 프로젝트가 없습니다.'+(r.skipped.length?' (상태에 "진행"이 없는 '+r.skipped.length+'건 제외)':'');return;}
@@ -1616,11 +1659,11 @@ function renderPlanImpPreview(){
     }).join('')+'</tbody></table></div>'+
     '<div class="hint">'+
     (r.longFormat?'파트별 계약MM을 계약명 기준으로 묶어 인식했습니다 (등급 기본 중급)':
-      'MM 인식 열: '+r.mmCols.map(c=>c.label).join(', ')+' (등급 기본 중급)')+
-    (r.skipped.length?' · 진행중이 아니어서 제외: '+r.skipped.length+'건':'')+
+      (r.mmCols?'MM 인식 열: '+r.mmCols.map(c=>c.label).join(', ')+' (등급 기본 중급)':'등급 기본 중급'))+
+    (r.skipped&&r.skipped.length?' · 진행중이 아니어서 제외: '+r.skipped.length+'건':'')+
     (r.unknownParts&&r.unknownParts.length?'<br>⚠ 단가표에 없는 파트 → 단가 0으로 등록됨: <b>'+r.unknownParts.join(', ')+'</b> — 단가표에 같은 이름의 직군을 추가한 뒤 견적 기준 화면에서 단가를 다시 선택하세요.':'')+
     (noBudget?'<br>⚠ 계약액 열이 없어 0으로 등록됩니다. 등록 후 프로젝트 수정에서 계약액을 입력하면 견적 수익률이 계산됩니다.':'')+
-    '</div>';
+    extra+'</div>';
   document.getElementById('planImpSubmit').disabled=false;
 }
 document.getElementById('btnPlanImpOpen').onclick=()=>{document.getElementById('planImpMsg').textContent='';planImpModal.classList.add('show');};
@@ -1636,6 +1679,47 @@ document.getElementById('planImpFetch').onclick=async()=>{
     const r=await api('/import/sheet',{method:'POST',body:JSON.stringify({url})});
     document.getElementById('planImpText').value=r.rows.map(row=>row.join('\t')).join('\n');
     renderPlanImpPreview();
+  }catch(err){msg.classList.add('err');msg.textContent='✗ '+err.message;}
+  finally{btn.disabled=false;}
+};
+// 모든 탭 일괄 가져오기 (계약 시트가 여러 탭으로 나뉜 경우)
+document.getElementById('planImpFetchAll').onclick=async()=>{
+  const msg=document.getElementById('planImpMsg');msg.className='msg';
+  const url=document.getElementById('planImpUrl').value.trim();
+  if(!url){msg.classList.add('err');msg.textContent='구글시트 링크를 입력하세요.';return;}
+  const btn=document.getElementById('planImpFetchAll');btn.disabled=true;
+  msg.textContent='모든 탭을 읽는 중… (탭이 많으면 20초 이상 걸릴 수 있습니다)';
+  try{
+    const r=await api('/import/sheet-all',{method:'POST',body:JSON.stringify({url})});
+    const merged=new Map();const ok=[],skip=[];const unknown=new Set();let skipped=0;
+    for(const sh of r.sheets){
+      const p=parsePlanImp(sh.rows.map(row=>row.join('\t')).join('\n'));
+      if(p.error||!p.items||!p.items.length){skip.push(sh.name);continue;}
+      ok.push(sh.name+'('+p.items.length+')');
+      (p.unknownParts||[]).forEach(x=>unknown.add(x));
+      skipped+=(p.skipped||[]).length;
+      for(const it of p.items){
+        const cur=merged.get(it.name);
+        if(cur){cur.rows.push(...it.rows);
+          if(!cur.budget&&it.budget)cur.budget=it.budget;
+          if(!cur.client&&it.client)cur.client=it.client;
+          if(!cur.startYm&&it.startYm)cur.startYm=it.startYm;
+          if(!cur.endYm&&it.endYm)cur.endYm=it.endYm;}
+        else merged.set(it.name,{...it,rows:[...it.rows]});
+      }
+    }
+    const items=[...merged.values()];
+    if(!items.length){
+      msg.classList.add('err');
+      msg.textContent='✗ 모든 탭에서 진행중 계약을 찾지 못했습니다 ('+r.sheets.length+'개 탭 확인).';
+      return;
+    }
+    document.getElementById('planImpText').value='';
+    renderPlanImpPreview({items,skipped:new Array(skipped),unknownParts:[...unknown],longFormat:true},
+      '📑 인식된 탭 '+ok.length+'/'+r.sheets.length+'개: '+ok.join(', ')+
+      (skip.length?'<br>· 구조가 달라 건너뛴 탭: '+skip.join(', '):''));
+    msg.classList.add('ok');
+    msg.textContent='✓ '+ok.length+'개 탭에서 진행중 계약 '+items.length+'건을 모았습니다. 미리보기 확인 후 [등록]을 누르세요.';
   }catch(err){msg.classList.add('err');msg.textContent='✗ '+err.message;}
   finally{btn.disabled=false;}
 };

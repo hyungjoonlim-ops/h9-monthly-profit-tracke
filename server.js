@@ -521,6 +521,37 @@ function parseCsv(text) {
   return rows;
 }
 
+// 스프레드시트의 모든 탭을 한 번에 가져오기 (xlsx로 통째로 내려받아 파싱)
+app.post('/api/import/sheet-all', async (req, res) => {
+  try {
+    const url = String((req.body || {}).url || '').trim();
+    const m = url.match(/^https:\/\/docs\.google\.com\/spreadsheets\/d\/([A-Za-z0-9_-]+)/);
+    let exportUrl;
+    if (m) exportUrl = `https://docs.google.com/spreadsheets/d/${m[1]}/export?format=xlsx`;
+    else if (process.env.ALLOW_TEST_SHEET_URL === '1' && /^http:\/\/127\.0\.0\.1[:/]/.test(url)) exportUrl = url;
+    else {
+      return res.status(400).json({ error: '구글시트 링크 형식이 아닙니다. https://docs.google.com/spreadsheets/d/… 링크를 붙여넣어 주세요.' });
+    }
+    const r = await fetch(exportUrl, { redirect: 'follow' });
+    const ct = r.headers.get('content-type') || '';
+    if (!r.ok || ct.includes('text/html')) {
+      return res.status(400).json({
+        error: '시트를 읽을 수 없습니다 (HTTP ' + r.status + '). 시트 공유 설정이 "링크가 있는 모든 사용자 – 뷰어"인지 확인하세요.',
+      });
+    }
+    const XLSX = (await import('xlsx')).default || (await import('xlsx'));
+    const wb = XLSX.read(Buffer.from(await r.arrayBuffer()), { type: 'buffer' });
+    const sheets = wb.SheetNames.map((name) => ({
+      name,
+      rows: XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: false, defval: '' })
+        .map((row) => row.map((c) => String(c == null ? '' : c))),
+    }));
+    res.json({ sheets });
+  } catch (e) {
+    res.status(500).json({ error: '시트 전체 가져오기 실패: ' + e.message });
+  }
+});
+
 app.post('/api/import/sheet', async (req, res) => {
   try {
     const url = String((req.body || {}).url || '').trim();

@@ -17,6 +17,7 @@ export const pool = new pg.Pool({
   database: process.env.PGDATABASE,
   ssl: { rejectUnauthorized: false },
   max: 5,
+  connectionTimeoutMillis: 10000,
 });
 
 pool.on('error', (err) => console.error('예상치 못한 DB 풀 오류:', err.message));

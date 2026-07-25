@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cookieSession from 'cookie-session';
 import crypto from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { pool } from './db.js';
@@ -428,6 +429,28 @@ app.delete('/api/projects/:id/records/:ym', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
+
+// 시작 시 스키마 자동 생성 — 테이블이 없으면 만들고, 단가표가 비어 있으면 기본값 시딩
+try {
+  const schema = await readFile(join(__dirname, 'db', 'schema.sql'), 'utf8');
+  await pool.query(schema);
+  await pool.query(`
+    insert into mt_rate_cards (role, junior, mid, senior, expert, sort_order)
+    select * from (values
+      ('DT개발',        5200000, 6800000, 8900000, 9400000, 0),
+      ('TF (수원,SDS)', 4900000, 6300000, 7700000, 9100000, 1),
+      ('서비스개발',    4700000, 5500000, 7200000, 9500000, 2),
+      ('PM',            5100000, 5600000, 6700000, 7400000, 3),
+      ('Interaction',   4900000, 5700000, 6300000, 9000000, 4),
+      ('UX',            4800000, 5900000, 7000000, 7500000, 5),
+      ('Visual',        4900000, 5700000, 6200000, 9100000, 6)
+    ) as v(role, junior, mid, senior, expert, sort_order)
+    where not exists (select 1 from mt_rate_cards)
+  `);
+  console.log('✓ DB 스키마 확인/생성 완료');
+} catch (e) {
+  console.error('❌ DB 스키마 초기화 실패 — 접속 정보(PGHOST/PGUSER/PGPASSWORD)를 확인하세요:', e.message);
+}
 
 // 시작 시 DB에 저장된 비밀번호 존재 여부 확인
 try {

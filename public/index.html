@@ -445,7 +445,7 @@
     </table>
     </div>
     <div class="addline">
-      <div class="field grow"><label>이름 직접 추가 (시트의 파트명·팀명)</label><input id="pmNewSrc" placeholder="예: DX실 2팀"></div>
+      <div class="field grow"><label>이름 또는 <b>패턴 규칙</b> 추가 — <code>*</code>로 여러 이름을 한 번에 (예: <code>DX실 *</code>)</label><input id="pmNewSrc" placeholder="예: DX실 2팀   또는   DX실 *"></div>
       <div class="field"><label>→ 직군</label><select id="pmNewRole"></select></div>
       <button class="ghost" id="btnPmAdd">매핑 추가</button>
     </div>
@@ -455,7 +455,9 @@
     </div>
     <div class="hint">계약 시트의 <b>파트</b>명과 MM 시트의 <b>팀</b>명이 단가표 직군명과 다를 때 여기서 연결해 주세요.
       저장하면 견적 투입계획의 단가 인식, 계약 대비 변동 분석의 파트별 집계에 즉시 반영됩니다.
-      이름이 같거나 포함 관계면 자동 매칭되므로, <b>자동으로 못 찾은 것만</b> 아래 목록에 나타납니다.</div>
+      이름이 같거나 포함 관계면 자동 매칭되므로, <b>자동으로 못 찾은 것만</b> 아래 목록에 나타납니다.<br>
+      <b>패턴 규칙</b>: <code>DX실 *</code> 처럼 <code>*</code>를 넣으면 그 형태의 모든 이름에 한 번에 적용됩니다
+      (예: <code>* 팀</code> → 모든 N팀). 개별 지정이 패턴보다 우선하고, 패턴끼리는 더 구체적인(긴) 규칙이 우선합니다.</div>
   </div>
 
   <div class="panel">
@@ -607,16 +609,33 @@ function ymRange(a,b){
 const ymLabel=ym=>ym?ym.replace('-','.'):'-';
 // 파트/팀 이름 → 단가표 직군 해석: 저장된 매핑 우선, 없으면 이름 유사도(공백·괄호 무시, 포함 관계)
 const normName=t=>String(t||'').replace(/\s|\(.*?\)|MM|공수/gi,'').toLowerCase();
-function resolveRole(name){
-  const raw=String(name||'').trim();
-  if(!raw)return null;
-  if(rates[raw]!=null)return raw;
-  if(partMap[raw])return rates[partMap[raw]]!=null?partMap[raw]:null;
-  const n=normName(raw);if(!n)return null;
-  const hit=Object.keys(partMap).find(k=>normName(k)===n);
-  if(hit&&rates[partMap[hit]]!=null)return partMap[hit];
-  return Object.keys(rates).find(r=>{const rr=normName(r);return rr&&(rr===n||rr.includes(n)||n.includes(rr));})||null;
+const isPattern=k=>String(k||'').includes('*');
+// 와일드카드 패턴('DX실 *') → 정규식. 정규화된 이름끼리 비교한다.
+function patRe(pat){
+  const n=normName(String(pat).replace(/\*/g,''));
+  return new RegExp('^'+n.split('').map(x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('.*')+'$');
 }
+// 어떤 규칙이 이 이름을 매칭했는지 함께 반환 (화면 표시용)
+function resolveRoleInfo(name,map){
+  const pm=map||partMap;
+  const raw=String(name||'').trim();
+  if(!raw)return {role:null};
+  if(rates[raw]!=null)return {role:raw,via:'직군명'};
+  if(pm[raw]&&rates[pm[raw]]!=null)return {role:pm[raw],via:'매핑'};
+  const n=normName(raw);
+  if(!n)return {role:null};
+  const plain=Object.keys(pm).filter(k=>!isPattern(k));
+  const hit=plain.find(k=>normName(k)===n);
+  if(hit&&rates[pm[hit]]!=null)return {role:pm[hit],via:'매핑'};
+  // 패턴 규칙 — 구체적인(긴) 규칙 우선
+  const pats=Object.keys(pm).filter(isPattern).sort((a,b)=>b.length-a.length);
+  for(const p of pats){
+    if(patRe(p).test(n)&&rates[pm[p]]!=null)return {role:pm[p],via:'패턴 '+p};
+  }
+  const fz=Object.keys(rates).find(r=>{const rr=normName(r);return rr&&(rr===n||rr.includes(n)||n.includes(rr));});
+  return fz?{role:fz,via:'자동'}:{role:null};
+}
+const resolveRole=(name,map)=>resolveRoleInfo(name,map).role;
 // 단가 조회 — 매핑되지 않은 이름이 와도 해석해서 단가를 찾는다
 const rateOf=(std,gi)=>{
   if(rates[std]&&rates[std][gi]!=null)return rates[std][gi];
@@ -2010,7 +2029,7 @@ function pmCandidates(){
   pmExtra.forEach(n=>add(n,'직접 추가'));
   Object.keys(pmDraft||{}).forEach(n=>add(n,'저장된 매핑'));
   return [...out.entries()].map(([name,srcs])=>({name,srcs:[...srcs].join(', ')}))
-    .filter(x=>rates[x.name]==null)
+    .filter(x=>rates[x.name]==null&&!isPattern(x.name))
     .sort((a,b)=>a.name.localeCompare(b.name,'ko'));
 }
 function renderPartMap(){
@@ -2018,24 +2037,41 @@ function renderPartMap(){
   const roles=Object.keys(rates);
   const body=document.getElementById('pmBody');
   const list=pmCandidates();
-  document.getElementById('pmCount').textContent=list.length?list.length+'건':'매핑 필요 없음';
+  const unresolved=list.filter(x=>!(pmDraft[x.name]||resolveRoleInfo(x.name,pmDraft).role)).length;
+  document.getElementById('pmCount').textContent=
+    (list.length?list.length+'건'+(unresolved?' · 미매칭 '+unresolved+'건':' · 전부 해결'):'매핑 필요 없음');
   const nr=document.getElementById('pmNewRole');
   if(nr.options.length!==roles.length)nr.innerHTML=roles.map(r=>'<option>'+r+'</option>').join('');
   if(!list.length){
     body.innerHTML='<tr><td colspan="5" class="empty">모든 파트·팀 이름이 단가표 직군과 자동으로 연결됩니다. 매핑할 항목이 없습니다.</td></tr>';
     return;
   }
-  body.innerHTML=list.map(x=>{
+  // 패턴 규칙 행 (와일드카드) — 몇 개 이름에 적용되는지 함께 표시
+  const pats=Object.keys(pmDraft).filter(isPattern).sort();
+  const patRows=pats.map(p=>{
+    const esc=p.replace(/"/g,'&quot;');
+    const hits=list.filter(x=>{const i=resolveRoleInfo(x.name,pmDraft);return i.via==='패턴 '+p;}).length;
+    return '<tr style="background:var(--panel2)"><td style="font-weight:700">'+p.replace(/</g,'&lt;')+
+      ' <span class="pill warn" style="font-size:10px">패턴</span></td>'+
+      '<td class="muted">규칙</td>'+
+      '<td><select data-pm="'+esc+'">'+
+        roles.map(r=>'<option '+(r===pmDraft[p]?'selected':'')+'>'+r+'</option>').join('')+'</select></td>'+
+      '<td>'+(hits?'<span class="pill good">'+hits+'건 적용</span>':'<span class="muted">적용 대상 없음</span>')+'</td>'+
+      '<td><span class="del-x" data-pmdel="'+esc+'">×</span></td></tr>';
+  }).join('');
+  body.innerHTML=patRows+list.map(x=>{
     const saved=pmDraft[x.name]||'';
-    const auto=resolveRole(x.name);
-    const eff=saved||auto;
+    const info=resolveRoleInfo(x.name,pmDraft);
+    const eff=saved||info.role;
     const esc=x.name.replace(/"/g,'&quot;');
-    return '<tr><td style="font-weight:700">'+x.name.replace(/</g,'&lt;')+'</td>'+
+    const badge=saved?'good':(info.via&&info.via.startsWith('패턴')?'warn':'flat');
+    const note=saved?'':(info.via?' ('+info.via+')':'');
+    return '<tr><td style="font-weight:700;padding-left:'+(pats.length?'18px':'0')+'">'+x.name.replace(/</g,'&lt;')+'</td>'+
       '<td class="muted">'+x.srcs+'</td>'+
       '<td><select data-pm="'+esc+'">'+
-        '<option value="">— 자동 —</option>'+
+        '<option value="">— 자동/패턴 —</option>'+
         roles.map(r=>'<option '+(r===saved?'selected':'')+'>'+r+'</option>').join('')+'</select></td>'+
-      '<td>'+(eff?'<span class="pill '+(saved?'good':'flat')+'">'+eff+(saved?'':' (자동)')+'</span>'
+      '<td>'+(eff?'<span class="pill '+badge+'">'+eff+note+'</span>'
               :'<span class="pill bad">미매칭 · 단가 0</span>')+'</td>'+
       '<td>'+(saved?'<span class="del-x" data-pmdel="'+esc+'">×</span>':'')+'</td></tr>';
   }).join('');

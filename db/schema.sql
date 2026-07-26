@@ -66,6 +66,14 @@ alter table mt_projects add column if not exists plan_cost_out numeric not null 
 alter table mt_projects add column if not exists plan_cost_etc numeric not null default 0;
 alter table mt_projects add column if not exists rate_std text not null default 'SW';
 
+-- 파트/팀 → 단가표 직군 매핑
+-- 계약 시트의 파트명, MM 시트의 팀명이 단가표 직군명과 다를 때 대응 관계를 저장한다.
+create table if not exists mt_part_map (
+  source     text primary key,            -- 시트에 적힌 파트명 또는 팀명 (예: 'DX실 2팀', 'GUI')
+  role       text not null,               -- 단가표의 직군명 (예: '서비스개발')
+  updated_at timestamptz not null default now()
+);
+
 -- 수익률 변동 히스토리 — 월별 투입·실적을 저장할 때마다 수익률 스냅샷과 변동 사유를 기록
 create table if not exists mt_change_logs (
   id          bigserial primary key,

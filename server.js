@@ -203,6 +203,41 @@ app.put('/api/rates', async (req, res) => {
   } finally { client.release(); }
 });
 
+// ── 파트/팀 → 직군 매핑 ───────────────────────────────
+app.get('/api/part-map', async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT source, role FROM mt_part_map ORDER BY source');
+    const out = {};
+    for (const r of rows) out[r.source] = r.role;
+    res.json(out);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/part-map', async (req, res) => {
+  const map = req.body || {};
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('DELETE FROM mt_part_map');
+    let n = 0;
+    for (const [source, role] of Object.entries(map)) {
+      const s = String(source).trim(), r = String(role || '').trim();
+      if (!s || !r) continue;
+      await client.query(
+        `INSERT INTO mt_part_map (source, role, updated_at) VALUES ($1,$2,now())
+         ON CONFLICT(source) DO UPDATE SET role=excluded.role, updated_at=now()`,
+        [s, r]
+      );
+      n++;
+    }
+    await client.query('COMMIT');
+    res.json({ ok: true, count: n });
+  } catch (e) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: e.message });
+  } finally { client.release(); }
+});
+
 // ── 인력 명부 ─────────────────────────────────────────
 app.get('/api/staff', async (req, res) => {
   try {

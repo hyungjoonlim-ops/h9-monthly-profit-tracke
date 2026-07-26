@@ -431,6 +431,34 @@
   </div>
 
   <div class="panel">
+    <div class="toolbar">
+      <h2>파트 · 팀 → 직군 매핑 <span class="tag" id="pmCount"></span></h2>
+      <button class="ghost sm" id="btnPmRefresh">미매칭 다시 찾기</button>
+    </div>
+    <div class="tablewrap">
+    <table>
+      <thead><tr>
+        <th style="min-width:200px">시트에 적힌 이름 (파트/팀)</th><th style="width:110px">출처</th>
+        <th style="min-width:180px">→ 단가표 직군</th><th style="min-width:120px">적용 결과</th><th style="width:30px"></th>
+      </tr></thead>
+      <tbody id="pmBody"></tbody>
+    </table>
+    </div>
+    <div class="addline">
+      <div class="field grow"><label>이름 직접 추가 (시트의 파트명·팀명)</label><input id="pmNewSrc" placeholder="예: DX실 2팀"></div>
+      <div class="field"><label>→ 직군</label><select id="pmNewRole"></select></div>
+      <button class="ghost" id="btnPmAdd">매핑 추가</button>
+    </div>
+    <div class="savebar">
+      <button id="btnPmSave">매핑 저장</button>
+      <span class="status" id="pmStatus"></span>
+    </div>
+    <div class="hint">계약 시트의 <b>파트</b>명과 MM 시트의 <b>팀</b>명이 단가표 직군명과 다를 때 여기서 연결해 주세요.
+      저장하면 견적 투입계획의 단가 인식, 계약 대비 변동 분석의 파트별 집계에 즉시 반영됩니다.
+      이름이 같거나 포함 관계면 자동 매칭되므로, <b>자동으로 못 찾은 것만</b> 아래 목록에 나타납니다.</div>
+  </div>
+
+  <div class="panel">
     <h2>직군별·등급별 단가표 <span class="tag">원/MM</span></h2>
     <div class="tablewrap">
     <table>
@@ -543,7 +571,7 @@
 
 <script>
 const GRADES=['초급','중급','고급','특급'];
-let projects=[],staff=[],rates={},allPlans=[],allAssigns=[],allRecords=[];
+let projects=[],staff=[],rates={},allPlans=[],allAssigns=[],allRecords=[],partMap={};
 let curPjId=null,curYm=null,editPjId=null,planPjId=null;
 let moDraft=null; // {assigns:[{staffId,mm}], rec:{revenue,costOut,costEtc,note}}
 let planDraft=null; // {rows:[{role,grade,mm,rate}], out, etc}
@@ -577,7 +605,24 @@ function ymRange(a,b){
   return out;
 }
 const ymLabel=ym=>ym?ym.replace('-','.'):'-';
-const rateOf=(std,gi)=>(rates[std]&&rates[std][gi]!=null)?rates[std][gi]:0;
+// 파트/팀 이름 → 단가표 직군 해석: 저장된 매핑 우선, 없으면 이름 유사도(공백·괄호 무시, 포함 관계)
+const normName=t=>String(t||'').replace(/\s|\(.*?\)|MM|공수/gi,'').toLowerCase();
+function resolveRole(name){
+  const raw=String(name||'').trim();
+  if(!raw)return null;
+  if(rates[raw]!=null)return raw;
+  if(partMap[raw])return rates[partMap[raw]]!=null?partMap[raw]:null;
+  const n=normName(raw);if(!n)return null;
+  const hit=Object.keys(partMap).find(k=>normName(k)===n);
+  if(hit&&rates[partMap[hit]]!=null)return partMap[hit];
+  return Object.keys(rates).find(r=>{const rr=normName(r);return rr&&(rr===n||rr.includes(n)||n.includes(rr));})||null;
+}
+// 단가 조회 — 매핑되지 않은 이름이 와도 해석해서 단가를 찾는다
+const rateOf=(std,gi)=>{
+  if(rates[std]&&rates[std][gi]!=null)return rates[std][gi];
+  const r=resolveRole(std);
+  return (r&&rates[r]&&rates[r][gi]!=null)?rates[r][gi]:0;
+};
 const staffById=id=>staff.find(s=>s.id===id)||null;
 // 기술등급은 기준(SW/SDS/LG)별로 따로 관리 — 프로젝트의 단가 기준에 맞는 등급이 적용된다
 const STDS=['SW','SDS','LG'];
@@ -1404,7 +1449,10 @@ function renderAnalysis(){
   allAssigns.filter(a=>a.projectId===p.id).forEach(a=>{
     const st=staffById(a.staffId);
     const team=st?(st.dept2||st.dept1||'기타'):'기타';
-    let key=[...planBy.keys()].find(k=>{const nk=norm(k),nt=norm(team);return nk===nt||nk.includes(nt)||nt.includes(nk);})||team||'기타';
+    // 저장된 매핑 → 계약 파트명과 유사도 → 팀명 그대로
+    let key=resolveRole(team)
+      ||[...planBy.keys()].find(k=>{const nk=norm(k),nt=norm(team);return nk===nt||nk.includes(nt)||nt.includes(nk);})
+      ||team||'기타';
     const rate=st?staffRate(st.id,p.rateStd||'SW'):0;
     const o=actBy.get(key)||{mm:0,labor:0};o.mm+=a.mm;o.labor+=a.mm*rate;actBy.set(key,o);
   });
@@ -1598,19 +1646,39 @@ function renderUtil(){
     .sort((a,b)=>b.ratio-a.ratio||a.s.name.localeCompare(b.s.name,'ko'));
   document.getElementById('utCount').textContent=rows.length+'명 표시 / 재직 '+actives.length+'명';
   const body=document.getElementById('utBody');
-  body.innerHTML=rows.length?rows.map(r=>{
+  // 소속(실 · 팀)별 그룹핑 — 그룹 머리행에 인원·가용·투입·평균 운용율 요약
+  const groups=new Map();
+  rows.forEach(r=>{
+    const k=(r.s.dept1||'(부서 미지정)')+(r.s.dept2?' · '+r.s.dept2:'');
+    if(!groups.has(k))groups.set(k,[]);
+    groups.get(k).push(r);
+  });
+  const staffRow=r=>{
     const g=r.s.gradeSw;
-    return '<tr'+(r.s.active?'':' style="opacity:.65"')+'><td style="font-weight:700">'+r.s.name+
+    return '<tr'+(r.s.active?'':' style="opacity:.65"')+'><td style="font-weight:700;padding-left:18px">'+r.s.name+
       (r.s.active?'':' <span class="pill warn" style="font-size:10px">재직해제</span>')+'</td>'+
       '<td>'+(r.s.dept1||'-')+'</td><td>'+(r.s.dept2||'-')+'</td>'+
       '<td>'+(r.s.position||'-')+'</td>'+
       '<td>'+(g!=null?'<span class="pill flat">'+GRADES[g]+'</span>':'<span class="muted">-</span>')+'</td>'+
       '<td class="right">'+r.cap.toFixed(2)+'</td><td class="right">'+r.mm.toFixed(2)+'</td>'+
       '<td>'+utBar(r.ratio)+'</td>'+
-      '<td>'+(r.projects.length?r.projects.sort((a,b)=>b.mm-a.mm).map(x=>
+      '<td>'+(r.projects.length?r.projects.slice().sort((a,b)=>b.mm-a.mm).map(x=>
         '<span class="pill flat" style="margin:2px 4px 2px 0;display:inline-block">'+String(x.name).replace(/</g,'&lt;')+' '+x.mm.toFixed(2)+'</span>').join('')
         :'<span class="muted">미투입</span>')+'</td></tr>';
-  }).join(''):'<tr><td colspan="9" class="empty">해당 조건의 인력이 없습니다.</td></tr>';
+  };
+  body.innerHTML=rows.length?[...groups.entries()]
+    .sort((a,b)=>a[0].localeCompare(b[0],'ko'))
+    .map(([dept,list])=>{
+      const gCap=list.reduce((a,r)=>a+r.cap,0),gMM=list.reduce((a,r)=>a+r.mm,0);
+      const gRatio=gCap>0?gMM/gCap:0;
+      const idleN=list.filter(r=>r.mm<=0).length;
+      return '<tr style="background:var(--panel2)"><td colspan="5" style="font-weight:700">'+dept+
+        ' <span class="muted">'+list.length+'명'+(idleN?' · 미투입 '+idleN+'명':'')+'</span></td>'+
+        '<td class="right" style="font-weight:700">'+gCap.toFixed(2)+'</td>'+
+        '<td class="right" style="font-weight:700">'+gMM.toFixed(2)+'</td>'+
+        '<td>'+utBar(gRatio)+'</td><td class="muted">소속 합계</td></tr>'+
+        list.sort((a,b)=>b.ratio-a.ratio||a.s.name.localeCompare(b.s.name,'ko')).map(staffRow).join('');
+    }).join(''):'<tr><td colspan="9" class="empty">해당 조건의 인력이 없습니다.</td></tr>';
   document.getElementById('utFoot').innerHTML=rows.length?
     '<td>합계 '+rows.length+'명</td><td></td><td></td><td></td><td></td>'+
     '<td class="right">'+rows.reduce((a,r)=>a+r.cap,0).toFixed(2)+'</td>'+
@@ -1779,8 +1847,7 @@ function parsePlanImp(text){
   const startIdx=find(/시작|착수/);
   const endIdx=find(/종료|마감/);
   const partIdx=find(/파트|부문/);
-  const roleFor=t=>{const hh=String(t||'').replace(/\s|\(.*?\)/g,'');if(!hh)return null;
-    return roleKeys.find(r=>{const rr=r.replace(/\s|\(.*?\)/g,'');return rr&&(hh.includes(rr)||rr.includes(hh));})||null;};
+  const roleFor=t=>resolveRole(t);
 
   // 세로 형식: 한 계약이 파트별 여러 행 (계약번호·고객사·계약명·형태·상태·계약시작·계약종료·계약MM·투입MM·파트·1월~12월·합계)
   if(partIdx>=0){
@@ -1930,6 +1997,79 @@ document.getElementById('planImpSubmit').onclick=async()=>{
     setTimeout(()=>planImpModal.classList.remove('show'),1500);
   }catch(err){msg.classList.add('err');msg.textContent='✗ '+err.message;btn.disabled=false;}
 };
+// ── 파트/팀 → 직군 매핑 화면 ──────────────────────────
+let pmDraft=null;   // 편집 중 매핑 {source: role}
+let pmExtra=[];     // 사용자가 직접 추가한 이름
+function pmCandidates(){
+  // 데이터에 실제로 등장하는 파트명·팀명 수집 (단가표에 그대로 있는 이름은 제외)
+  const out=new Map(); // name -> Set(출처)
+  const add=(n,src)=>{const k=String(n||'').trim();if(!k)return;
+    if(!out.has(k))out.set(k,new Set());out.get(k).add(src);};
+  allPlans.forEach(r=>add(r.role,'계약 파트'));
+  staff.forEach(s=>{if(s.dept2)add(s.dept2,'인력 팀');else if(s.dept1)add(s.dept1,'인력 부서');});
+  pmExtra.forEach(n=>add(n,'직접 추가'));
+  Object.keys(pmDraft||{}).forEach(n=>add(n,'저장된 매핑'));
+  return [...out.entries()].map(([name,srcs])=>({name,srcs:[...srcs].join(', ')}))
+    .filter(x=>rates[x.name]==null)
+    .sort((a,b)=>a.name.localeCompare(b.name,'ko'));
+}
+function renderPartMap(){
+  if(!pmDraft)pmDraft={...partMap};
+  const roles=Object.keys(rates);
+  const body=document.getElementById('pmBody');
+  const list=pmCandidates();
+  document.getElementById('pmCount').textContent=list.length?list.length+'건':'매핑 필요 없음';
+  const nr=document.getElementById('pmNewRole');
+  if(nr.options.length!==roles.length)nr.innerHTML=roles.map(r=>'<option>'+r+'</option>').join('');
+  if(!list.length){
+    body.innerHTML='<tr><td colspan="5" class="empty">모든 파트·팀 이름이 단가표 직군과 자동으로 연결됩니다. 매핑할 항목이 없습니다.</td></tr>';
+    return;
+  }
+  body.innerHTML=list.map(x=>{
+    const saved=pmDraft[x.name]||'';
+    const auto=resolveRole(x.name);
+    const eff=saved||auto;
+    const esc=x.name.replace(/"/g,'&quot;');
+    return '<tr><td style="font-weight:700">'+x.name.replace(/</g,'&lt;')+'</td>'+
+      '<td class="muted">'+x.srcs+'</td>'+
+      '<td><select data-pm="'+esc+'">'+
+        '<option value="">— 자동 —</option>'+
+        roles.map(r=>'<option '+(r===saved?'selected':'')+'>'+r+'</option>').join('')+'</select></td>'+
+      '<td>'+(eff?'<span class="pill '+(saved?'good':'flat')+'">'+eff+(saved?'':' (자동)')+'</span>'
+              :'<span class="pill bad">미매칭 · 단가 0</span>')+'</td>'+
+      '<td>'+(saved?'<span class="del-x" data-pmdel="'+esc+'">×</span>':'')+'</td></tr>';
+  }).join('');
+  body.querySelectorAll('[data-pm]').forEach(el=>el.onchange=e=>{
+    const k=e.target.dataset.pm;
+    if(e.target.value)pmDraft[k]=e.target.value;else delete pmDraft[k];
+    renderPartMap();
+  });
+  body.querySelectorAll('[data-pmdel]').forEach(x=>x.onclick=e=>{
+    delete pmDraft[e.target.dataset.pmdel];renderPartMap();
+  });
+}
+document.getElementById('btnPmRefresh').onclick=()=>{pmDraft={...partMap};pmExtra=[];renderPartMap();};
+document.getElementById('btnPmAdd').onclick=()=>{
+  const n=document.getElementById('pmNewSrc').value.trim();
+  const r=document.getElementById('pmNewRole').value;
+  if(!n||!r)return;
+  if(!pmDraft)pmDraft={};
+  pmDraft[n]=r;if(!pmExtra.includes(n))pmExtra.push(n);
+  document.getElementById('pmNewSrc').value='';renderPartMap();
+};
+document.getElementById('btnPmSave').onclick=async()=>{
+  const s=document.getElementById('pmStatus');s.className='status';s.textContent='저장 중…';
+  try{
+    const r=await api('/part-map',{method:'PUT',body:JSON.stringify(pmDraft||{})});
+    partMap={...pmDraft};
+    s.textContent='✓ 매핑 '+r.count+'건이 저장되었습니다. 분석·단가에 즉시 반영됩니다.';
+    setTimeout(()=>s.textContent='',3000);
+    renderPartMap();renderDash();
+    if(!document.getElementById('tab-analysis').classList.contains('hidden'))renderAnalysis();
+    if(!document.getElementById('tab-plan').classList.contains('hidden')){planDraft=null;renderPlan();}
+  }catch(err){s.className='status err';s.textContent='✗ 저장 실패: '+err.message;}
+};
+
 // 단가표
 function renderRates(){
   const body=document.getElementById('rateBody');
@@ -1963,11 +2103,12 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
 });
 
 async function refreshAll(rerender=true){
-  [projects,staff,rates,allPlans,allAssigns,allRecords]=await Promise.all([
-    api('/projects'),api('/staff'),api('/rates'),api('/plans'),api('/assignments'),api('/records')]);
+  [projects,staff,rates,allPlans,allAssigns,allRecords,partMap]=await Promise.all([
+    api('/projects'),api('/staff'),api('/rates'),api('/plans'),api('/assignments'),api('/records'),
+    api('/part-map').catch(()=>({}))]);
   if(curPjId==null&&projects.length)curPjId=projects[0].id;
   if(planPjId==null&&projects.length)planPjId=projects[0].id;
-  renderDash();renderPjList();renderStaff();renderRates();
+  renderDash();renderPjList();renderStaff();renderRates();renderPartMap();
   if(!document.getElementById('tab-analysis').classList.contains('hidden'))renderAnalysis();
   if(!document.getElementById('tab-util').classList.contains('hidden'))renderUtil();
   if(rerender){

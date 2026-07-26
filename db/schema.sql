@@ -43,6 +43,8 @@ alter table mt_staff add column if not exists job_title text;
 alter table mt_staff add column if not exists grade_sw integer;
 alter table mt_staff add column if not exists grade_sds integer;
 alter table mt_staff add column if not exists grade_lg integer;
+-- 운용율 산정 기준: 이 인력이 한 달에 투입 가능한 MM (1.0 = 풀타임, 0.5 = 반일 등)
+alter table mt_staff add column if not exists capacity numeric not null default 1;
 
 -- 프로젝트 마스터
 create table if not exists mt_projects (

@@ -123,6 +123,11 @@ const gradeOrNull = (v) => {
   const n = Number(v);
   return Number.isFinite(n) ? Math.max(0, Math.min(3, Math.round(n))) : null;
 };
+const capOf = (v) => {
+  if (v == null || v === '') return 1;
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? Math.min(2, n) : 1;
+};
 function mapStaff(r) {
   return {
     id: Number(r.id), name: r.name,
@@ -130,6 +135,7 @@ function mapStaff(r) {
     gradeSw: r.grade_sw == null ? null : Number(r.grade_sw),
     gradeSds: r.grade_sds == null ? null : Number(r.grade_sds),
     gradeLg: r.grade_lg == null ? null : Number(r.grade_lg),
+    capacity: r.capacity == null ? 1 : Number(r.capacity),
     active: !!r.active, memo: r.memo || '',
   };
 }
@@ -139,6 +145,7 @@ const staffParams = (s) => [
   s.dept2 ? String(s.dept2).trim() : null,
   s.position ? String(s.position).trim() : null,
   gradeOrNull(s.gradeSw), gradeOrNull(s.gradeSds), gradeOrNull(s.gradeLg),
+  capOf(s.capacity),
 ];
 function mapPlanRow(r) {
   return {
@@ -209,8 +216,8 @@ app.post('/api/staff', async (req, res) => {
   if (!s.name || !String(s.name).trim()) return res.status(400).json({ error: '이름은 필수입니다.' });
   try {
     const { rows } = await pool.query(
-      `INSERT INTO mt_staff (name, dept1, dept2, job_title, grade_sw, grade_sds, grade_lg, active, memo)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      `INSERT INTO mt_staff (name, dept1, dept2, job_title, grade_sw, grade_sds, grade_lg, capacity, active, memo)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
       [...staffParams(s), s.active !== false, s.memo || null]
     );
     res.json(mapStaff(rows[0]));
@@ -244,8 +251,8 @@ app.post('/api/staff/bulk', async (req, res) => {
         changed++;
       } else {
         const ins = await client.query(
-          `INSERT INTO mt_staff (name, dept1, dept2, job_title, grade_sw, grade_sds, grade_lg, active, memo)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,true,$8) RETURNING id`,
+          `INSERT INTO mt_staff (name, dept1, dept2, job_title, grade_sw, grade_sds, grade_lg, capacity, active, memo)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,$9) RETURNING id`,
           [...staffParams(s), s.memo || null]
         );
         keptIds.add(Number(ins.rows[0].id));
@@ -280,7 +287,8 @@ app.put('/api/staff/:id', async (req, res) => {
   try {
     const { rows } = await pool.query(
       `UPDATE mt_staff SET name=$1, dept1=$2, dept2=$3, job_title=$4,
-              grade_sw=$5, grade_sds=$6, grade_lg=$7, active=$8, memo=$9 WHERE id=$10 RETURNING *`,
+              grade_sw=$5, grade_sds=$6, grade_lg=$7, capacity=$8, active=$9, memo=$10
+       WHERE id=$11 RETURNING *`,
       [...staffParams(s), s.active !== false, s.memo || null, req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: '인력을 찾을 수 없습니다.' });

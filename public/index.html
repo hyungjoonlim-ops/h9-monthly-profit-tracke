@@ -119,6 +119,7 @@
   <div class="tab active" data-tab="dash">대시보드</div>
   <div class="tab" data-tab="monthly">월별 투입 · 수익률</div>
   <div class="tab" data-tab="analysis">계약 대비 변동 분석</div>
+  <div class="tab" data-tab="util">인력 운용율</div>
   <div class="tab" data-tab="plan">프로젝트 · 견적 기준</div>
   <div class="tab" data-tab="staff">인력 · 단가</div>
 </div>
@@ -280,6 +281,56 @@
   </div>
 </section>
 
+<!-- ══════════ 인력 운용율 ══════════ -->
+<section id="tab-util" class="hidden">
+  <div class="panel">
+    <div class="toolbar">
+      <h2>인력 운용율 현황 <span class="tag" id="utYmLabel"></span></h2>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="field" style="min-width:150px"><select id="utYm"></select></div>
+        <button class="ghost sm" id="btnUtExport">CSV 내보내기</button>
+      </div>
+    </div>
+    <div class="cards" id="utCards"></div>
+  </div>
+
+  <div class="panel">
+    <h2>전사 월별 운용율 추이 <span class="tag">투입 MM ÷ 가용 MM</span></h2>
+    <div class="chartwrap" id="utChart"><div class="empty">데이터가 없습니다.</div></div>
+    <div class="legend" id="utLegend"></div>
+  </div>
+
+  <div class="panel">
+    <div class="toolbar">
+      <h2>직원별 투입 프로젝트 <span class="tag" id="utCount"></span></h2>
+      <div class="field" style="min-width:170px"><select id="utFilter">
+        <option value="all">전체 인력</option>
+        <option value="over">과투입 (100% 초과)</option>
+        <option value="part">여유 있음 (1~99%)</option>
+        <option value="idle">미투입 (0%)</option>
+      </select></div>
+    </div>
+    <div class="tablewrap">
+    <table>
+      <thead><tr>
+        <th style="min-width:100px">이름</th><th>부서(실)</th><th>팀</th><th>직급</th><th>등급(SW)</th>
+        <th>가용 MM</th><th>투입 MM</th><th style="min-width:130px">운용율</th>
+        <th style="min-width:240px">투입 프로젝트 (MM)</th>
+      </tr></thead>
+      <tbody id="utBody"></tbody>
+      <tfoot><tr style="font-weight:700" id="utFoot"></tr></tfoot>
+    </table>
+    </div>
+    <div class="hint">운용율 = 당월 투입 MM ÷ 가용 MM. 가용 MM은 인력 탭에서 조정할 수 있습니다(기본 1.0 = 풀타임).</div>
+  </div>
+
+  <div class="panel">
+    <h2>투입 가능 여유 리소스 <span class="tag">부서 · 등급별</span></h2>
+    <div id="utBench"></div>
+    <div class="hint">당월 가용 MM이 남은 재직 인력입니다. 신규 프로젝트에 투입할 수 있는 여분 리소스를 부서·등급별로 확인하세요.</div>
+  </div>
+</section>
+
 <!-- ══════════ 프로젝트 · 견적 기준 ══════════ -->
 <section id="tab-plan" class="hidden">
   <div class="panel">
@@ -360,7 +411,7 @@
         <th style="min-width:100px">부서(실)</th><th style="min-width:100px">부서(팀)</th>
         <th style="min-width:110px">이름</th><th style="min-width:80px">직급</th>
         <th style="width:92px">SW등급</th><th style="width:92px">SDS등급</th><th style="width:92px">LG등급</th>
-        <th style="width:60px">재직</th><th style="min-width:110px">메모</th><th style="width:30px"></th>
+        <th style="width:78px">가용MM</th><th style="width:60px">재직</th><th style="min-width:110px">메모</th><th style="width:30px"></th>
       </tr></thead>
       <tbody id="staffBody"></tbody>
     </table>
@@ -376,7 +427,7 @@
       <button class="ghost" id="btnAddStaff">인력 추가</button>
       <span class="status" id="staffStatus"></span>
     </div>
-    <div class="hint">기술등급은 SW / SDS / LG 기준별로 따로 관리됩니다. 프로젝트의 단가 기준에 해당하는 등급이 그 프로젝트의 투입 단가에 적용되며, 등급을 바꾸면 투입된 모든 월의 인건비·수익률이 자동으로 다시 계산됩니다.</div>
+    <div class="hint">가용MM은 인력 운용율 계산 기준입니다 (1.0 = 풀타임, 0.5 = 반일). 기술등급은 SW / SDS / LG 기준별로 따로 관리됩니다. 프로젝트의 단가 기준에 해당하는 등급이 그 프로젝트의 투입 단가에 적용되며, 등급을 바꾸면 투입된 모든 월의 인건비·수익률이 자동으로 다시 계산됩니다.</div>
   </div>
 
   <div class="panel">
@@ -655,7 +706,18 @@ function renderDash(){
     '<div class="card"><div class="lbl">등록 프로젝트</div><div class="val">'+projects.length+'</div><div class="foot">진행중 '+active+'건 · 인력 '+staff.filter(s=>s.active).length+'명</div></div>'+
     '<div class="card"><div class="lbl">최근 실적월 매출</div><div class="val">'+won(lastRev)+'</div><div class="foot">'+(lastYm?ymLabel(lastYm)+' · 전 프로젝트':'실적 없음')+'</div></div>'+
     '<div class="card"><div class="lbl">최근 실적월 수익</div><div class="val '+(lastRev-lastCost>=0?'good':'bad')+'">'+won(lastRev-lastCost)+'</div><div class="foot">원가 '+won(lastCost)+'</div></div>'+
-    '<div class="card hl"><div class="lbl">최근월 전사 수익률</div><div class="val '+(lastM!=null?cls(lastM):'')+'">'+(lastM!=null?lastM.toFixed(1)+'%':'-')+'</div><div class="foot">전월 대비 '+(lastM!=null&&prevM!=null?deltaHtml(lastM-prevM):'–')+'</div></div>';
+    '<div class="card hl"><div class="lbl">최근월 전사 수익률</div><div class="val '+(lastM!=null?cls(lastM):'')+'">'+(lastM!=null?lastM.toFixed(1)+'%':'-')+'</div><div class="foot">전월 대비 '+(lastM!=null&&prevM!=null?deltaHtml(lastM-prevM):'–')+'</div></div>'+
+    (()=>{ // 인력 운용율 요약 (최근 실적월 기준)
+      const acts=staff.filter(s=>s.active);
+      if(!lastYm||!acts.length)return '';
+      const cap=acts.reduce((a,s)=>a+capOfStaff(s),0);
+      const l=utLoad(lastYm);let used=0,work=0;
+      acts.forEach(s=>{const mm=(l.get(s.id)||{mm:0}).mm;used+=mm;if(mm>0)work++;});
+      const r=cap>0?used/cap:0;
+      return '<div class="card"><div class="lbl">인력 운용율 <span class="muted">'+ymLabel(lastYm)+'</span></div>'+
+        '<div class="val '+utCls(r)+'">'+(r*100).toFixed(1)+'%</div>'+
+        '<div class="foot">투입 '+work+'명 / 재직 '+acts.length+'명 · 여유 '+Math.max(0,cap-used).toFixed(2)+' MM</div></div>';
+    })();
   const series=[{name:'전사 월별 수익률',color:'#3ea6ff',data:compData}];
   lineChart('dashChart',months,series,{emptyMsg:'월별 투입을 입력하면 추이가 표시됩니다.'});
   legendHtml('dashLegend',months.length?series:[]);
@@ -1455,6 +1517,138 @@ function renderAnalysis(){
     :'<div class="empty">계약 기준(견적 투입계획)과 월별 실투입을 입력하면 자동으로 분석됩니다.</div>';
 }
 
+// ── 인력 운용율 대시보드 ──────────────────────────────
+let utYm=null;
+const capOfStaff=s=>(s&&s.capacity>0)?s.capacity:1;
+const utCls=r=>r>1.05?'bad':r>=0.85?'good':r>0?'warn':'flat';
+function utBar(ratio){
+  const pct=Math.max(0,Math.min(150,ratio*100));
+  const col=ratio>1.05?'var(--bad)':ratio>=0.85?'var(--good)':ratio>0?'var(--accent)':'var(--line)';
+  return '<div style="display:flex;align-items:center;gap:8px">'+
+    '<div style="flex:1;min-width:60px;height:8px;background:var(--panel2);border-radius:4px;overflow:hidden">'+
+    '<div style="width:'+(pct/1.5)+'%;height:100%;background:'+col+'"></div></div>'+
+    '<span style="min-width:46px;text-align:right;font-weight:700;color:'+col+'">'+(ratio*100).toFixed(0)+'%</span></div>';
+}
+// 전사 가용 MM (재직 인력 기준)
+const totalCapacity=()=>staff.filter(s=>s.active).reduce((a,s)=>a+capOfStaff(s),0);
+// 특정 월의 인력별 투입 (staffId -> {mm, byProject:[{name,mm}]})
+function utLoad(ym){
+  const m=new Map();
+  allAssigns.filter(a=>a.ym===ym&&a.mm>0).forEach(a=>{
+    const p=projects.find(x=>x.id===a.projectId);
+    const o=m.get(a.staffId)||{mm:0,byProject:[]};
+    o.mm+=a.mm;o.byProject.push({name:p?p.name:'(삭제된 프로젝트)',mm:a.mm});
+    m.set(a.staffId,o);
+  });
+  return m;
+}
+function utMonths(){
+  const set=new Set(allAssigns.map(a=>a.ym));
+  projects.forEach(p=>ymRange(p.startYm,p.endYm).forEach(y=>set.add(y)));
+  if(!set.size){const d=new Date();set.add(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));}
+  return [...set].sort();
+}
+function renderUtil(){
+  const months=utMonths();
+  const assignMonths=[...new Set(allAssigns.filter(a=>a.mm>0).map(a=>a.ym))].sort();
+  if(!utYm||!months.includes(utYm)){
+    const d=new Date(),now=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    // 기본은 당월 → 없으면 당월 이전의 가장 최근 투입월 → 그것도 없으면 마지막 월
+    utYm=months.includes(now)?now
+      :(assignMonths.filter(m=>m<=now).pop()||assignMonths[assignMonths.length-1]||months[months.length-1]);
+  }
+  const sel=document.getElementById('utYm');
+  sel.innerHTML=months.map(m=>'<option value="'+m+'" '+(m===utYm?'selected':'')+'>'+ymLabel(m)+'</option>').join('');
+  sel.onchange=()=>{utYm=sel.value;renderUtil();};
+  document.getElementById('utYmLabel').textContent=ymLabel(utYm);
+
+  const actives=staff.filter(s=>s.active);
+  const load=utLoad(utYm);
+  const cap=totalCapacity();
+  let used=0;actives.forEach(s=>{used+=(load.get(s.id)||{mm:0}).mm;});
+  const working=actives.filter(s=>(load.get(s.id)||{mm:0}).mm>0).length;
+  const idle=actives.length-working;
+  // 재직 해제됐지만 당월 투입이 남은 인력도 표·과투입 집계에 포함 (투입 현황 누락 방지)
+  const listed=[...actives,...staff.filter(s=>!s.active&&(load.get(s.id)||{mm:0}).mm>0)];
+  const over=listed.filter(s=>(load.get(s.id)||{mm:0}).mm>capOfStaff(s)*1.05).length;
+  const freeMM=actives.reduce((a,s)=>a+Math.max(0,capOfStaff(s)-(load.get(s.id)||{mm:0}).mm),0);
+  const ratio=cap>0?used/cap:0;
+  document.getElementById('utCards').innerHTML=
+    '<div class="card"><div class="lbl">재직 인원 / 가용 MM</div><div class="val">'+actives.length+'명</div><div class="foot">총 가용 '+cap.toFixed(2)+' MM</div></div>'+
+    '<div class="card"><div class="lbl">투입 인원</div><div class="val">'+working+'명</div><div class="foot">투입 '+used.toFixed(2)+' MM · 과투입 '+over+'명</div></div>'+
+    '<div class="card"><div class="lbl">미투입 인원</div><div class="val '+(idle>0?'warn':'good')+'">'+idle+'명</div><div class="foot">투입 가능 여유 '+freeMM.toFixed(2)+' MM</div></div>'+
+    '<div class="card hl"><div class="lbl">전사 운용율</div><div class="val '+utCls(ratio)+'">'+(ratio*100).toFixed(1)+'%</div><div class="foot">'+ymLabel(utYm)+' · 투입 MM ÷ 가용 MM</div></div>';
+
+  // 월별 추이 (가용 MM은 현재 재직 기준 고정)
+  const series=[{name:'전사 운용율',color:'#3ea6ff',data:months.map(ym=>{
+    if(!assignMonths.includes(ym))return null;
+    const l=utLoad(ym);let u=0;actives.forEach(s=>{u+=(l.get(s.id)||{mm:0}).mm;});
+    return cap>0?u/cap*100:null;})}];
+  series.push({name:'목표 85%',color:'#f2c14e',dash:true,noDots:true,data:months.map(()=>85)});
+  lineChart('utChart',months,series,{emptyMsg:'월별 투입을 입력하거나 시트에서 가져오면 표시됩니다.'});
+  legendHtml('utLegend',months.length?series:[]);
+
+  // 직원별 표
+  const filter=document.getElementById('utFilter').value;
+  const rows=listed.map(s=>{
+    const l=load.get(s.id)||{mm:0,byProject:[]};
+    const c=capOfStaff(s);
+    return {s,mm:l.mm,cap:c,ratio:c>0?l.mm/c:0,projects:l.byProject};
+  }).filter(r=>filter==='all'||(filter==='over'&&r.ratio>1.05)||(filter==='part'&&r.ratio>0&&r.ratio<=1.05)||(filter==='idle'&&r.mm<=0))
+    .sort((a,b)=>b.ratio-a.ratio||a.s.name.localeCompare(b.s.name,'ko'));
+  document.getElementById('utCount').textContent=rows.length+'명 표시 / 재직 '+actives.length+'명';
+  const body=document.getElementById('utBody');
+  body.innerHTML=rows.length?rows.map(r=>{
+    const g=r.s.gradeSw;
+    return '<tr'+(r.s.active?'':' style="opacity:.65"')+'><td style="font-weight:700">'+r.s.name+
+      (r.s.active?'':' <span class="pill warn" style="font-size:10px">재직해제</span>')+'</td>'+
+      '<td>'+(r.s.dept1||'-')+'</td><td>'+(r.s.dept2||'-')+'</td>'+
+      '<td>'+(r.s.position||'-')+'</td>'+
+      '<td>'+(g!=null?'<span class="pill flat">'+GRADES[g]+'</span>':'<span class="muted">-</span>')+'</td>'+
+      '<td class="right">'+r.cap.toFixed(2)+'</td><td class="right">'+r.mm.toFixed(2)+'</td>'+
+      '<td>'+utBar(r.ratio)+'</td>'+
+      '<td>'+(r.projects.length?r.projects.sort((a,b)=>b.mm-a.mm).map(x=>
+        '<span class="pill flat" style="margin:2px 4px 2px 0;display:inline-block">'+String(x.name).replace(/</g,'&lt;')+' '+x.mm.toFixed(2)+'</span>').join('')
+        :'<span class="muted">미투입</span>')+'</td></tr>';
+  }).join(''):'<tr><td colspan="9" class="empty">해당 조건의 인력이 없습니다.</td></tr>';
+  document.getElementById('utFoot').innerHTML=rows.length?
+    '<td>합계 '+rows.length+'명</td><td></td><td></td><td></td><td></td>'+
+    '<td class="right">'+rows.reduce((a,r)=>a+r.cap,0).toFixed(2)+'</td>'+
+    '<td class="right">'+rows.reduce((a,r)=>a+r.mm,0).toFixed(2)+'</td><td></td><td></td>':'';
+
+  // 여유 리소스 (부서별 그룹)
+  const bench=actives.map(s=>({s,free:capOfStaff(s)-(load.get(s.id)||{mm:0}).mm}))
+    .filter(x=>x.free>0.001);
+  const byDept=new Map();
+  bench.forEach(x=>{const k=x.s.dept1||'(부서 미지정)';const arr=byDept.get(k)||[];arr.push(x);byDept.set(k,arr);});
+  document.getElementById('utBench').innerHTML=byDept.size?[...byDept.entries()]
+    .sort((a,b)=>b[1].reduce((s,x)=>s+x.free,0)-a[1].reduce((s,x)=>s+x.free,0))
+    .map(([dept,arr])=>{
+      const tot=arr.reduce((a,x)=>a+x.free,0);
+      return '<div style="padding:10px 4px;border-bottom:1px solid var(--line)">'+
+        '<div style="margin-bottom:6px"><b>'+dept+'</b> <span class="pill good">여유 '+tot.toFixed(2)+' MM</span> <span class="muted">'+arr.length+'명</span></div>'+
+        arr.sort((a,b)=>b.free-a.free).map(x=>{
+          const g=x.s.gradeSw;
+          return '<span class="pill '+(x.free>=1?'warn':'flat')+'" style="margin:2px 6px 2px 0;display:inline-block">'+
+            x.s.name+(g!=null?' · '+GRADES[g]:'')+(x.s.dept2?' · '+x.s.dept2:'')+' — 여유 '+x.free.toFixed(2)+'MM</span>';
+        }).join('')+'</div>';
+    }).join(''):'<div class="empty">여유 리소스가 없습니다 (전원 풀 투입).</div>';
+}
+document.getElementById('utFilter').onchange=renderUtil;
+document.getElementById('btnUtExport').onclick=()=>{
+  const load=utLoad(utYm);
+  const rows=[['월','이름','부서(실)','팀','직급','등급(SW)','가용MM','투입MM','운용율(%)','투입 프로젝트']];
+  staff.filter(s=>s.active).forEach(s=>{
+    const l=load.get(s.id)||{mm:0,byProject:[]};const c=capOfStaff(s);
+    rows.push([utYm,s.name,s.dept1||'',s.dept2||'',s.position||'',s.gradeSw!=null?GRADES[s.gradeSw]:'',
+      c.toFixed(2),l.mm.toFixed(2),(c>0?l.mm/c*100:0).toFixed(1),
+      l.byProject.map(x=>x.name+'('+x.mm.toFixed(2)+')').join(' / ')]);
+  });
+  const csv='﻿'+rows.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download='H9_인력운용율_'+utYm+'.csv';a.click();
+};
+
 // ── 인력 · 단가 ───────────────────────────────────────
 const gradeSelect=(v,attrs)=>'<select '+attrs+'><option value="">—</option>'+
   GRADES.map((g,i)=>'<option value="'+i+'" '+(i===v?'selected':'')+'>'+g+'</option>').join('')+'</select>';
@@ -1468,6 +1662,7 @@ function renderStaff(){
       '<tr'+(s.active?'':' style="opacity:.5"')+'>'+
       '<td>'+txt(s,'dept1')+'</td><td>'+txt(s,'dept2')+'</td><td>'+txt(s,'name')+'</td><td>'+txt(s,'position')+'</td>'+
       STDS.map(std=>'<td>'+gradeSelect(gradeOf(s,std),'data-id="'+s.id+'" data-f="'+GKEY[std]+'"')+'</td>').join('')+
+      '<td><input class="num" data-id="'+s.id+'" data-f="capacity" value="'+(s.capacity!=null?s.capacity:1)+'" inputmode="decimal"></td>'+
       '<td style="text-align:center"><input type="checkbox" style="width:auto" data-id="'+s.id+'" data-f="active" '+(s.active?'checked':'')+'></td>'+
       '<td>'+txt(s,'memo')+'</td>'+
       '<td><span class="del-x" data-del="'+s.id+'">×</span></td></tr>').join('');
@@ -1476,6 +1671,7 @@ function renderStaff(){
     const id=+e.target.dataset.id,f=e.target.dataset.f;
     const s=staff.find(x=>x.id===id);if(!s)return;
     if(f==='gradeSw'||f==='gradeSds'||f==='gradeLg')s[f]=e.target.value===''?null:+e.target.value;
+    else if(f==='capacity')s.capacity=Math.min(2,Math.max(0.1,parseNum(e.target.value)||1));
     else if(f==='active')s.active=e.target.checked;
     else s[f]=e.target.value;
     try{
@@ -1756,13 +1952,14 @@ document.getElementById('btnSaveRates').onclick=async()=>{
 // ── 탭/공통 ───────────────────────────────────────────
 function switchTab(name){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
-  ['dash','monthly','analysis','plan','staff'].forEach(n=>document.getElementById('tab-'+n).classList.toggle('hidden',n!==name));
+  ['dash','monthly','analysis','util','plan','staff'].forEach(n=>document.getElementById('tab-'+n).classList.toggle('hidden',n!==name));
 }
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   switchTab(t.dataset.tab);
   if(t.dataset.tab==='monthly'){if(curPjId==null&&projects.length)curPjId=projects[0].id;moDraft=null;renderMonthly();}
   if(t.dataset.tab==='plan'){if(planPjId==null&&projects.length)planPjId=projects[0].id;planDraft=null;renderPlan();}
   if(t.dataset.tab==='analysis'){if(anPjId==null&&projects.length)anPjId=(curPjId!=null?curPjId:projects[0].id);renderAnalysis();}
+  if(t.dataset.tab==='util')renderUtil();
 });
 
 async function refreshAll(rerender=true){
@@ -1772,6 +1969,7 @@ async function refreshAll(rerender=true){
   if(planPjId==null&&projects.length)planPjId=projects[0].id;
   renderDash();renderPjList();renderStaff();renderRates();
   if(!document.getElementById('tab-analysis').classList.contains('hidden'))renderAnalysis();
+  if(!document.getElementById('tab-util').classList.contains('hidden'))renderUtil();
   if(rerender){
     moDraft=null;planDraft=null;
     renderMonthly();renderPlan();

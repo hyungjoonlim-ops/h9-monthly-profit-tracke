@@ -612,8 +612,9 @@ const normName=t=>String(t||'').replace(/\s|\(.*?\)|MM|공수/gi,'').toLowerCase
 const isPattern=k=>String(k||'').includes('*');
 // 와일드카드 패턴('DX실 *') → 정규식. 정규화된 이름끼리 비교한다.
 function patRe(pat){
-  const n=normName(String(pat).replace(/\*/g,''));
-  return new RegExp('^'+n.split('').map(x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('.*')+'$');
+  // '*' 를 구분자로 나눠 각 조각을 정규화·이스케이프한 뒤 .* 로 연결
+  const esc=x=>normName(x).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  return new RegExp('^'+String(pat).split('*').map(esc).join('.*')+'$');
 }
 // 어떤 규칙이 이 이름을 매칭했는지 함께 반환 (화면 표시용)
 function resolveRoleInfo(name,map){
@@ -1698,8 +1699,11 @@ function renderUtil(){
         '<td>'+utBar(gRatio)+'</td><td class="muted">소속 합계</td></tr>'+
         list.sort((a,b)=>b.ratio-a.ratio||a.s.name.localeCompare(b.s.name,'ko')).map(staffRow).join('');
     }).join(''):'<tr><td colspan="9" class="empty">해당 조건의 인력이 없습니다.</td></tr>';
+  const offN=rows.filter(r=>!r.s.active).length;
   document.getElementById('utFoot').innerHTML=rows.length?
-    '<td>합계 '+rows.length+'명</td><td></td><td></td><td></td><td></td>'+
+    '<td>합계 '+rows.length+'명</td>'+
+    '<td colspan="4" class="muted" style="font-weight:400">'+
+      (offN?'재직 해제 '+offN+'명 포함 — 상단 전사 운용율은 재직자만 집계':'')+'</td>'+
     '<td class="right">'+rows.reduce((a,r)=>a+r.cap,0).toFixed(2)+'</td>'+
     '<td class="right">'+rows.reduce((a,r)=>a+r.mm,0).toFixed(2)+'</td><td></td><td></td>':'';
 

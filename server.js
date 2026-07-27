@@ -949,7 +949,7 @@ try {
     );
   }
   // 파트 → 직군 기본 매핑 (1회만 시딩, 이후 사용자가 화면에서 수정·삭제 가능)
-  const pmSeed = await pool.query("SELECT 1 FROM mt_app_settings WHERE key='part_map_seed_v1'");
+  const pmSeed = await pool.query("SELECT 1 FROM mt_app_settings WHERE key='part_map_seed_v2'");
   if (!pmSeed.rows.length) {
     await pool.query(`
       insert into mt_part_map (source, role, updated_at) values
@@ -957,11 +957,12 @@ try {
         ('DEV', '서비스개발', now()),
         ('QA',  '서비스개발', now()),
         ('BE',  '서비스개발', now()),
-        ('FE',  '서비스개발', now())
+        ('FE',  '서비스개발', now()),
+        ('PUB', '서비스개발', now())
       on conflict (source) do nothing
     `);
     await pool.query(
-      `INSERT INTO mt_app_settings(key,value,updated_at) VALUES('part_map_seed_v1','1',now())
+      `INSERT INTO mt_app_settings(key,value,updated_at) VALUES('part_map_seed_v2','1',now())
        ON CONFLICT(key) DO NOTHING`
     );
   }

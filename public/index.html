@@ -620,11 +620,16 @@
       <button type="button" class="ghost" id="planImpFetch">현재 탭만</button>
       <button type="button" id="planImpFetchAll">모든 탭 일괄</button>
     </div>
+    <div class="row" style="margin-bottom:8px">
+      <div class="field"><label style="display:flex;gap:6px;align-items:center">
+        <input type="checkbox" id="planImpAllStatus" style="width:auto" checked>
+        <b>모든 프로젝트 가져오기</b> — 체크를 풀면 상태에 '진행'이 포함된 계약만 가져옵니다</label></div>
+    </div>
     <p class="hint" style="margin-bottom:10px">시트에서 <b>머리글 행을 포함해</b> 범위를 복사해 붙여넣으세요. 두 가지 형식을 자동 인식합니다:<br>
       ① <b>계약 관리 시트</b> — <b>계약번호 · 고객사 · 계약명 · 형태 · 상태 · 계약시작 · 계약종료 · 계약MM · 투입MM · 파트 · 1월~12월 · 합계</b>
       (계약명으로 파트 행들을 묶고, 파트별 <b>계약MM</b>으로 견적 기준을 만듭니다. 계약명이 병합 셀이라 아랫줄이 비어 있어도 됩니다)<br>
       ② <b>가로 형식</b> — 프로젝트명 · 상태 · 발주처 · 계약액 · 직군별 MM 열<br>
-      두 형식 모두 상태에 <b>"진행"이 포함된 계약만</b> 가져오며, 등급은 기본 중급으로 넣고 견적 기준 화면에서 조정하면 됩니다.</p>
+      시트의 <b>상태</b>는 진행중 / 완료 / 보류로 자동 변환되어 프로젝트 상태에 반영됩니다. 등급은 기본 중급으로 넣고 견적 기준 화면에서 조정하면 됩니다.</p>
     <textarea id="planImpText" rows="8" placeholder="계약번호	고객사	계약명	형태	상태	계약시작	계약종료	계약MM	투입MM	파트&#10;C-2601	SK에코플랜트	CTMS 리뉴얼	SI	진행중	2026-08-01	2026-12-31	6	5.5	DT개발&#10;			 	 	 	 	3	3	서비스개발"></textarea>
     <div id="planImpPreview" style="margin-top:10px;max-height:320px;overflow:auto"></div>
     <div class="msg" id="planImpMsg"></div>
@@ -1921,8 +1926,16 @@ document.getElementById('bulkSubmit').onclick=async()=>{
 // ── 견적 투입계획 일괄 가져오기 (구글시트) ────────────
 const planImpModal=document.getElementById('planImpModal');
 let planImpParsed=null;
+// 시트의 상태 문자열 → 앱의 상태값(진행중/완료/보류)
+function statusNorm(t){
+  const v=String(t||'').trim();
+  if(!v)return '진행중';
+  if(/완료|종료|납품|검수완료/.test(v))return '완료';
+  if(/보류|중단|취소|홀드|hold/i.test(v))return '보류';
+  return '진행중';
+}
 function ymNorm(s){const m=String(s||'').match(/(\d{4})\s*[.\-\/년]\s*(\d{1,2})/);return m?m[1]+'-'+String(+m[2]).padStart(2,'0'):null;}
-function parsePlanImp(text){
+function parsePlanImp(text,includeAll){
   const raw=text.split('\n').map(l=>l.replace(/\s+$/,'')).filter(l=>l.trim());
   if(raw.length<2)return {error:'머리글 행과 데이터 행이 최소 1줄씩 필요합니다.'};
   const delim=text.includes('\t')?'\t':',';
@@ -1954,20 +1967,28 @@ function parsePlanImp(text){
              startYm:startIdx>=0?ymNorm(row[startIdx]):null,endYm:endIdx>=0?ymNorm(row[endIdx]):null,
              budget:budgetIdx>=0?parseNum(row[budgetIdx]):0,
              projectType:typeIdx>=0?(row[typeIdx]||'').trim():''};
+        // 전체 가져오기: 파트·계약MM이 비어 있는 계약도 프로젝트로 등록
+        const pass=includeAll||!(statusIdx>=0&&ctx.status&&!/진행/.test(ctx.status));
+        if(!pass)skippedSet.add(ctx.name);
+        else if(includeAll&&!map.has(ctx.name))map.set(ctx.name,{
+          name:ctx.name,client:ctx.client,budget:ctx.budget,startYm:ctx.startYm,endYm:ctx.endYm,
+          projectType:ctx.projectType||'',rows:[],
+          status:statusNorm(ctx.status),rawStatus:ctx.status||''});
       }
       if(!ctx)continue;
       const part=row[partIdx];if(!part)continue;
-      if(statusIdx>=0&&ctx.status&&!/진행/.test(ctx.status)){skippedSet.add(ctx.name);continue;}
+      if(!includeAll&&statusIdx>=0&&ctx.status&&!/진행/.test(ctx.status)){skippedSet.add(ctx.name);continue;}
       const mm=parseNum(row[cmmIdx]);if(!(mm>0))continue;
       let it=map.get(ctx.name);
       if(!it){it={name:ctx.name,client:ctx.client,budget:ctx.budget,startYm:ctx.startYm,endYm:ctx.endYm,
-                  projectType:ctx.projectType||'',rows:[],status:ctx.status||'진행중'};map.set(ctx.name,it);}
+                  projectType:ctx.projectType||'',rows:[],
+                  status:statusNorm(ctx.status),rawStatus:ctx.status||''};map.set(ctx.name,it);}
       const role=roleFor(part);
       if(!role)unknownParts.add(part);
       it.rows.push({role:role||String(part).trim(),grade:1,mm,rate:role?rateOf(role,1):0});
     }
-    const items=[...map.values()].filter(it=>it.rows.length);
-    if(!items.length&&!skippedSet.size)return {error:'가져올 데이터 행이 없습니다. 파트와 계약MM이 입력된 행이 있는지 확인하세요.'};
+    const items=[...map.values()].filter(it=>includeAll||it.rows.length);
+    if(!items.length&&!skippedSet.size)return {error:'가져올 데이터 행이 없습니다. 계약명이 입력된 행이 있는지 확인하세요.'};
     return {items,skipped:[...skippedSet],mmCols:null,unknownParts:[...unknownParts],longFormat:true};
   }
 
@@ -1984,12 +2005,13 @@ function parsePlanImp(text){
   for(const row of grid.slice(1)){
     const name=row[nameIdx];if(!name)continue;
     const status=statusIdx>=0?(row[statusIdx]||''):'';
-    if(statusIdx>=0&&!/진행/.test(status)){skipped.push(name);continue;}
+    if(!includeAll&&statusIdx>=0&&!/진행/.test(status)){skipped.push(name);continue;}
     const rows=[];
     mmCols.forEach(c=>{const mm=parseNum(row[c.i]);if(mm>0)rows.push({role:c.role,grade:1,mm,rate:rateOf(c.role,1)});});
     items.push({name,client:clientIdx>=0?row[clientIdx]||'':'',budget:budgetIdx>=0?parseNum(row[budgetIdx]):0,
       startYm:startIdx>=0?ymNorm(row[startIdx]):null,endYm:endIdx>=0?ymNorm(row[endIdx]):null,
-      projectType:typeIdx>=0?(row[typeIdx]||'').trim():'',rows,status});
+      projectType:typeIdx>=0?(row[typeIdx]||'').trim():'',rows,
+      status:statusNorm(status),rawStatus:status});
   }
   return {items,skipped,mmCols,hasStatus:statusIdx>=0};
 }
@@ -1999,11 +2021,12 @@ function renderPlanImpPreview(pre,extraNote){
   const text=document.getElementById('planImpText').value;
   planImpParsed=null;document.getElementById('planImpSubmit').disabled=true;
   if(!pre&&!text.trim()){box.innerHTML='';return;}
-  const r=pre||parsePlanImp(text);
+  const includeAll=document.getElementById('planImpAllStatus').checked;
+  const r=pre||parsePlanImp(text,includeAll);
   const extra=extraNote?'<br>'+extraNote:'';
   if(r.error){box.innerHTML='';msg.classList.add('err');msg.textContent='✗ '+r.error;return;}
   if(!r.items.length){box.innerHTML='';msg.classList.add('err');
-    msg.textContent='✗ 가져올 진행중 프로젝트가 없습니다.'+(r.skipped.length?' (상태에 "진행"이 없는 '+r.skipped.length+'건 제외)':'');return;}
+    msg.textContent='✗ 가져올 프로젝트가 없습니다.'+(r.skipped.length?' (상태에 "진행"이 없어 '+r.skipped.length+'건 제외 — 전체를 가져오려면 위 체크박스를 켜세요)':'');return;}
   planImpParsed=r.items;
   const noBudget=r.items.every(it=>!(it.budget>0));
   box.innerHTML='<div class="tablewrap"><table><thead><tr><th>프로젝트</th><th>유형</th><th>상태</th><th>발주처</th><th>계약액</th>'+
@@ -2013,14 +2036,16 @@ function renderPlanImpPreview(pre,extraNote){
       const margin=it.budget>0?(it.budget-labor)/it.budget*100:null;
       return '<tr><td style="font-weight:700">'+it.name+'</td>'+
         '<td>'+(it.projectType?'<span class="pill flat">'+String(it.projectType).replace(/</g,'&lt;')+'</span>':'-')+'</td>'+
-        '<td>'+(it.status||'-')+'</td><td>'+(it.client||'-')+'</td>'+
+        '<td>'+(it.rawStatus||it.status||'-')+(it.status&&it.rawStatus&&statusNorm(it.rawStatus)!==it.rawStatus?
+          ' <span class="pill flat" style="font-size:10px">'+it.status+'</span>':'')+'</td>'+
+        '<td>'+(it.client||'-')+'</td>'+
         '<td class="right">'+won(it.budget)+'</td><td class="right">'+mm.toFixed(2)+'</td><td class="right">'+won(labor)+'</td>'+
         '<td>'+(margin!=null?'<span class="pill '+cls(margin)+'">'+margin.toFixed(1)+'%</span>':'-')+'</td></tr>';
     }).join('')+'</tbody></table></div>'+
     '<div class="hint">'+
     (r.longFormat?'파트별 계약MM을 계약명 기준으로 묶어 인식했습니다 (등급 기본 중급)':
       (r.mmCols?'MM 인식 열: '+r.mmCols.map(c=>c.label).join(', ')+' (등급 기본 중급)':'등급 기본 중급'))+
-    (r.skipped&&r.skipped.length?' · 진행중이 아니어서 제외: '+r.skipped.length+'건':'')+
+    (r.skipped&&r.skipped.length?' · 진행중이 아니어서 제외: '+r.skipped.length+'건 (전체를 가져오려면 위 체크박스를 켜세요)':'')+
     (r.unknownParts&&r.unknownParts.length?'<br>⚠ 단가표에 없는 파트 → 단가 0으로 등록됨: <b>'+r.unknownParts.join(', ')+'</b> — 단가표에 같은 이름의 직군을 추가한 뒤 견적 기준 화면에서 단가를 다시 선택하세요.':'')+
     (noBudget?'<br>⚠ 계약액 열이 없어 0으로 등록됩니다. 등록 후 프로젝트 수정에서 계약액을 입력하면 견적 수익률이 계산됩니다.':'')+
     extra+'</div>';
@@ -2031,6 +2056,7 @@ document.getElementById('planImpCancel').onclick=()=>planImpModal.classList.remo
 planImpModal.onclick=e=>{if(e.target===planImpModal)planImpModal.classList.remove('show');};
 // 이벤트 객체가 첫 인자(pre)로 넘어가면 미리보기가 깨지므로 감싸서 호출
 document.getElementById('planImpText').oninput=()=>renderPlanImpPreview();
+document.getElementById('planImpAllStatus').onchange=()=>renderPlanImpPreview();
 document.getElementById('planImpFetch').onclick=async()=>{
   const msg=document.getElementById('planImpMsg');msg.className='msg';
   const url=document.getElementById('planImpUrl').value.trim();
@@ -2054,7 +2080,8 @@ document.getElementById('planImpFetchAll').onclick=async()=>{
     const r=await api('/import/sheet-all',{method:'POST',body:JSON.stringify({url})});
     const merged=new Map();const ok=[],skip=[];const unknown=new Set();let skipped=0;
     for(const sh of r.sheets){
-      const p=parsePlanImp(sh.rows.map(row=>row.join('\t')).join('\n'));
+      const p=parsePlanImp(sh.rows.map(row=>row.join('\t')).join('\n'),
+        document.getElementById('planImpAllStatus').checked);
       if(p.error||!p.items||!p.items.length){skip.push(sh.name);continue;}
       ok.push(sh.name+'('+p.items.length+')');
       (p.unknownParts||[]).forEach(x=>unknown.add(x));
@@ -2073,7 +2100,7 @@ document.getElementById('planImpFetchAll').onclick=async()=>{
     const items=[...merged.values()];
     if(!items.length){
       msg.classList.add('err');
-      msg.textContent='✗ 모든 탭에서 진행중 계약을 찾지 못했습니다 ('+r.sheets.length+'개 탭 확인).';
+      msg.textContent='✗ 모든 탭에서 계약을 찾지 못했습니다 ('+r.sheets.length+'개 탭 확인).';
       return;
     }
     document.getElementById('planImpText').value='';
@@ -2081,7 +2108,7 @@ document.getElementById('planImpFetchAll').onclick=async()=>{
       '📑 인식된 탭 '+ok.length+'/'+r.sheets.length+'개: '+ok.join(', ')+
       (skip.length?'<br>· 구조가 달라 건너뛴 탭: '+skip.join(', '):''));
     msg.classList.add('ok');
-    msg.textContent='✓ '+ok.length+'개 탭에서 진행중 계약 '+items.length+'건을 모았습니다. 미리보기 확인 후 [등록]을 누르세요.';
+    msg.textContent='✓ '+ok.length+'개 탭에서 계약 '+items.length+'건을 모았습니다. 미리보기 확인 후 [등록]을 누르세요.';
   }catch(err){msg.classList.add('err');msg.textContent='✗ '+err.message;}
   finally{btn.disabled=false;}
 };

@@ -439,20 +439,21 @@ app.post('/api/plan/import', async (req, res) => {
           `UPDATE mt_projects SET client=COALESCE($1,client), budget=CASE WHEN $2>0 THEN $2 ELSE budget END,
                   start_ym=COALESCE($3,start_ym), end_ym=COALESCE($4,end_ym),
                   plan_cost_out=$5, plan_cost_etc=$6, rate_std=COALESCE($7,rate_std),
-                  project_type=COALESCE($8,project_type)
-           WHERE id=$9`,
+                  project_type=COALESCE($8,project_type), status=COALESCE($9,status)
+           WHERE id=$10`,
           [p.client || null, num(p.budget), YM.test(p.startYm) ? p.startYm : null,
            YM.test(p.endYm) ? p.endYm : null, num(p.planCostOut), num(p.planCostEtc),
-           p.rateStd || null, p.projectType ? String(p.projectType).trim() : null, pid]
+           p.rateStd || null, p.projectType ? String(p.projectType).trim() : null,
+           p.status ? String(p.status).trim() : null, pid]
         );
         updated++;
       } else {
         const ins = await client.query(
           `INSERT INTO mt_projects (name, client, budget, start_ym, end_ym, plan_cost_out, plan_cost_etc, rate_std, project_type, status)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'진행중') RETURNING id`,
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
           [name, p.client || null, num(p.budget), YM.test(p.startYm) ? p.startYm : null,
            YM.test(p.endYm) ? p.endYm : null, num(p.planCostOut), num(p.planCostEtc), p.rateStd || 'SW',
-           p.projectType ? String(p.projectType).trim() : null]
+           p.projectType ? String(p.projectType).trim() : null, p.status ? String(p.status).trim() : '진행중']
         );
         pid = Number(ins.rows[0].id);
         created++;

@@ -110,6 +110,7 @@ H9 인력(부서(실)/부서(팀)/이름/직급 + SW·SDS·LG 기준별 기술�
 | GET/PUT | `/api/rates` | 단가표 조회/전체 교체 |
 | GET/PUT | `/api/part-map` | 파트·팀 → 직군 매핑 조회/교체 |
 | GET/PUT | `/api/project-types` | 프로젝트 유형·목표 수익률 조회/교체 |
+| POST | `/api/admin/reset` | 프로젝트 데이터 초기화 (인력·단가·비밀번호 보존) |
 | GET/POST | `/api/staff` | 인력 목록/등록 |
 | POST | `/api/staff/bulk` | 인력 일괄 등록 `[{dept1, dept2, name, position, gradeSw, gradeSds, gradeLg}]` |
 | POST | `/api/import/sheet` | 구글시트 CSV 가져오기 `{url}` (공유: 링크 보유자 뷰어) |

@@ -203,6 +203,46 @@ app.put('/api/rates', async (req, res) => {
   } finally { client.release(); }
 });
 
+// ── 데이터 초기화 (재구축용) ──────────────────────────
+// 프로젝트 관련 데이터만 삭제한다. 인력 명부(mt_staff)·단가표(mt_rate_cards)·
+// 앱 설정(mt_app_settings, 비밀번호)은 절대 건드리지 않는다.
+app.post('/api/admin/reset', async (req, res) => {
+  const b = req.body || {};
+  if (String(b.confirm || '') !== '초기화') {
+    return res.status(400).json({ error: '확인 문구가 일치하지 않습니다. "초기화"를 입력하세요.' });
+  }
+  const client = await pool.connect();
+  try {
+    const before = {};
+    for (const t of ['mt_projects', 'mt_plan_rows', 'mt_assignments',
+      'mt_monthly_records', 'mt_change_logs', 'mt_quote_files',
+      'mt_project_types', 'mt_part_map', 'mt_staff', 'mt_rate_cards']) {
+      const { rows } = await client.query(`SELECT COUNT(*)::int AS n FROM ${t}`);
+      before[t] = rows[0].n;
+    }
+    await client.query('BEGIN');
+    // mt_projects 삭제 시 plan_rows·assignments·records·logs·quote_files 는 ON DELETE CASCADE
+    await client.query('TRUNCATE mt_quote_files, mt_change_logs, mt_monthly_records, mt_assignments, mt_plan_rows, mt_projects RESTART IDENTITY CASCADE');
+    if (b.resetTypes) await client.query('DELETE FROM mt_project_types');
+    if (b.resetPartMap) await client.query('DELETE FROM mt_part_map');
+    await client.query('COMMIT');
+    res.json({
+      ok: true,
+      deleted: {
+        프로젝트: before.mt_projects, 견적투입계획: before.mt_plan_rows,
+        월별투입: before.mt_assignments, 월별실적: before.mt_monthly_records,
+        변동히스토리: before.mt_change_logs, 견적서파일: before.mt_quote_files,
+        프로젝트유형: b.resetTypes ? before.mt_project_types : 0,
+        파트매핑: b.resetPartMap ? before.mt_part_map : 0,
+      },
+      kept: { 인력명부: before.mt_staff, 단가표: before.mt_rate_cards },
+    });
+  } catch (e) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: e.message });
+  } finally { client.release(); }
+});
+
 // ── 프로젝트 유형 마스터 ──────────────────────────────
 app.get('/api/project-types', async (req, res) => {
   try {

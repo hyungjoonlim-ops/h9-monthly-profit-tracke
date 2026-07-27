@@ -98,6 +98,8 @@
   @media(max-width:760px){.cards{grid-template-columns:1fr 1fr}}
   .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
   .modal-bg.show{display:flex}
+  .panel.danger{border-color:#8a3b3b}
+  .panel.danger h2{color:#ff9b8a}
   .modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;width:100%;max-width:360px;max-height:calc(100vh - 40px);overflow-y:auto}
   .modal h3{font-size:16px;margin-bottom:16px}
   .modal .field{margin-bottom:12px}
@@ -438,6 +440,25 @@
   <div class="panel">
     <h2>등록된 프로젝트 <span class="tag" id="pjListCount">0건</span></h2>
     <div id="pjList"></div>
+  </div>
+
+  <div class="panel danger">
+    <h2>데이터 초기화 (재구축)</h2>
+    <div class="hint" style="margin-bottom:12px">
+      프로젝트 · 견적 투입계획 · 월별 투입 · 월별 실적 · 변동 히스토리 · 견적서 파일을 <b>모두 삭제</b>합니다.<br>
+      <b style="color:var(--good)">보존:</b> H9 인력 명부, 직군별 단가표, 로그인 비밀번호는 삭제되지 않습니다.
+      되돌릴 수 없으니 시트에서 다시 가져올 준비가 된 상태에서 실행하세요.
+    </div>
+    <div class="row" style="align-items:flex-end">
+      <div class="field"><label style="display:flex;gap:6px;align-items:center">
+        <input type="checkbox" id="rsTypes" style="width:auto"> 프로젝트 유형도 초기화</label></div>
+      <div class="field"><label style="display:flex;gap:6px;align-items:center">
+        <input type="checkbox" id="rsPartMap" style="width:auto"> 파트·팀 매핑도 초기화</label></div>
+      <div class="field grow"><label>확인 문구 — <b>초기화</b> 를 그대로 입력</label>
+        <input id="rsConfirm" placeholder="초기화"></div>
+      <button class="danger" id="btnReset">데이터 초기화 실행</button>
+    </div>
+    <div class="msg" id="rsMsg" style="margin-top:10px"></div>
   </div>
 </section>
 
@@ -2163,6 +2184,31 @@ document.getElementById('btnPmSave').onclick=async()=>{
     if(!document.getElementById('tab-analysis').classList.contains('hidden'))renderAnalysis();
     if(!document.getElementById('tab-plan').classList.contains('hidden')){planDraft=null;renderPlan();}
   }catch(err){s.className='status err';s.textContent='✗ 저장 실패: '+err.message;}
+};
+
+// ── 데이터 초기화 ─────────────────────────────────────
+document.getElementById('btnReset').onclick=async()=>{
+  const msg=document.getElementById('rsMsg');msg.className='msg';
+  const confirmText=document.getElementById('rsConfirm').value.trim();
+  if(confirmText!=='초기화'){msg.classList.add('err');msg.textContent='✗ 확인 문구에 "초기화"를 정확히 입력하세요.';return;}
+  const opts={confirm:'초기화',
+    resetTypes:document.getElementById('rsTypes').checked,
+    resetPartMap:document.getElementById('rsPartMap').checked};
+  if(!confirm('프로젝트·투입·실적 데이터를 모두 삭제합니다.\n\n인력 명부와 단가표는 보존됩니다.\n되돌릴 수 없습니다. 계속할까요?'))return;
+  const btn=document.getElementById('btnReset');btn.disabled=true;msg.textContent='초기화 중…';
+  try{
+    const r=await api('/admin/reset',{method:'POST',body:JSON.stringify(opts)});
+    document.getElementById('rsConfirm').value='';
+    curPjId=null;planPjId=null;anPjId=null;curYm=null;moDraft=null;planDraft=null;ptDraft=null;pmDraft=null;
+    await refreshAll();
+    const d=r.deleted,k=r.kept;
+    msg.classList.add('ok');
+    msg.innerHTML='✓ 초기화 완료 — 삭제: 프로젝트 '+d.프로젝트+'건 · 견적 투입계획 '+d.견적투입계획+'행 · 월별 투입 '+
+      d.월별투입+'건 · 월별 실적 '+d.월별실적+'건 · 히스토리 '+d.변동히스토리+'건 · 견적서 '+d.견적서파일+'개'+
+      (d.프로젝트유형?' · 유형 '+d.프로젝트유형+'개':'')+(d.파트매핑?' · 매핑 '+d.파트매핑+'건':'')+
+      '<br>보존: 인력 명부 '+k.인력명부+'명 · 단가표 '+k.단가표+'개 직군 — 이제 계약 시트를 가져오세요.';
+  }catch(err){msg.classList.add('err');msg.textContent='✗ 초기화 실패: '+err.message;}
+  finally{btn.disabled=false;}
 };
 
 // ── 프로젝트 유형 · 목표 수익률 ────────────────────────

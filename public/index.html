@@ -1094,30 +1094,53 @@ document.getElementById('btnMoSave').onclick=async()=>{
 // ── 월별 실투입 MM 가져오기 (MM 변동 시트) ────────────
 const moImpModal=document.getElementById('moImpModal');
 let moImpParsed=null;
+// 파싱 실패 시 무엇을 봤는지 보여주는 진단 문구
+function impDiag(grid){
+  const head=grid.slice(0,Math.min(5,grid.length)).map((r,i)=>
+    '<div style="font-family:monospace;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+
+    (i+1)+'행: '+r.slice(0,14).map(c=>c===''?'·':String(c).replace(/</g,'&lt;')).join(' | ')+'</div>').join('');
+  return '<div style="margin-top:8px;padding:8px;border:1px solid var(--line);border-radius:6px">'+
+    '<b>읽어온 내용 (앞 5행)</b>'+head+'</div>';
+}
 function parseMonthlyImp(text){
   const raw=text.split('\n').map(l=>l.replace(/[\r\s]+$/,''));
   const delim=text.includes('\t')?'\t':',';
   const grid=raw.map(l=>l.split(delim).map(x=>x.trim())).filter(r=>r.some(c=>c!==''));
-  if(grid.length<2)return {error:'머리글과 데이터가 필요합니다.'};
-  const isMon=c=>/^(\d{1,2})\s*월$/.exec(String(c||'').trim());
-  // 월(1월~12월) 라벨이 6개 이상 있는 행 = 열 지도
+  if(grid.length<2)return {error:'머리글과 데이터가 필요합니다.',diag:impDiag(grid)};
+  // 월 라벨: '1월' '01월' '2026-01' '2026.1' 형태 모두 인식
+  const isMon=c=>{
+    const t=String(c||'').trim();
+    let m=/^(\d{1,2})\s*월$/.exec(t);
+    if(m)return {mon:+m[1]};
+    m=/^(20\d{2})[-./](\d{1,2})$/.exec(t);
+    if(m)return {mon:+m[2],year:+m[1]};
+    return null;
+  };
+  // 월 라벨이 6개 이상 있는 행 = 열 지도
   let mrow=-1;
-  for(let i=0;i<Math.min(grid.length,12);i++){
+  for(let i=0;i<Math.min(grid.length,14);i++){
     if(grid[i].filter(c=>isMon(c)).length>=6){mrow=i;break;}
   }
-  if(mrow<0)return {error:'월(1월~12월) 머리글 행을 찾지 못했습니다. 머리글 행들을 포함해 복사했는지 확인하세요.'};
+  if(mrow<0){
+    // 계약 관리 시트를 잘못 넣은 경우 안내
+    const looksContract=grid.slice(0,6).some(r=>r.some(c=>/계약명|계약MM|파트/.test(c)));
+    return {error:looksContract
+      ?'이 시트는 계약 관리 시트로 보입니다. 계약 기준은 [프로젝트 · 견적 기준] 탭의 "구글시트 일괄 가져오기"에서 등록하세요.'
+      :'월(1월~12월) 머리글 행을 찾지 못했습니다. 머리글 행들을 포함해 복사했는지, 월 표기가 "1월" 또는 "2026-01" 형태인지 확인하세요.',
+      diag:impDiag(grid)};
+  }
   // 라벨 열 찾기 (머리글이 여러 행에 나뉘어 있어도 전체에서 탐색)
   let nameIdx=-1,teamIdx=-1,staffIdx=-1,gradeIdx=-1;
   for(let i=0;i<=mrow;i++)grid[i].forEach((c,j)=>{
-    if(nameIdx<0&&/프로젝트/.test(c))nameIdx=j;
-    if(teamIdx<0&&/^팀$/.test(c))teamIdx=j;
-    if(staffIdx<0&&/^이름$/.test(c))staffIdx=j;
-    if(gradeIdx<0&&/^등급$/.test(c))gradeIdx=j;
+    if(nameIdx<0&&/프로젝트|사업명|과제|계약명/.test(c))nameIdx=j;
+    if(teamIdx<0&&/^(팀|소속|부서)$/.test(c))teamIdx=j;
+    if(staffIdx<0&&/^(이름|성명|인력|인력명|투입인력)$/.test(c))staffIdx=j;
+    if(gradeIdx<0&&/등급/.test(c))gradeIdx=j;
   });
   if(nameIdx<0)nameIdx=0;
-  if(staffIdx<0)return {error:'"이름" 열을 찾지 못했습니다. 머리글 행들을 포함해 복사했는지 확인하세요.'};
+  if(staffIdx<0)return {error:'"이름"(또는 성명·인력명) 열을 찾지 못했습니다. 머리글 행들을 포함해 복사했는지 확인하세요.',diag:impDiag(grid)};
   // 연도: 제목/연도 행의 "20XX년" 표시 + 12월→1월 넘어가면 +1
-  const monthCols=[];grid[mrow].forEach((c,j)=>{const m=isMon(c);if(m)monthCols.push({col:j,mon:+m[1]});});
+  const monthCols=[];grid[mrow].forEach((c,j)=>{const m=isMon(c);if(m)monthCols.push({col:j,mon:m.mon,fixedYear:m.year||null});});
   const marks=[];let baseYear=null;
   for(let i=0;i<=mrow;i++)grid[i].forEach((c,j)=>{
     const m=/(20\d{2})\s*년/.exec(c);if(!m)return;
@@ -1127,9 +1150,12 @@ function parseMonthlyImp(text){
   if(baseYear==null)baseYear=marks.length?marks[0].year:new Date().getFullYear();
   let year=baseYear,prev=0;
   monthCols.forEach(mc=>{
-    const mk=marks.filter(k=>k.col<=mc.col).pop();
-    if(mk&&mk.year!==year&&mc.mon<=prev)year=mk.year;
-    else if(mc.mon<prev)year++;
+    if(mc.fixedYear){year=mc.fixedYear;}          // '2026-01' 처럼 연도가 붙은 경우
+    else{
+      const mk=marks.filter(k=>k.col<=mc.col).pop();
+      if(mk&&mk.year!==year&&mc.mon<=prev)year=mk.year;
+      else if(mc.mon<prev)year++;
+    }
     prev=mc.mon;
     mc.ym=year+'-'+String(mc.mon).padStart(2,'0');
   });
@@ -1150,13 +1176,14 @@ function parseMonthlyImp(text){
       grade:parseGrade(gradeIdx>=0?row[gradeIdx]:''),months});
   }
   const list=[...items.values()];
-  if(!list.length)return {error:'가져올 투입 데이터가 없습니다. 프로젝트명·이름·월별 MM이 입력된 행이 있는지 확인하세요.'};
+  if(!list.length)return {error:'가져올 투입 데이터가 없습니다. 프로젝트명·이름·월별 MM이 입력된 행이 있는지 확인하세요.'+
+    ' (인식된 열 — 프로젝트명 '+(nameIdx+1)+'열, 이름 '+(staffIdx+1)+'열, 월 '+monthCols.length+'개)',diag:impDiag(grid)};
   return {items:list,months:monthCols.map(m=>m.ym)};
 }
 function showMoImpPreview(r,extraNote){
   const box=document.getElementById('moImpPreview');const msg=document.getElementById('moImpMsg');
   moImpParsed=null;document.getElementById('moImpSubmit').disabled=true;
-  if(r.error){box.innerHTML='';msg.classList.add('err');msg.textContent='✗ '+r.error;return;}
+  if(r.error){box.innerHTML=r.diag||'';msg.classList.add('err');msg.textContent='✗ '+r.error;return;}
   moImpParsed=r.items;
   const extra=extraNote?'<br>'+extraNote:'';
   const newStaff=new Set();
@@ -1943,6 +1970,12 @@ function parsePlanImp(text,includeAll){
   const header=grid[0];
   const roleKeys=Object.keys(rates);
   const find=re=>header.findIndex(h=>re.test(h));
+  // 월별 인력 투입 현황 시트를 잘못 넣은 경우 먼저 안내
+  const monCount=header.filter(h=>/^\d{1,2}\s*월$/.test(String(h).trim())).length
+    +grid.slice(0,6).reduce((a,r)=>a+r.filter(h=>/^\d{1,2}\s*월$/.test(String(h).trim())).length,0);
+  if(monCount>=6&&!header.some(h=>/계약MM|파트|계약액|계약금/.test(h))){
+    return {error:'이 시트는 월별 인력 투입 현황(MM) 시트로 보입니다. 월별 실투입은 [월별 투입 · 수익률] 탭의 "구글시트 MM 가져오기"에서 반영하세요.'};
+  }
   const nameIdx=find(/계약명|프로젝트|사업명|과제|건명/);
   if(nameIdx<0)return {error:'머리글에서 "계약명(프로젝트명)" 열을 찾지 못했습니다. 머리글 행을 포함해 복사했는지 확인하세요.'};
   const statusIdx=find(/상태|진행|구분/);
@@ -2433,6 +2466,12 @@ document.getElementById('pwForm').onsubmit=async(e)=>{
   }catch(err){pwMsg.classList.add('err');pwMsg.textContent='✗ '+err.message;}
   finally{btn.disabled=false;}
 };
+
+// Esc 로 열려 있는 모달 닫기
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Escape')return;
+  document.querySelectorAll('.modal-bg.show').forEach(m=>m.classList.remove('show'));
+});
 
 // ── 초기화 ────────────────────────────────────────────
 (async function(){

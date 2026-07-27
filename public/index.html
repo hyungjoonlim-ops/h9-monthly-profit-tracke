@@ -1094,6 +1094,27 @@ document.getElementById('btnMoSave').onclick=async()=>{
 // ── 월별 실투입 MM 가져오기 (MM 변동 시트) ────────────
 const moImpModal=document.getElementById('moImpModal');
 let moImpParsed=null;
+// 월 라벨 인식: "25'10월" "1월" "2026-01" "2026년 1월"
+function monLabel(c){
+  const t=String(c||'').trim();
+  let m=/^(\d{2})\s*['\u2019]\s*(\d{1,2})\s*월?$/.exec(t);
+  if(m)return {mon:+m[2],year:2000+(+m[1])};
+  m=/^(20\d{2})\s*[년.\-/]\s*(\d{1,2})\s*월?$/.exec(t);
+  if(m)return {mon:+m[2],year:+m[1]};
+  m=/^(\d{1,2})\s*월$/.exec(t);
+  if(m)return {mon:+m[1],year:null};
+  return null;
+}
+// 연도 없는 라벨에 연도 채우기 (12월 → 1월 넘어가면 +1)
+function fillYears(cols,baseYear){
+  let y=baseYear,prev=0;
+  cols.forEach(c=>{
+    if(c.year)y=c.year;
+    else if(c.mon<prev)y++;
+    prev=c.mon;c.ym=y+'-'+String(c.mon).padStart(2,'0');
+  });
+  return cols;
+}
 // 파싱 실패 시 무엇을 봤는지 보여주는 진단 문구
 function impDiag(grid){
   const head=grid.slice(0,Math.min(5,grid.length)).map((r,i)=>
@@ -1134,7 +1155,8 @@ function parseMonthlyImp(text){
   for(let i=0;i<=mrow;i++)grid[i].forEach((c,j)=>{
     if(nameIdx<0&&/프로젝트|사업명|과제|계약명/.test(c))nameIdx=j;
     if(teamIdx<0&&/^(팀|소속|부서)$/.test(c))teamIdx=j;
-    if(staffIdx<0&&/^(이름|성명|인력|인력명|투입인력)$/.test(c))staffIdx=j;
+    if(teamIdx<0&&/^(파트|부문)$/.test(c))teamIdx=j;
+    if(staffIdx<0&&/이름|성명|인력/.test(c))staffIdx=j;
     if(gradeIdx<0&&/등급/.test(c))gradeIdx=j;
   });
   if(nameIdx<0)nameIdx=0;
@@ -1167,6 +1189,7 @@ function parseMonthlyImp(text){
     if(nm)curName=nm;
     const person=(row[staffIdx]||'').trim();
     if(!curName||!person||/자동입력/.test(person))continue;
+    if(/^(미정|미배정|TBD|-|해당없음)$/i.test(person))continue;   // 인력 미정 행은 건너뜀
     const months={};let tot=0;
     monthCols.forEach(mc=>{const v=parseNum(row[mc.col]);if(v>0){months[mc.ym]=v;tot+=v;}});
     if(!(tot>0))continue;
@@ -1989,8 +2012,20 @@ function parsePlanImp(text,includeAll){
 
   // 세로 형식: 한 계약이 파트별 여러 행 (계약번호·고객사·계약명·형태·상태·계약시작·계약종료·계약MM·투입MM·파트·1월~12월·합계)
   if(partIdx>=0){
-    let cmmIdx=find(/계약\s*MM/i);if(cmmIdx<0)cmmIdx=find(/합계/);
-    if(cmmIdx<0)return {error:'"계약MM" 열을 찾지 못했습니다.'};
+    // MM 열 인식: '계약MM' → '총MM' → 정확히 'MM' → '합계' (단가 열은 제외)
+    const okMM=i=>i>=0&&!/단가/.test(String(header[i]||''));
+    let cmmIdx=find(/계약\s*MM/i);
+    if(!okMM(cmmIdx))cmmIdx=find(/총\s*MM/i);
+    if(!okMM(cmmIdx))cmmIdx=header.findIndex(h=>/^MM$/i.test(String(h).replace(/\s/g,'')));
+    if(!okMM(cmmIdx))cmmIdx=find(/합계/);
+    if(!okMM(cmmIdx))cmmIdx=-1;
+    // 파트별 등급 열 + 월별 MM 열 (파트별 계약MM이 없으면 월별 합으로 산출)
+    const gIdx=find(/등급/);
+    const monCols=fillYears(header.map((h,j)=>{const m=monLabel(h);return m?{col:j,mon:m.mon,year:m.year}:null;})
+      .filter(Boolean), new Date().getFullYear());
+    if(cmmIdx<0&&!monCols.length){
+      return {error:'MM 열을 찾지 못했습니다. 머리글에 "계약MM"·"총MM"·"MM" 또는 월별 MM 열(예: 25\u2019 10월)이 필요합니다.',diag:impDiag(grid)};
+    }
     const map=new Map();const skippedSet=new Set();const unknownParts=new Set();
     let ctx=null;
     for(const row of grid.slice(1)){
@@ -1999,26 +2034,33 @@ function parsePlanImp(text,includeAll){
         ctx={name:rawName,client:clientIdx>=0?row[clientIdx]||'':'',status:statusIdx>=0?row[statusIdx]||'':'',
              startYm:startIdx>=0?ymNorm(row[startIdx]):null,endYm:endIdx>=0?ymNorm(row[endIdx]):null,
              budget:budgetIdx>=0?parseNum(row[budgetIdx]):0,
+             totalMM:cmmIdx>=0?parseNum(row[cmmIdx]):0,
              projectType:typeIdx>=0?(row[typeIdx]||'').trim():''};
         // 전체 가져오기: 파트·계약MM이 비어 있는 계약도 프로젝트로 등록
         const pass=includeAll||!(statusIdx>=0&&ctx.status&&!/진행/.test(ctx.status));
         if(!pass)skippedSet.add(ctx.name);
         else if(includeAll&&!map.has(ctx.name))map.set(ctx.name,{
           name:ctx.name,client:ctx.client,budget:ctx.budget,startYm:ctx.startYm,endYm:ctx.endYm,
-          projectType:ctx.projectType||'',rows:[],
+          projectType:ctx.projectType||'',rows:[],totalMM:ctx.totalMM||0,
           status:statusNorm(ctx.status),rawStatus:ctx.status||''});
       }
       if(!ctx)continue;
       const part=row[partIdx];if(!part)continue;
       if(!includeAll&&statusIdx>=0&&ctx.status&&!/진행/.test(ctx.status)){skippedSet.add(ctx.name);continue;}
-      const mm=parseNum(row[cmmIdx]);if(!(mm>0))continue;
+      // 파트별 MM: 월별 열이 있으면 그 합, 없으면 MM 열 값
+      let mm=0;
+      if(monCols.length)monCols.forEach(mc=>{mm+=parseNum(row[mc.col]);});
+      else if(cmmIdx>=0)mm=parseNum(row[cmmIdx]);
       let it=map.get(ctx.name);
       if(!it){it={name:ctx.name,client:ctx.client,budget:ctx.budget,startYm:ctx.startYm,endYm:ctx.endYm,
-                  projectType:ctx.projectType||'',rows:[],
+                  projectType:ctx.projectType||'',rows:[],totalMM:ctx.totalMM||0,
                   status:statusNorm(ctx.status),rawStatus:ctx.status||''};map.set(ctx.name,it);}
+      if(!(mm>0))continue;
       const role=roleFor(part);
       if(!role)unknownParts.add(part);
-      it.rows.push({role:role||String(part).trim(),grade:1,mm,rate:role?rateOf(role,1):0});
+      const g=gIdx>=0?parseGrade(row[gIdx]):null;
+      const gr=g==null?1:g;
+      it.rows.push({role:role||String(part).trim(),grade:gr,mm,rate:role?rateOf(role,gr):0});
     }
     const items=[...map.values()].filter(it=>includeAll||it.rows.length);
     if(!items.length&&!skippedSet.size)return {error:'가져올 데이터 행이 없습니다. 계약명이 입력된 행이 있는지 확인하세요.'};
@@ -2066,17 +2108,22 @@ function renderPlanImpPreview(pre,extraNote){
     '<th>총 MM</th><th>계획 인건비</th><th>견적 수익률</th></tr></thead><tbody>'+
     r.items.map(it=>{
       let mm=0,labor=0;it.rows.forEach(x=>{mm+=x.mm;labor+=x.mm*x.rate;});
-      const margin=it.budget>0?(it.budget-labor)/it.budget*100:null;
+      const margin=(it.budget>0&&labor>0)?(it.budget-labor)/it.budget*100:null;
+      const noSplit=!(mm>0)&&it.totalMM>0;
       return '<tr><td style="font-weight:700">'+it.name+'</td>'+
         '<td>'+(it.projectType?'<span class="pill flat">'+String(it.projectType).replace(/</g,'&lt;')+'</span>':'-')+'</td>'+
         '<td>'+(it.rawStatus||it.status||'-')+(it.status&&it.rawStatus&&statusNorm(it.rawStatus)!==it.rawStatus?
           ' <span class="pill flat" style="font-size:10px">'+it.status+'</span>':'')+'</td>'+
         '<td>'+(it.client||'-')+'</td>'+
-        '<td class="right">'+won(it.budget)+'</td><td class="right">'+mm.toFixed(2)+'</td><td class="right">'+won(labor)+'</td>'+
+        '<td class="right">'+won(it.budget)+'</td>'+
+        '<td class="right">'+(noSplit?'<span class="pill warn">계약 '+it.totalMM.toFixed(2)+' · 파트 미배분</span>'
+          :mm.toFixed(2)+(it.totalMM>0&&Math.abs(it.totalMM-mm)>0.5
+            ?' <span class="muted" style="font-size:10px">/ 계약 '+it.totalMM.toFixed(2)+'</span>':''))+'</td>'+
+        '<td class="right">'+won(labor)+'</td>'+
         '<td>'+(margin!=null?'<span class="pill '+cls(margin)+'">'+margin.toFixed(1)+'%</span>':'-')+'</td></tr>';
     }).join('')+'</tbody></table></div>'+
     '<div class="hint">'+
-    (r.longFormat?'파트별 계약MM을 계약명 기준으로 묶어 인식했습니다 (등급 기본 중급)':
+    (r.longFormat?'계약명으로 파트 행들을 묶어 인식했습니다. 파트별 MM은 월별 열 합계 또는 MM 열에서 산출하고, 등급은 시트의 등급 열을 사용합니다':
       (r.mmCols?'MM 인식 열: '+r.mmCols.map(c=>c.label).join(', ')+' (등급 기본 중급)':'등급 기본 중급'))+
     (r.skipped&&r.skipped.length?' · 진행중이 아니어서 제외: '+r.skipped.length+'건 (전체를 가져오려면 위 체크박스를 켜세요)':'')+
     (r.unknownParts&&r.unknownParts.length?'<br>⚠ 단가표에 없는 파트 → 단가 0으로 등록됨: <b>'+r.unknownParts.join(', ')+'</b> — 단가표에 같은 이름의 직군을 추가한 뒤 견적 기준 화면에서 단가를 다시 선택하세요.':'')+

@@ -113,7 +113,7 @@ function mapProject(r) {
     id: Number(r.id), name: r.name, client: r.client,
     budget: num(r.budget), startYm: r.start_ym, endYm: r.end_ym,
     planMargin: num(r.plan_margin), planCostOut: num(r.plan_cost_out), planCostEtc: num(r.plan_cost_etc),
-    rateStd: r.rate_std || 'SW',
+    rateStd: r.rate_std || 'SW', projectType: r.project_type || '',
     status: r.status, memo: r.memo,
     createdAt: r.created_at,
   };
@@ -197,6 +197,53 @@ app.put('/api/rates', async (req, res) => {
     }
     await client.query('COMMIT');
     res.json({ ok: true, count: i });
+  } catch (e) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: e.message });
+  } finally { client.release(); }
+});
+
+// ── 프로젝트 유형 마스터 ──────────────────────────────
+app.get('/api/project-types', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT name, target_margin, sort_order, memo FROM mt_project_types ORDER BY sort_order, name'
+    );
+    res.json(rows.map((r) => ({
+      name: r.name,
+      targetMargin: r.target_margin == null ? null : Number(r.target_margin),
+      sortOrder: Number(r.sort_order), memo: r.memo || '',
+    })));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/project-types', async (req, res) => {
+  const list = Array.isArray(req.body) ? req.body : [];
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const keep = [];
+    let i = 0;
+    for (const t of list) {
+      const name = String(t.name || '').trim();
+      if (!name) continue;
+      keep.push(name);
+      await client.query(
+        `INSERT INTO mt_project_types (name, target_margin, sort_order, memo, updated_at)
+         VALUES ($1,$2,$3,$4,now())
+         ON CONFLICT(name) DO UPDATE SET target_margin=excluded.target_margin,
+           sort_order=excluded.sort_order, memo=excluded.memo, updated_at=now()`,
+        [name, t.targetMargin == null || t.targetMargin === '' ? null : num(t.targetMargin), i++, t.memo || null]
+      );
+    }
+    // 목록에서 빠진 유형은 삭제 (해당 프로젝트의 유형 값은 그대로 남겨 이력 보존)
+    if (keep.length) {
+      await client.query('DELETE FROM mt_project_types WHERE name <> ALL($1::text[])', [keep]);
+    } else {
+      await client.query('DELETE FROM mt_project_types');
+    }
+    await client.query('COMMIT');
+    res.json({ ok: true, count: keep.length });
   } catch (e) {
     await client.query('ROLLBACK');
     res.status(500).json({ error: e.message });
@@ -351,22 +398,32 @@ app.post('/api/plan/import', async (req, res) => {
         await client.query(
           `UPDATE mt_projects SET client=COALESCE($1,client), budget=CASE WHEN $2>0 THEN $2 ELSE budget END,
                   start_ym=COALESCE($3,start_ym), end_ym=COALESCE($4,end_ym),
-                  plan_cost_out=$5, plan_cost_etc=$6, rate_std=COALESCE($7,rate_std)
-           WHERE id=$8`,
+                  plan_cost_out=$5, plan_cost_etc=$6, rate_std=COALESCE($7,rate_std),
+                  project_type=COALESCE($8,project_type)
+           WHERE id=$9`,
           [p.client || null, num(p.budget), YM.test(p.startYm) ? p.startYm : null,
            YM.test(p.endYm) ? p.endYm : null, num(p.planCostOut), num(p.planCostEtc),
-           p.rateStd || null, pid]
+           p.rateStd || null, p.projectType ? String(p.projectType).trim() : null, pid]
         );
         updated++;
       } else {
         const ins = await client.query(
-          `INSERT INTO mt_projects (name, client, budget, start_ym, end_ym, plan_cost_out, plan_cost_etc, rate_std, status)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'진행중') RETURNING id`,
+          `INSERT INTO mt_projects (name, client, budget, start_ym, end_ym, plan_cost_out, plan_cost_etc, rate_std, project_type, status)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'진행중') RETURNING id`,
           [name, p.client || null, num(p.budget), YM.test(p.startYm) ? p.startYm : null,
-           YM.test(p.endYm) ? p.endYm : null, num(p.planCostOut), num(p.planCostEtc), p.rateStd || 'SW']
+           YM.test(p.endYm) ? p.endYm : null, num(p.planCostOut), num(p.planCostEtc), p.rateStd || 'SW',
+           p.projectType ? String(p.projectType).trim() : null]
         );
         pid = Number(ins.rows[0].id);
         created++;
+      }
+      // 시트의 '형태'로 들어온 유형은 마스터에 자동 등록 (7개 유형이 저절로 채워짐)
+      if (p.projectType && String(p.projectType).trim()) {
+        await client.query(
+          `INSERT INTO mt_project_types (name, sort_order) VALUES ($1, 99)
+           ON CONFLICT(name) DO NOTHING`,
+          [String(p.projectType).trim()]
+        );
       }
       await client.query('DELETE FROM mt_plan_rows WHERE project_id=$1', [pid]);
       let i = 0;
@@ -640,11 +697,12 @@ app.post('/api/projects', async (req, res) => {
   if (!p.name || !String(p.name).trim()) return res.status(400).json({ error: '프로젝트명은 필수입니다.' });
   try {
     const { rows } = await pool.query(
-      `INSERT INTO mt_projects (name, client, budget, start_ym, end_ym, plan_margin, plan_cost_out, plan_cost_etc, rate_std, status, memo)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+      `INSERT INTO mt_projects (name, client, budget, start_ym, end_ym, plan_margin, plan_cost_out, plan_cost_etc, rate_std, project_type, status, memo)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
       [String(p.name).trim(), p.client || null, num(p.budget),
        YM.test(p.startYm) ? p.startYm : null, YM.test(p.endYm) ? p.endYm : null,
-       num(p.planMargin), num(p.planCostOut), num(p.planCostEtc), p.rateStd || 'SW', p.status || '진행중', p.memo || null]
+       num(p.planMargin), num(p.planCostOut), num(p.planCostEtc), p.rateStd || 'SW',
+       p.projectType ? String(p.projectType).trim() : null, p.status || '진행중', p.memo || null]
     );
     res.json(mapProject(rows[0]));
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -656,11 +714,13 @@ app.put('/api/projects/:id', async (req, res) => {
   try {
     const { rows } = await pool.query(
       `UPDATE mt_projects SET name=$1, client=$2, budget=$3, start_ym=$4, end_ym=$5,
-              plan_margin=$6, plan_cost_out=$7, plan_cost_etc=$8, rate_std=$9, status=$10, memo=$11
-       WHERE id=$12 RETURNING *`,
+              plan_margin=$6, plan_cost_out=$7, plan_cost_etc=$8, rate_std=$9,
+              project_type=$10, status=$11, memo=$12
+       WHERE id=$13 RETURNING *`,
       [String(p.name).trim(), p.client || null, num(p.budget),
        YM.test(p.startYm) ? p.startYm : null, YM.test(p.endYm) ? p.endYm : null,
-       num(p.planMargin), num(p.planCostOut), num(p.planCostEtc), p.rateStd || 'SW', p.status || '진행중', p.memo || null, req.params.id]
+       num(p.planMargin), num(p.planCostOut), num(p.planCostEtc), p.rateStd || 'SW',
+       p.projectType ? String(p.projectType).trim() : null, p.status || '진행중', p.memo || null, req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: '프로젝트를 찾을 수 없습니다.' });
     res.json(mapProject(rows[0]));

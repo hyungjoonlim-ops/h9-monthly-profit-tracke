@@ -147,6 +147,22 @@
     </div>
     <div class="hint">행을 클릭하면 해당 프로젝트의 월별 투입 화면으로 이동합니다. 견적 수익률은 견적 기준 투입계획으로 산출된 고정 기준입니다.</div>
   </div>
+
+  <div class="panel">
+    <h2>프로젝트 유형별 수익률 <span class="tag" id="typeCount"></span></h2>
+    <div class="tablewrap">
+    <table>
+      <thead><tr>
+        <th style="min-width:140px">유형</th><th>건수</th><th>계약액 합계</th>
+        <th>견적 기준 수익률</th><th>누적 수익률</th><th>최근월 수익률</th>
+        <th>목표</th><th style="min-width:110px">목표 대비</th>
+      </tr></thead>
+      <tbody id="typeBody"></tbody>
+      <tfoot><tr style="font-weight:700" id="typeFoot"></tr></tfoot>
+    </table>
+    </div>
+    <div class="hint">유형은 계약 시트의 <b>형태</b> 열에서 자동 인식되며, 유형별 목표 수익률은 프로젝트·견적 기준 탭에서 설정합니다. 수익률은 계약액·매출로 가중한 값입니다.</div>
+  </div>
 </section>
 
 <!-- ══════════ 월별 투입 · 수익률 ══════════ -->
@@ -338,6 +354,7 @@
     <div class="row">
       <div class="field grow"><label>프로젝트명 *</label><input id="pjName" placeholder="예: SK에코플랜트 26년 CTMS 리뉴얼"></div>
       <div class="field"><label>발주처</label><input id="pjClient" placeholder="발주처"></div>
+      <div class="field"><label>프로젝트 유형</label><select id="pjType"></select></div>
       <div class="field"><label>단가 기준</label><select id="pjStd"><option>SW</option><option>SDS</option><option>LG</option></select></div>
       <div class="field"><label>상태</label><select id="pjStatus"><option>진행중</option><option>완료</option><option>보류</option></select></div>
     </div>
@@ -390,6 +407,32 @@
       <span class="status" id="quoteStatus"></span>
     </div>
     <div id="quoteList" class="hint" style="margin-top:6px"></div>
+  </div>
+
+  <div class="panel">
+    <div class="toolbar">
+      <h2>프로젝트 유형 · 목표 수익률 <span class="tag" id="ptCount"></span></h2>
+      <button class="ghost sm" id="btnPtSync">프로젝트에서 유형 수집</button>
+    </div>
+    <div class="tablewrap">
+    <table>
+      <thead><tr>
+        <th style="min-width:180px">유형명</th><th style="width:130px">목표 수익률(%)</th>
+        <th style="min-width:160px">메모</th><th>적용 프로젝트</th><th style="width:30px"></th>
+      </tr></thead>
+      <tbody id="ptBody"></tbody>
+    </table>
+    </div>
+    <div class="addline">
+      <div class="field grow"><label>새 유형명</label><input id="ptNewName" placeholder="예: SI 구축 / SM 운영 / 상주 / 컨설팅"></div>
+      <div class="field"><label>목표 수익률(%)</label><input id="ptNewTarget" class="num" inputmode="decimal" placeholder="예: 25"></div>
+      <button class="ghost" id="btnPtAdd">유형 추가</button>
+    </div>
+    <div class="savebar">
+      <button id="btnPtSave">유형 저장</button>
+      <span class="status" id="ptStatus"></span>
+    </div>
+    <div class="hint">계약 시트를 가져오면 <b>형태</b> 열의 값이 유형으로 자동 등록됩니다. 목표 수익률을 넣으면 대시보드의 유형별 표에서 목표 대비 달성도가 표시됩니다.</div>
   </div>
 
   <div class="panel">
@@ -573,7 +616,7 @@
 
 <script>
 const GRADES=['초급','중급','고급','특급'];
-let projects=[],staff=[],rates={},allPlans=[],allAssigns=[],allRecords=[],partMap={};
+let projects=[],staff=[],rates={},allPlans=[],allAssigns=[],allRecords=[],partMap={},projectTypes=[];
 let curPjId=null,curYm=null,editPjId=null,planPjId=null;
 let moDraft=null; // {assigns:[{staffId,mm}], rec:{revenue,costOut,costEtc,note}}
 let planDraft=null; // {rows:[{role,grade,mm,rate}], out, etc}
@@ -1234,6 +1277,7 @@ function pjFormData(){
     name:document.getElementById('pjName').value.trim(),
     client:document.getElementById('pjClient').value.trim(),
     rateStd:document.getElementById('pjStd').value,
+    projectType:document.getElementById('pjType').value,
     status:document.getElementById('pjStatus').value,
     budget:parseNum(document.getElementById('pjBudget').value),
     startYm:document.getElementById('pjStart').value||null,
@@ -1247,6 +1291,7 @@ function pjFormReset(){
   document.getElementById('btnCancelEdit').classList.add('hidden');
   ['pjName','pjClient','pjMemo'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('pjStd').value='SW';
+  document.getElementById('pjType').value='';
   document.getElementById('pjStatus').value='진행중';
   document.getElementById('pjBudget').value='0';
   document.getElementById('pjStart').value='';document.getElementById('pjEnd').value='';
@@ -1390,7 +1435,8 @@ function renderPjList(){
   list.innerHTML=projects.slice().reverse().map(p=>{
     const pm=planMarginOf(p);
     return '<div class="pj-item"><div><div style="font-weight:700">'+p.name+' <span class="pill '+(p.status==='진행중'?'good':p.status==='완료'?'flat':'warn')+'">'+p.status+'</span>'+
-      (pm!=null?' <span class="pill '+cls(pm)+'">견적 '+pm.toFixed(1)+'%</span>':' <span class="pill flat">견적 미확정</span>')+'</div>'+
+      (pm!=null?' <span class="pill '+cls(pm)+'">견적 '+pm.toFixed(1)+'%</span>':' <span class="pill flat">견적 미확정</span>')+
+      (p.projectType?' <span class="pill flat">'+String(p.projectType).replace(/</g,'&lt;')+'</span>':'')+'</div>'+
       '<div class="meta">'+(p.client||'-')+' · 기준 '+(p.rateStd||'SW')+' · 계약 '+won(p.budget)+'원 · '+ymLabel(p.startYm)+'~'+ymLabel(p.endYm)+(p.memo?' · '+p.memo:'')+'</div></div>'+
       '<div class="actions"><button class="ghost sm" data-plan="'+p.id+'">견적 기준</button>'+
       '<button class="ghost sm" data-rec="'+p.id+'">월별 투입</button>'+
@@ -1406,6 +1452,7 @@ function renderPjList(){
     document.getElementById('btnCancelEdit').classList.remove('hidden');
     document.getElementById('pjName').value=p.name;document.getElementById('pjClient').value=p.client||'';
     document.getElementById('pjStd').value=p.rateStd||'SW';
+    document.getElementById('pjType').value=p.projectType||'';
     document.getElementById('pjStatus').value=p.status;document.getElementById('pjBudget').value=p.budget;
     document.getElementById('pjStart').value=p.startYm||'';document.getElementById('pjEnd').value=p.endYm||'';
     document.getElementById('pjMemo').value=p.memo||'';
@@ -1870,6 +1917,7 @@ function parsePlanImp(text){
   const startIdx=find(/시작|착수/);
   const endIdx=find(/종료|마감/);
   const partIdx=find(/파트|부문/);
+  const typeIdx=find(/형태|유형/);
   const roleFor=t=>resolveRole(t);
 
   // 세로 형식: 한 계약이 파트별 여러 행 (계약번호·고객사·계약명·형태·상태·계약시작·계약종료·계약MM·투입MM·파트·1월~12월·합계)
@@ -1883,14 +1931,16 @@ function parsePlanImp(text){
       if(rawName){ // 새 계약 블록 시작 (병합 셀로 아랫줄이 비어 있으면 이전 값 유지)
         ctx={name:rawName,client:clientIdx>=0?row[clientIdx]||'':'',status:statusIdx>=0?row[statusIdx]||'':'',
              startYm:startIdx>=0?ymNorm(row[startIdx]):null,endYm:endIdx>=0?ymNorm(row[endIdx]):null,
-             budget:budgetIdx>=0?parseNum(row[budgetIdx]):0};
+             budget:budgetIdx>=0?parseNum(row[budgetIdx]):0,
+             projectType:typeIdx>=0?(row[typeIdx]||'').trim():''};
       }
       if(!ctx)continue;
       const part=row[partIdx];if(!part)continue;
       if(statusIdx>=0&&ctx.status&&!/진행/.test(ctx.status)){skippedSet.add(ctx.name);continue;}
       const mm=parseNum(row[cmmIdx]);if(!(mm>0))continue;
       let it=map.get(ctx.name);
-      if(!it){it={name:ctx.name,client:ctx.client,budget:ctx.budget,startYm:ctx.startYm,endYm:ctx.endYm,rows:[],status:ctx.status||'진행중'};map.set(ctx.name,it);}
+      if(!it){it={name:ctx.name,client:ctx.client,budget:ctx.budget,startYm:ctx.startYm,endYm:ctx.endYm,
+                  projectType:ctx.projectType||'',rows:[],status:ctx.status||'진행중'};map.set(ctx.name,it);}
       const role=roleFor(part);
       if(!role)unknownParts.add(part);
       it.rows.push({role:role||String(part).trim(),grade:1,mm,rate:role?rateOf(role,1):0});
@@ -1900,7 +1950,7 @@ function parsePlanImp(text){
     return {items,skipped:[...skippedSet],mmCols:null,unknownParts:[...unknownParts],longFormat:true};
   }
 
-  const used=[nameIdx,statusIdx,clientIdx,budgetIdx,startIdx,endIdx];
+  const used=[nameIdx,statusIdx,clientIdx,budgetIdx,startIdx,endIdx,typeIdx];
   const mmCols=[];
   header.forEach((h,i)=>{
     if(used.includes(i))return;
@@ -1917,7 +1967,8 @@ function parsePlanImp(text){
     const rows=[];
     mmCols.forEach(c=>{const mm=parseNum(row[c.i]);if(mm>0)rows.push({role:c.role,grade:1,mm,rate:rateOf(c.role,1)});});
     items.push({name,client:clientIdx>=0?row[clientIdx]||'':'',budget:budgetIdx>=0?parseNum(row[budgetIdx]):0,
-      startYm:startIdx>=0?ymNorm(row[startIdx]):null,endYm:endIdx>=0?ymNorm(row[endIdx]):null,rows,status});
+      startYm:startIdx>=0?ymNorm(row[startIdx]):null,endYm:endIdx>=0?ymNorm(row[endIdx]):null,
+      projectType:typeIdx>=0?(row[typeIdx]||'').trim():'',rows,status});
   }
   return {items,skipped,mmCols,hasStatus:statusIdx>=0};
 }
@@ -1934,12 +1985,14 @@ function renderPlanImpPreview(pre,extraNote){
     msg.textContent='✗ 가져올 진행중 프로젝트가 없습니다.'+(r.skipped.length?' (상태에 "진행"이 없는 '+r.skipped.length+'건 제외)':'');return;}
   planImpParsed=r.items;
   const noBudget=r.items.every(it=>!(it.budget>0));
-  box.innerHTML='<div class="tablewrap"><table><thead><tr><th>프로젝트</th><th>상태</th><th>발주처</th><th>계약액</th>'+
+  box.innerHTML='<div class="tablewrap"><table><thead><tr><th>프로젝트</th><th>유형</th><th>상태</th><th>발주처</th><th>계약액</th>'+
     '<th>총 MM</th><th>계획 인건비</th><th>견적 수익률</th></tr></thead><tbody>'+
     r.items.map(it=>{
       let mm=0,labor=0;it.rows.forEach(x=>{mm+=x.mm;labor+=x.mm*x.rate;});
       const margin=it.budget>0?(it.budget-labor)/it.budget*100:null;
-      return '<tr><td style="font-weight:700">'+it.name+'</td><td>'+(it.status||'-')+'</td><td>'+(it.client||'-')+'</td>'+
+      return '<tr><td style="font-weight:700">'+it.name+'</td>'+
+        '<td>'+(it.projectType?'<span class="pill flat">'+String(it.projectType).replace(/</g,'&lt;')+'</span>':'-')+'</td>'+
+        '<td>'+(it.status||'-')+'</td><td>'+(it.client||'-')+'</td>'+
         '<td class="right">'+won(it.budget)+'</td><td class="right">'+mm.toFixed(2)+'</td><td class="right">'+won(labor)+'</td>'+
         '<td>'+(margin!=null?'<span class="pill '+cls(margin)+'">'+margin.toFixed(1)+'%</span>':'-')+'</td></tr>';
     }).join('')+'</tbody></table></div>'+
@@ -1955,7 +2008,8 @@ function renderPlanImpPreview(pre,extraNote){
 document.getElementById('btnPlanImpOpen').onclick=()=>{document.getElementById('planImpMsg').textContent='';planImpModal.classList.add('show');};
 document.getElementById('planImpCancel').onclick=()=>planImpModal.classList.remove('show');
 planImpModal.onclick=e=>{if(e.target===planImpModal)planImpModal.classList.remove('show');};
-document.getElementById('planImpText').oninput=renderPlanImpPreview;
+// 이벤트 객체가 첫 인자(pre)로 넘어가면 미리보기가 깨지므로 감싸서 호출
+document.getElementById('planImpText').oninput=()=>renderPlanImpPreview();
 document.getElementById('planImpFetch').onclick=async()=>{
   const msg=document.getElementById('planImpMsg');msg.className='msg';
   const url=document.getElementById('planImpUrl').value.trim();
@@ -1987,6 +2041,7 @@ document.getElementById('planImpFetchAll').onclick=async()=>{
       for(const it of p.items){
         const cur=merged.get(it.name);
         if(cur){cur.rows.push(...it.rows);
+          if(!cur.projectType&&it.projectType)cur.projectType=it.projectType;
           if(!cur.budget&&it.budget)cur.budget=it.budget;
           if(!cur.client&&it.client)cur.client=it.client;
           if(!cur.startYm&&it.startYm)cur.startYm=it.startYm;
@@ -2110,6 +2165,128 @@ document.getElementById('btnPmSave').onclick=async()=>{
   }catch(err){s.className='status err';s.textContent='✗ 저장 실패: '+err.message;}
 };
 
+// ── 프로젝트 유형 · 목표 수익률 ────────────────────────
+let ptDraft=null;
+const typeOf=p=>(p.projectType||'').trim()||'(유형 미지정)';
+function typeTarget(name){
+  const t=projectTypes.find(x=>x.name===name);
+  return t&&t.targetMargin!=null?t.targetMargin:null;
+}
+// 유형별 집계: 계약액·견적수익률(가중)·누적·최근월
+function typeStats(){
+  const map=new Map();
+  projects.forEach(p=>{
+    const k=typeOf(p);
+    if(!map.has(k))map.set(k,{name:k,n:0,budget:0,planCost:0,planBudget:0,cumRev:0,cumCost:0,lastRev:0,lastCost:0,lastYm:null});
+    const o=map.get(k);
+    o.n++;o.budget+=p.budget;
+    const ps=planStats(p);
+    if(ps&&p.budget>0){o.planBudget+=p.budget;o.planCost+=ps.cost;}
+    const s=projectSeries(p);
+    o.cumRev+=s.cumRev;o.cumCost+=s.cumCost;
+    // 프로젝트별 마지막 실적월
+    let li=-1;s.monthly.forEach((v,i)=>{if(v!=null)li=i;});
+    if(li>=0){
+      const a=s.acts[li];o.lastRev+=a.revenue;o.lastCost+=a.cost;
+      if(!o.lastYm||s.months[li]>o.lastYm)o.lastYm=s.months[li];
+    }
+  });
+  return [...map.values()].sort((a,b)=>{
+    const ai=projectTypes.findIndex(t=>t.name===a.name),bi=projectTypes.findIndex(t=>t.name===b.name);
+    return (ai<0?99:ai)-(bi<0?99:bi)||b.budget-a.budget;
+  });
+}
+function renderTypeDash(){
+  const rows=typeStats();
+  const body=document.getElementById('typeBody');
+  document.getElementById('typeCount').textContent=rows.length?rows.length+'개 유형':'';
+  if(!rows.length){body.innerHTML='<tr><td colspan="8" class="empty">프로젝트를 등록하면 유형별로 집계됩니다.</td></tr>';
+    document.getElementById('typeFoot').innerHTML='';return;}
+  const pct=(a,b)=>b>0?(b-a)/b*100:null;
+  body.innerHTML=rows.map(o=>{
+    const pm=o.planBudget>0?pct(o.planCost,o.planBudget):null;
+    const cum=o.cumRev>0?pct(o.cumCost,o.cumRev):null;
+    const last=o.lastRev>0?pct(o.lastCost,o.lastRev):null;
+    const tg=typeTarget(o.name);
+    const base=cum!=null?cum:last;
+    return '<tr><td style="font-weight:700">'+o.name.replace(/</g,'&lt;')+'</td>'+
+      '<td class="right">'+o.n+'</td><td class="right">'+won(o.budget)+'</td>'+
+      '<td>'+(pm!=null?'<span class="pill '+cls(pm)+'">'+pm.toFixed(1)+'%</span>':'-')+'</td>'+
+      '<td>'+(cum!=null?'<span class="pill '+cls(cum)+'">'+cum.toFixed(1)+'%</span>':'-')+'</td>'+
+      '<td>'+(last!=null?last.toFixed(1)+'%':'-')+'</td>'+
+      '<td>'+(tg!=null?tg.toFixed(1)+'%':'<span class="muted">-</span>')+'</td>'+
+      '<td>'+(tg!=null&&base!=null?deltaHtml(base-tg):'–')+'</td></tr>';
+  }).join('');
+  const tb=rows.reduce((a,o)=>a+o.budget,0),tpb=rows.reduce((a,o)=>a+o.planBudget,0),
+        tpc=rows.reduce((a,o)=>a+o.planCost,0),tcr=rows.reduce((a,o)=>a+o.cumRev,0),
+        tcc=rows.reduce((a,o)=>a+o.cumCost,0);
+  const tpm=tpb>0?(tpb-tpc)/tpb*100:null,tcm=tcr>0?(tcr-tcc)/tcr*100:null;
+  document.getElementById('typeFoot').innerHTML=
+    '<td>전체</td><td class="right">'+rows.reduce((a,o)=>a+o.n,0)+'</td><td class="right">'+won(tb)+'</td>'+
+    '<td>'+(tpm!=null?tpm.toFixed(1)+'%':'-')+'</td><td>'+(tcm!=null?tcm.toFixed(1)+'%':'-')+'</td>'+
+    '<td></td><td></td><td></td>';
+}
+function renderTypes(){
+  if(!ptDraft)ptDraft=projectTypes.map(t=>({...t}));
+  // 프로젝트 유형 select
+  const sel=document.getElementById('pjType');
+  const cur=sel.value;
+  const names=ptDraft.map(t=>t.name);
+  sel.innerHTML='<option value="">— 미지정 —</option>'+names.map(n=>'<option>'+n+'</option>').join('');
+  if(cur&&names.includes(cur))sel.value=cur;
+  // 마스터 표
+  const body=document.getElementById('ptBody');
+  document.getElementById('ptCount').textContent=ptDraft.length+'개';
+  const used=new Map();
+  projects.forEach(p=>{const k=(p.projectType||'').trim();if(k)used.set(k,(used.get(k)||0)+1);});
+  body.innerHTML=ptDraft.length?ptDraft.map((t,i)=>
+    '<tr><td><input data-pt="'+i+'" data-f="name" value="'+String(t.name).replace(/"/g,'&quot;')+'"></td>'+
+    '<td><input class="num" data-pt="'+i+'" data-f="targetMargin" inputmode="decimal" value="'+(t.targetMargin!=null?t.targetMargin:'')+'"></td>'+
+    '<td><input data-pt="'+i+'" data-f="memo" value="'+String(t.memo||'').replace(/"/g,'&quot;')+'"></td>'+
+    '<td class="right">'+(used.get(t.name)||0)+'건</td>'+
+    '<td><span class="del-x" data-ptdel="'+i+'">×</span></td></tr>').join('')
+    :'<tr><td colspan="5" class="empty">유형이 없습니다. 계약 시트를 가져오거나 아래에서 추가하세요.</td></tr>';
+  body.querySelectorAll('[data-pt]').forEach(el=>el.onchange=e=>{
+    const i=+e.target.dataset.pt,f=e.target.dataset.f;
+    if(f==='targetMargin')ptDraft[i][f]=e.target.value===''?null:parseNum(e.target.value);
+    else ptDraft[i][f]=e.target.value;
+  });
+  body.querySelectorAll('[data-ptdel]').forEach(x=>x.onclick=e=>{
+    ptDraft.splice(+e.target.dataset.ptdel,1);renderTypes();
+  });
+  renderTypeDash();
+}
+document.getElementById('btnPtAdd').onclick=()=>{
+  const n=document.getElementById('ptNewName').value.trim();
+  if(!n)return;
+  if(!ptDraft)ptDraft=[];
+  if(ptDraft.some(t=>t.name===n)){alert('이미 있는 유형입니다.');return;}
+  const tv=document.getElementById('ptNewTarget').value;
+  ptDraft.push({name:n,targetMargin:tv===''?null:parseNum(tv),memo:''});
+  document.getElementById('ptNewName').value='';document.getElementById('ptNewTarget').value='';
+  renderTypes();
+};
+// 이미 등록된 프로젝트의 유형값을 마스터로 흡수 (시트 가져오기 후 정리용)
+document.getElementById('btnPtSync').onclick=()=>{
+  if(!ptDraft)ptDraft=[];
+  let added=0;
+  projects.forEach(p=>{const k=(p.projectType||'').trim();
+    if(k&&!ptDraft.some(t=>t.name===k)){ptDraft.push({name:k,targetMargin:null,memo:''});added++;}});
+  renderTypes();
+  const s=document.getElementById('ptStatus');s.className='status';
+  s.textContent=added?'✓ 유형 '+added+'개를 추가했습니다. [유형 저장]을 누르세요.':'추가할 새 유형이 없습니다.';
+  setTimeout(()=>s.textContent='',3500);
+};
+document.getElementById('btnPtSave').onclick=async()=>{
+  const s=document.getElementById('ptStatus');s.className='status';s.textContent='저장 중…';
+  try{
+    const r=await api('/project-types',{method:'PUT',body:JSON.stringify(ptDraft||[])});
+    projectTypes=(ptDraft||[]).map(t=>({...t}));
+    s.textContent='✓ 유형 '+r.count+'개가 저장되었습니다.';setTimeout(()=>s.textContent='',3000);
+    await refreshAll(false);ptDraft=null;renderTypes();
+  }catch(err){s.className='status err';s.textContent='✗ 저장 실패: '+err.message;}
+};
+
 // 단가표
 function renderRates(){
   const body=document.getElementById('rateBody');
@@ -2143,12 +2320,12 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
 });
 
 async function refreshAll(rerender=true){
-  [projects,staff,rates,allPlans,allAssigns,allRecords,partMap]=await Promise.all([
+  [projects,staff,rates,allPlans,allAssigns,allRecords,partMap,projectTypes]=await Promise.all([
     api('/projects'),api('/staff'),api('/rates'),api('/plans'),api('/assignments'),api('/records'),
-    api('/part-map').catch(()=>({}))]);
+    api('/part-map').catch(()=>({})),api('/project-types').catch(()=>[])]);
   if(curPjId==null&&projects.length)curPjId=projects[0].id;
   if(planPjId==null&&projects.length)planPjId=projects[0].id;
-  renderDash();renderPjList();renderStaff();renderRates();renderPartMap();
+  renderDash();renderPjList();renderStaff();renderRates();renderPartMap();renderTypes();
   if(!document.getElementById('tab-analysis').classList.contains('hidden'))renderAnalysis();
   if(!document.getElementById('tab-util').classList.contains('hidden'))renderUtil();
   if(rerender){

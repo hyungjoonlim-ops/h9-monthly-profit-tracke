@@ -46,6 +46,15 @@ alter table mt_staff add column if not exists grade_lg integer;
 -- 운용율 산정 기준: 이 인력이 한 달에 투입 가능한 MM (1.0 = 풀타임, 0.5 = 반일 등)
 alter table mt_staff add column if not exists capacity numeric not null default 1;
 
+-- 프로젝트 유형 마스터 (SI / SM / 운영·유지보수 등) — 유형별 목표 수익률 관리
+create table if not exists mt_project_types (
+  name          text primary key,
+  target_margin numeric,                    -- 유형별 목표 수익률(%) — 비우면 목표 없음
+  sort_order    integer not null default 0,
+  memo          text,
+  updated_at    timestamptz not null default now()
+);
+
 -- 프로젝트 마스터
 create table if not exists mt_projects (
   id            bigserial primary key,
@@ -65,6 +74,9 @@ create table if not exists mt_projects (
 alter table mt_projects add column if not exists plan_cost_out numeric not null default 0;
 alter table mt_projects add column if not exists plan_cost_etc numeric not null default 0;
 alter table mt_projects add column if not exists rate_std text not null default 'SW';
+-- 프로젝트 유형 (계약 시트의 '형태' 열 → 유형별 수익률 집계 축)
+alter table mt_projects add column if not exists project_type text;
+create index if not exists idx_mt_projects_type on mt_projects(project_type);
 
 -- 파트/팀 → 단가표 직군 매핑
 -- 계약 시트의 파트명, MM 시트의 팀명이 단가표 직군명과 다를 때 대응 관계를 저장한다.

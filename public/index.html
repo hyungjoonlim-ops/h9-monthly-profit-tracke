@@ -112,7 +112,8 @@
 <body>
 <header>
   <h1>H9 월간 수익률 변동 관리</h1>
-  <span class="sub">견적 기준 투입계획 · 월별 실투입 인력(MM) · 수익률 실시간 비교</span>
+  <span class="sub">견적 기준 투입계획 · 월별 실투입 인력(MM) · 수익률 실시간 비교
+    <span class="muted" id="appVer" style="margin-left:8px;font-size:11px"></span></span>
   <span class="conn"><span class="dot" id="connDot"></span><span id="connText">DB 연결 확인 중…</span>
     <button class="ghost sm" id="btnChangePw" style="margin-left:10px;display:none">비밀번호 변경</button>
     <button class="ghost sm" id="btnLogout" style="display:none">로그아웃</button></span>
@@ -641,6 +642,7 @@
 </div>
 
 <script>
+const APP_VERSION='v7 · 시트 인식 개선(EZL·25\u201910월)';
 const GRADES=['초급','중급','고급','특급'];
 let projects=[],staff=[],rates={},allPlans=[],allAssigns=[],allRecords=[],partMap={},projectTypes=[];
 let curPjId=null,curYm=null,editPjId=null,planPjId=null;
@@ -1096,8 +1098,12 @@ const moImpModal=document.getElementById('moImpModal');
 let moImpParsed=null;
 // 월 라벨 인식: "25'10월" "1월" "2026-01" "2026년 1월"
 function monLabel(c){
-  const t=String(c||'').trim();
-  let m=/^(\d{2})\s*['\u2019]\s*(\d{1,2})\s*월?$/.exec(t);
+  // 앞에 붙은 아포스트로피(텍스트 표시용) 제거
+  const t=String(c||'').trim().replace(/^['\u2019]+/,'');
+  // 2025-10-01 / 2025.10.1 같은 날짜 셀
+  let m=/^(20\d{2})[-./](\d{1,2})[-./]\d{1,2}/.exec(t);
+  if(m)return {mon:+m[2],year:+m[1]};
+  m=/^(\d{2})\s*['\u2019]\s*(\d{1,2})\s*월?$/.exec(t);
   if(m)return {mon:+m[2],year:2000+(+m[1])};
   m=/^(20\d{2})\s*[년.\-/]\s*(\d{1,2})\s*월?$/.exec(t);
   if(m)return {mon:+m[2],year:+m[1]};
@@ -1263,7 +1269,10 @@ document.getElementById('moImpFetchAll').onclick=async()=>{
     for(const sh of r.sheets){
       const text=sh.rows.map(row=>row.join('\t')).join('\n');
       const p=parseMonthlyImp(text);
-      if(p.error||!p.items||!p.items.length){skip.push(sh.name);continue;}
+      if(p.error||!p.items||!p.items.length){
+        const head=(sh.rows.find(rw=>rw.some(c=>String(c).trim()))||[]).filter(x=>String(x).trim()).slice(0,10).join(' | ');
+        skip.push({name:sh.name,why:p.error||'가져올 투입 행이 없음',head});
+        continue;}
       ok.push(sh.name+'('+p.items.length+')');
       // 같은 프로젝트가 여러 탭(각 실)에 있으면 인력 행을 합친다
       for(const it of p.items){
@@ -1275,12 +1284,21 @@ document.getElementById('moImpFetchAll').onclick=async()=>{
     const items=[...merged.values()];
     if(!items.length){
       msg.classList.add('err');
-      msg.textContent='✗ 모든 탭에서 투입 데이터를 찾지 못했습니다 ('+r.sheets.length+'개 탭 확인). 탭에 프로젝트명·이름·월별 MM 구조가 있는지 확인하세요.';
+      msg.textContent='✗ 모든 탭에서 투입 데이터를 찾지 못했습니다 ('+r.sheets.length+'개 탭 확인). 아래 이유를 확인하세요.';
+      document.getElementById('moImpPreview').innerHTML='<div class="hint"><b>탭별 실패 이유</b>'+
+        skip.map(x=>'<div style="margin:3px 0 3px 8px;font-size:12px">· <b>'+x.name+'</b> — '+
+          String(x.why).replace(/</g,'&lt;')+
+          (x.head?'<br><span class="muted" style="font-family:monospace;font-size:11px">머리글: '+
+            x.head.replace(/</g,'&lt;')+'</span>':'')+'</div>').join('')+'</div>';
       return;
     }
     document.getElementById('moImpText').value='';
     showMoImpPreview({items},'📑 인식된 탭 '+ok.length+'/'+r.sheets.length+'개: '+ok.join(', ')+
-      (skip.length?'<br>· 구조가 달라 건너뛴 탭: '+skip.join(', '):''));
+      (skip.length?'<br><b>건너뛴 탭 '+skip.length+'개 — 이유</b>'+skip.map(x=>
+        '<div style="margin:3px 0 3px 8px;font-size:12px">· <b>'+x.name+'</b> — '+
+        String(x.why).replace(/</g,'&lt;')+
+        (x.head?'<br><span class="muted" style="font-family:monospace;font-size:11px">머리글: '+
+          x.head.replace(/</g,'&lt;')+'</span>':'')+'</div>').join(''):''));
     msg.classList.add('ok');
     msg.textContent='✓ '+ok.length+'개 탭에서 프로젝트 '+items.length+'건을 모았습니다. 아래 미리보기 확인 후 [가져오기]를 누르세요.';
   }catch(err){msg.classList.add('err');msg.textContent='✗ '+err.message;}
@@ -2162,7 +2180,10 @@ document.getElementById('planImpFetchAll').onclick=async()=>{
     for(const sh of r.sheets){
       const p=parsePlanImp(sh.rows.map(row=>row.join('\t')).join('\n'),
         document.getElementById('planImpAllStatus').checked);
-      if(p.error||!p.items||!p.items.length){skip.push(sh.name);continue;}
+      if(p.error||!p.items||!p.items.length){
+        const head=(sh.rows[0]||[]).filter(x=>String(x).trim()).slice(0,10).join(' | ');
+        skip.push({name:sh.name,why:p.error||'가져올 계약 행이 없음',head});
+        continue;}
       ok.push(sh.name+'('+p.items.length+')');
       (p.unknownParts||[]).forEach(x=>unknown.add(x));
       skipped+=(p.skipped||[]).length;
@@ -2180,13 +2201,23 @@ document.getElementById('planImpFetchAll').onclick=async()=>{
     const items=[...merged.values()];
     if(!items.length){
       msg.classList.add('err');
-      msg.textContent='✗ 모든 탭에서 계약을 찾지 못했습니다 ('+r.sheets.length+'개 탭 확인).';
+      msg.classList.add('err');
+      msg.textContent='✗ 모든 탭에서 계약을 찾지 못했습니다 ('+r.sheets.length+'개 탭 확인). 아래 이유를 확인하세요.';
+      document.getElementById('planImpPreview').innerHTML='<div class="hint"><b>탭별 실패 이유</b>'+
+        skip.map(x=>'<div style="margin:3px 0 3px 8px;font-size:12px">· <b>'+x.name+'</b> — '+
+          String(x.why).replace(/</g,'&lt;')+
+          (x.head?'<br><span class="muted" style="font-family:monospace;font-size:11px">머리글: '+
+            x.head.replace(/</g,'&lt;')+'</span>':'')+'</div>').join('')+'</div>';
       return;
     }
     document.getElementById('planImpText').value='';
     renderPlanImpPreview({items,skipped:new Array(skipped),unknownParts:[...unknown],longFormat:true},
       '📑 인식된 탭 '+ok.length+'/'+r.sheets.length+'개: '+ok.join(', ')+
-      (skip.length?'<br>· 구조가 달라 건너뛴 탭: '+skip.join(', '):''));
+      (skip.length?'<br><b>건너뛴 탭 '+skip.length+'개 — 이유</b>'+skip.map(x=>
+        '<div style="margin:3px 0 3px 8px;font-size:12px">· <b>'+x.name+'</b> — '+
+        String(x.why).replace(/</g,'&lt;')+
+        (x.head?'<br><span class="muted" style="font-family:monospace;font-size:11px">머리글: '+
+          x.head.replace(/</g,'&lt;')+'</span>':'')+'</div>').join(''):''));
     msg.classList.add('ok');
     msg.textContent='✓ '+ok.length+'개 탭에서 계약 '+items.length+'건을 모았습니다. 미리보기 확인 후 [등록]을 누르세요.';
   }catch(err){msg.classList.add('err');msg.textContent='✗ '+err.message;}
@@ -2513,6 +2544,8 @@ document.getElementById('pwForm').onsubmit=async(e)=>{
   }catch(err){pwMsg.classList.add('err');pwMsg.textContent='✗ '+err.message;}
   finally{btn.disabled=false;}
 };
+
+document.getElementById('appVer').textContent=APP_VERSION;
 
 // Esc 로 열려 있는 모달 닫기
 document.addEventListener('keydown',e=>{

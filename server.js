@@ -103,11 +103,13 @@ const txt = (v) => (v == null || String(v).trim() === '' ? null : String(v).trim
 
 const mapProject = (r) => ({
   id: Number(r.id), code: r.code || '', name: r.name, client: r.client || '',
+  pm: r.pm || '', updatedBy: r.updated_by || '',
   projType: r.proj_type || '', status: r.status,
   startYm: r.start_ym, endYm: r.end_ym,
   cAmount: num(r.c_amount), cCostOut: num(r.c_cost_out), cCostEtc: num(r.c_cost_etc),
   fRevenue: num(r.f_revenue), fCostOut: num(r.f_cost_out), fCostEtc: num(r.f_cost_etc),
   fClosedAt: r.f_closed_at || '', reason: r.reason || '', memo: r.memo || '',
+  updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : null,
 });
 const mapStaff = (r) => ({
   id: Number(r.id), name: r.name, dept: r.dept || '',
@@ -251,7 +253,8 @@ app.get('/api/projects', async (req, res) => {
 });
 
 const projParams = (p) => [
-  txt(p.code), txt(p.name), txt(p.client), txt(p.projType), txt(p.status) || '진행중',
+  txt(p.code), txt(p.name), txt(p.client), txt(p.pm), txt(p.by),
+  txt(p.projType), txt(p.status) || '진행중',
   ym(p.startYm), ym(p.endYm),
   num(p.cAmount), num(p.cCostOut), num(p.cCostEtc),
   num(p.fRevenue), num(p.fCostOut), num(p.fCostEtc),
@@ -264,10 +267,10 @@ app.post('/api/projects', async (req, res) => {
   try {
     const { rows } = await pool.query(
       `INSERT INTO h9_projects
-         (code, name, client, proj_type, status, start_ym, end_ym,
+         (code, name, client, pm, updated_by, proj_type, status, start_ym, end_ym,
           c_amount, c_cost_out, c_cost_etc, f_revenue, f_cost_out, f_cost_etc,
           f_closed_at, reason, memo)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
       projParams(p)
     );
     res.json(mapProject(rows[0]));
@@ -278,12 +281,26 @@ app.put('/api/projects/:id', async (req, res) => {
   const p = req.body || {};
   if (!txt(p.name)) return res.status(400).json({ error: '프로젝트명은 필수입니다.' });
   try {
+    // 동시 편집 보호 — 내가 화면에 띄운 이후 다른 사람이 저장했으면 덮어쓰지 않는다
+    if (p.baseUpdatedAt) {
+      const cur = await pool.query('SELECT updated_at FROM h9_projects WHERE id=$1', [req.params.id]);
+      if (!cur.rows[0]) return res.status(404).json({ error: '프로젝트를 찾을 수 없습니다.' });
+      const db = new Date(cur.rows[0].updated_at).getTime();
+      const mine = new Date(p.baseUpdatedAt).getTime();
+      if (Number.isFinite(db) && Number.isFinite(mine) && db - mine > 1000) {
+        return res.status(409).json({
+          error: '다른 사용자가 먼저 저장했습니다. 화면을 새로고침한 뒤 다시 입력해 주세요.',
+          conflict: true,
+        });
+      }
+    }
     const { rows } = await pool.query(
-      `UPDATE h9_projects SET code=$1, name=$2, client=$3, proj_type=$4, status=$5,
-              start_ym=$6, end_ym=$7, c_amount=$8, c_cost_out=$9, c_cost_etc=$10,
-              f_revenue=$11, f_cost_out=$12, f_cost_etc=$13, f_closed_at=$14,
-              reason=$15, memo=$16, updated_at=now()
-       WHERE id=$17 RETURNING *`,
+      `UPDATE h9_projects SET code=$1, name=$2, client=$3, pm=$4,
+              updated_by=COALESCE($5,updated_by), proj_type=$6, status=$7,
+              start_ym=$8, end_ym=$9, c_amount=$10, c_cost_out=$11, c_cost_etc=$12,
+              f_revenue=$13, f_cost_out=$14, f_cost_etc=$15, f_closed_at=$16,
+              reason=$17, memo=$18, updated_at=now()
+       WHERE id=$19 RETURNING *`,
       [...projParams(p), req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: '프로젝트를 찾을 수 없습니다.' });
@@ -342,7 +359,7 @@ app.get('/api/projects/:id/logs', async (req, res) => {
       id: Number(r.id),
       cMargin: r.c_margin == null ? null : Number(r.c_margin),
       fMargin: r.f_margin == null ? null : Number(r.f_margin),
-      reason: r.reason || '', createdAt: r.created_at,
+      reason: r.reason || '', author: r.author || '', createdAt: r.created_at,
     })));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -351,11 +368,11 @@ app.post('/api/projects/:id/logs', async (req, res) => {
   const b = req.body || {};
   try {
     await pool.query(
-      `INSERT INTO h9_logs (project_id, c_margin, f_margin, reason) VALUES ($1,$2,$3,$4)`,
+      `INSERT INTO h9_logs (project_id, c_margin, f_margin, reason, author) VALUES ($1,$2,$3,$4,$5)`,
       [req.params.id,
        b.cMargin == null ? null : num(b.cMargin),
        b.fMargin == null ? null : num(b.fMargin),
-       txt(b.reason)]);
+       txt(b.reason), txt(b.by)]);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -386,17 +403,21 @@ app.post('/api/projects/import', async (req, res) => {
              name=$1, client=COALESCE($2,client), proj_type=COALESCE($3,proj_type),
              status=COALESCE($4,status), start_ym=COALESCE($5,start_ym), end_ym=COALESCE($6,end_ym),
              c_amount=CASE WHEN $7>0 THEN $7 ELSE c_amount END,
-             code=COALESCE($8,code), updated_at=now()
-           WHERE id=$9`,
+             code=COALESCE($8,code), pm=COALESCE($9,pm), updated_at=now()
+           WHERE id=$10`,
           [name, txt(p.client), txt(p.projType), txt(p.status), ym(p.startYm), ym(p.endYm),
-           num(p.cAmount), code, pid]);
+           num(p.cAmount), code, txt(p.pm), pid]);
         updated++;
       } else {
         const ins = await client.query(
-          `INSERT INTO h9_projects (code, name, client, proj_type, status, start_ym, end_ym, c_amount)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+          `INSERT INTO h9_projects (code, name, client, proj_type, status, start_ym, end_ym, c_amount, pm)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+           ON CONFLICT (code) WHERE code IS NOT NULL DO UPDATE
+             SET name=excluded.name, client=COALESCE(excluded.client,h9_projects.client),
+                 updated_at=now()
+           RETURNING id`,
           [code, name, txt(p.client), txt(p.projType), txt(p.status) || '진행중',
-           ym(p.startYm), ym(p.endYm), num(p.cAmount)]);
+           ym(p.startYm), ym(p.endYm), num(p.cAmount), txt(p.pm)]);
         pid = Number(ins.rows[0].id);
         created++;
       }

@@ -60,7 +60,16 @@ create table if not exists h9_projects (
   updated_at      timestamptz not null default now()
 );
 alter table h9_projects add column if not exists code text;
+alter table h9_projects add column if not exists pm text;          -- 담당 PM
+alter table h9_projects add column if not exists updated_by text;  -- 최종 입력자
 create index if not exists idx_h9_projects_code on h9_projects(code);
+-- 같은 프로젝트번호가 동시에 두 번 등록되는 것을 DB에서 차단
+-- (이미 중복이 있으면 인덱스 생성만 건너뛰고 나머지는 정상 진행)
+do $$
+begin
+  create unique index if not exists uq_h9_projects_code on h9_projects(code) where code is not null;
+exception when others then null;
+end $$;
 create index if not exists idx_h9_projects_type on h9_projects(proj_type);
 create index if not exists idx_h9_projects_status on h9_projects(status);
 
@@ -89,4 +98,6 @@ create table if not exists h9_logs (
   reason      text,
   created_at  timestamptz not null default now()
 );
+alter table h9_logs add column if not exists author text;          -- 입력자
 create index if not exists idx_h9_logs_project on h9_logs(project_id, created_at desc);
+create index if not exists idx_h9_projects_pm on h9_projects(pm);

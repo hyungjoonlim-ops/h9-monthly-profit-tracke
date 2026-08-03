@@ -16,7 +16,7 @@ export const pool = new pg.Pool({
   password: process.env.PGPASSWORD,
   database: process.env.PGDATABASE,
   ssl: process.env.PGSSL === 'disable' ? false : { rejectUnauthorized: false },
-  max: 5,
+  max: 10,          // 동시 접속 여유 (Supabase Session pooler)
   connectionTimeoutMillis: 10000,
 });
 

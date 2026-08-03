@@ -97,6 +97,9 @@
   <h1>H9 프로젝트 수익률 관리</h1>
   <span class="sub">계약 시점 수익률 ↔ 완료 시점 수익률 · 변동 관리 <span class="muted" id="appVer"></span></span>
   <span class="right"><span class="dot" id="dot"></span><span id="connText">연결 확인 중…</span>
+    <span class="muted">입력자</span>
+    <input id="myName" placeholder="이름 입력" style="width:96px;padding:4px 7px;font-size:12px">
+    <button class="ghost sm" id="btnReload">새로고침</button>
     <button class="ghost sm" id="btnPw" style="display:none">비밀번호 변경</button>
     <button class="ghost sm" id="btnOut" style="display:none">로그아웃</button></span>
 </header>
@@ -119,6 +122,8 @@
     <div class="toolbar">
       <h2>프로젝트별 수익률 <span class="tag" id="pjCount"></span></h2>
       <div class="sp">
+        <label style="display:flex;gap:6px;align-items:center;color:var(--ink2);font-size:12.5px">
+          <input type="checkbox" id="dashMine" style="width:auto"> 내 프로젝트만</label>
         <select id="dashFilter" style="width:160px">
           <option value="all">전체 상태</option>
           <option value="진행중">진행중</option>
@@ -131,7 +136,7 @@
     <div class="tw">
       <table>
         <thead><tr>
-          <th>번호</th><th>프로젝트</th><th>클라이언트</th><th>유형</th><th>상태</th>
+          <th>번호</th><th>프로젝트</th><th>담당 PM</th><th>클라이언트</th><th>유형</th><th>상태</th>
           <th class="right">계약액</th><th class="right">계약 수익률</th>
           <th class="right">완료 매출</th><th class="right">완료 수익률</th>
           <th class="right">변동</th><th>사유</th>
@@ -172,6 +177,7 @@
       <div class="field" style="max-width:130px"><label>프로젝트번호</label><input id="fCode" placeholder="예: C-2601"></div>
       <div class="field grow"><label>프로젝트명 *</label><input id="fName" placeholder="예: 이즐 충전소 운영"></div>
       <div class="field"><label>클라이언트</label><input id="fClient"></div>
+      <div class="field"><label>담당 PM</label><input id="fPm" list="pmList" placeholder="담당자"></div>
       <div class="field"><label>유형 (정산 형태)</label><input id="fType" placeholder="예: 월 정산"></div>
       <div class="field"><label>상태</label><select id="fStatus"><option>진행중</option><option>완료</option><option>보류</option></select></div>
       <div class="field"><label>시작월</label><input type="month" id="fStart"></div>
@@ -181,7 +187,9 @@
       <button id="btnSaveInfo">프로젝트 정보 저장</button>
       <button class="danger sm" id="btnDel">삭제</button>
       <span class="status" id="infoMsg"></span>
+      <span class="status" id="lastEdit" style="margin-left:auto"></span>
     </div>
+    <datalist id="pmList"></datalist>
   </div>
 
   <div class="cards" id="vsCards"></div>
@@ -325,7 +333,7 @@
     </div>
     <p class="hint" style="margin:0 0 10px">
       머리글 행을 포함해 붙여넣으세요. <b>프로젝트명</b>(또는 계약명)은 필수이고, 나머지는 있으면 자동 인식합니다:
-      <b>프로젝트번호 · 클라이언트(고객사) · 상태 · 시작 · 종료 · MM · 금액 · 정산 형태 · 파트 · 등급</b>.
+      <b>프로젝트번호 · 클라이언트(고객사) · 담당 PM · 상태 · 시작 · 종료 · MM · 금액 · 정산 형태 · 파트 · 등급</b>.
       프로젝트번호가 있으면 <b>번호로 기존 프로젝트를 찾아 갱신</b>하므로 이름이 바뀌어도 안전합니다.
       계약명이 병합 셀이라 아랫줄이 비어 있어도 됩니다. 파트·등급·MM이 있으면 <b>계약 시점 투입계획</b>으로 함께 등록됩니다.
     </p>
@@ -386,7 +394,7 @@
 </div>
 
 <script>
-const APP_VERSION='v2.1 · 프로젝트번호 인식';
+const APP_VERSION='v2.2 · 동시 편집 보호';
 const GRADES=['초급','중급','고급','특급'];
 let projects=[],staff=[],rates={},allRows=[];
 let curId=null,cDraft=[],fDraft=[];
@@ -433,6 +441,18 @@ function parseGrade(t){
   const i=['초','중','고','특'].indexOf(v[0]);
   return i>=0?i:null;
 }
+// 입력자 이름 (브라우저에 저장) — 여러 PM이 같은 계정으로 접속하므로 누가 입력했는지 남긴다
+const myName=()=>(localStorage.getItem('h9_user')||'').trim();
+function initMyName(){
+  const el=document.getElementById('myName');
+  el.value=myName();
+  el.onchange=()=>{localStorage.setItem('h9_user',el.value.trim());renderDash();};
+  el.onblur=el.onchange;
+}
+function renderPmList(){
+  const names=[...new Set([...staff.map(s=>s.name),...projects.map(p=>p.pm).filter(Boolean)])];
+  document.getElementById('pmList').innerHTML=names.map(n=>'<option value="'+esc(n)+'">').join('');
+}
 function setConn(ok,msg){
   document.getElementById('dot').className='dot '+(ok?'on':'off');
   document.getElementById('connText').textContent=msg;
@@ -469,7 +489,10 @@ const curProject=()=>projects.find(p=>p.id===curId)||null;
 // ── 대시보드 ──────────────────────────────────────────
 function renderDash(){
   const f=document.getElementById('dashFilter').value;
-  const list=projects.filter(p=>f==='all'||p.status===f);
+  const mine=document.getElementById('dashMine').checked;
+  const me=myName();
+  const list=projects.filter(p=>(f==='all'||p.status===f)
+    &&(!mine||!me||String(p.pm||'').trim()===me));
   let cAmt=0,cCost=0,fRev=0,fCost=0,done=0;
   projects.forEach(p=>{
     const c=contractStats(p),fs=finalStats(p);
@@ -490,14 +513,16 @@ function renderDash(){
 
   const body=document.getElementById('dashBody');
   document.getElementById('pjCount').textContent=list.length+'건';
-  if(!list.length){body.innerHTML='<tr><td colspan="11" class="empty">프로젝트가 없습니다. 프로젝트 수익률 탭에서 등록하거나 구글시트로 일괄 등록하세요.</td></tr>';
+  if(!list.length){body.innerHTML='<tr><td colspan="12" class="empty">프로젝트가 없습니다. 프로젝트 수익률 탭에서 등록하거나 구글시트로 일괄 등록하세요.</td></tr>';
     document.getElementById('dashFoot').innerHTML='';renderTypeDash();return;}
   body.innerHTML=list.map(p=>{
     const c=contractStats(p),fs=finalStats(p);
     const d=(c.margin!=null&&fs.margin!=null)?fs.margin-c.margin:null;
     return '<tr class="clickable" data-go="'+p.id+'">'+
       '<td class="muted">'+esc(p.code||'-')+'</td>'+
-      '<td style="font-weight:650">'+esc(p.name)+'</td><td>'+esc(p.client||'-')+'</td>'+
+      '<td style="font-weight:650">'+esc(p.name)+'</td>'+
+      '<td>'+(p.pm?esc(p.pm):'<span class="muted">-</span>')+'</td>'+
+      '<td>'+esc(p.client||'-')+'</td>'+
       '<td>'+(p.projType?'<span class="pill flat">'+esc(p.projType)+'</span>':'-')+'</td>'+
       '<td><span class="pill '+(p.status==='진행중'?'good':p.status==='완료'?'flat':'warn')+'">'+p.status+'</span></td>'+
       '<td class="right">'+won(p.cAmount)+'</td>'+
@@ -516,7 +541,7 @@ function renderDash(){
     if(fs.has&&fs.revenue>0){lf+=fs.revenue;lfc+=fs.cost;}});
   const m1=lc>0?(lc-lcc)/lc*100:null,m2=lf>0?(lf-lfc)/lf*100:null;
   document.getElementById('dashFoot').innerHTML=
-    '<td></td><td>합계 '+list.length+'건</td><td></td><td></td><td></td>'+
+    '<td></td><td>합계 '+list.length+'건</td><td></td><td></td><td></td><td></td>'+
     '<td class="right">'+won(lc)+'</td><td class="right">'+(m1!=null?m1.toFixed(1)+'%':'-')+'</td>'+
     '<td class="right">'+won(lf)+'</td><td class="right">'+(m2!=null?m2.toFixed(1)+'%':'-')+'</td>'+
     '<td class="right">'+((m1!=null&&m2!=null)?deltaHtml(m2-m1):'–')+'</td><td></td>';
@@ -545,11 +570,12 @@ function renderTypeDash(){
   }).join('');
 }
 document.getElementById('dashFilter').onchange=renderDash;
+document.getElementById('dashMine').onchange=renderDash;
 document.getElementById('btnCsv').onclick=()=>{
-  const rows=[['번호','프로젝트','클라이언트','유형','상태','계약액','계약수익률(%)','완료매출','완료수익률(%)','변동(%p)','사유']];
+  const rows=[['번호','프로젝트','담당PM','클라이언트','유형','상태','계약액','계약수익률(%)','완료매출','완료수익률(%)','변동(%p)','사유']];
   projects.forEach(p=>{
     const c=contractStats(p),fs=finalStats(p);
-    rows.push([p.code,p.name,p.client,p.projType,p.status,Math.round(p.cAmount),
+    rows.push([p.code,p.name,p.pm,p.client,p.projType,p.status,Math.round(p.cAmount),
       c.margin!=null?c.margin.toFixed(2):'',fs.has?Math.round(fs.revenue):'',
       fs.margin!=null?fs.margin.toFixed(2):'',
       (c.margin!=null&&fs.margin!=null)?(fs.margin-c.margin).toFixed(2):'',p.reason||'']);
@@ -572,13 +598,16 @@ function renderPjSelect(){
 function loadProject(){
   renderPjSelect();
   const p=curProject();
-  const ids=['fCode','fName','fClient','fType','fStart','fEnd','cAmount','cOut','cEtc','fRev','fOut','fEtc','fClosed','fReason'];
+  const ids=['fCode','fName','fClient','fPm','fType','fStart','fEnd','cAmount','cOut','cEtc','fRev','fOut','fEtc','fClosed','fReason'];
   if(!p){ids.forEach(i=>{const el=document.getElementById(i);if(el)el.value='';});
     document.getElementById('cAmount').value='0';
     cDraft=[];fDraft=[];renderPhase();renderVs();return;}
   document.getElementById('fCode').value=p.code||'';
   document.getElementById('fName').value=p.name;
   document.getElementById('fClient').value=p.client||'';
+  document.getElementById('fPm').value=p.pm||'';
+  document.getElementById('lastEdit').textContent=p.updatedAt
+    ?'최종 수정 '+String(p.updatedAt).replace('T',' ').slice(0,16)+(p.updatedBy?' · '+p.updatedBy:''):'';
   document.getElementById('fType').value=p.projType||'';
   document.getElementById('fStatus').value=p.status;
   document.getElementById('fStart').value=p.startYm||'';
@@ -599,6 +628,9 @@ function loadProject(){
 function formProject(){
   const p=curProject();if(!p)return null;
   return {...p,
+    baseUpdatedAt:p.updatedAt||null,
+    by:myName(),
+    pm:document.getElementById('fPm').value.trim(),
     code:document.getElementById('fCode').value.trim(),
     name:document.getElementById('fName').value.trim(),
     client:document.getElementById('fClient').value.trim(),
@@ -713,7 +745,7 @@ function renderVs(){
     '<td class="right" style="color:'+(((f.revenue-f.cost)-(c.revenue-c.cost))>=0?'var(--good)':'var(--bad)')+'">'+
       (((f.revenue-f.cost)-(c.revenue-c.cost))>=0?'+':'')+won((f.revenue-f.cost)-(c.revenue-c.cost))+'</td><td></td></tr>';
 }
-['fCode','fName','fClient','fType','fStatus','fStart','fEnd','cAmount','cOut','cEtc','fRev','fOut','fEtc','fClosed'].forEach(id=>{
+['fCode','fName','fClient','fPm','fType','fStatus','fStart','fEnd','cAmount','cOut','cEtc','fRev','fOut','fEtc','fClosed'].forEach(id=>{
   const el=document.getElementById(id);
   el.oninput=()=>{renderPhase();renderVs();};
   el.onchange=()=>{renderPhase();renderVs();};
@@ -746,7 +778,9 @@ document.getElementById('btnSaveInfo').onclick=async()=>{
   try{await api('/projects/'+p.id,{method:'PUT',body:JSON.stringify(p)});
     await refresh();loadProject();
     s.textContent='✓ 저장되었습니다.';setTimeout(()=>s.textContent='',2500);
-  }catch(e){s.className='status err';s.textContent='✗ '+e.message;}
+  }catch(e){s.className='status err';s.textContent='✗ '+e.message;
+    if(/먼저 저장/.test(e.message)&&confirm(e.message+'\n\n지금 새로고침할까요? (입력 중인 값은 사라집니다)')){
+      await refresh();loadProject();}}
 };
 document.getElementById('btnDel').onclick=async()=>{
   const p=curProject();if(!p)return;
@@ -767,10 +801,12 @@ document.getElementById('btnSaveAll').onclick=async()=>{
     await api('/projects/'+p.id+'/rows/F',{method:'PUT',body:JSON.stringify(fDraft.filter(r=>r.mm>0))});
     const c=contractStats(p,cDraft),f=finalStats(p,fDraft);
     await api('/projects/'+p.id+'/logs',{method:'POST',body:JSON.stringify({
-      cMargin:c.margin,fMargin:f.margin,reason:p.reason})});
+      cMargin:c.margin,fMargin:f.margin,reason:p.reason,by:myName()})});
     await refresh();loadProject();
     s.textContent='✓ 수익률이 저장되고 이력에 기록되었습니다.';setTimeout(()=>s.textContent='',3000);
-  }catch(e){s.className='status err';s.textContent='✗ '+e.message;}
+  }catch(e){s.className='status err';s.textContent='✗ '+e.message;
+    if(/먼저 저장/.test(e.message)&&confirm(e.message+'\n\n지금 새로고침할까요? (입력 중인 값은 사라집니다)')){
+      await refresh();loadProject();}}
   finally{btn.disabled=false;}
 };
 // 변동 이력
@@ -785,13 +821,15 @@ document.getElementById('btnLogs').onclick=async()=>{
   try{
     const logs=await api('/projects/'+p.id+'/logs');
     box.innerHTML=logs.length?'<div class="tw"><table><thead><tr><th>기록 시각</th>'+
-      '<th class="right">계약 수익률</th><th class="right">완료 수익률</th><th class="right">변동</th><th>사유</th></tr></thead><tbody>'+
+      '<th class="right">계약 수익률</th><th class="right">완료 수익률</th><th class="right">변동</th><th>입력자</th><th>사유</th></tr></thead><tbody>'+
       logs.map(l=>{
         const d=(l.cMargin!=null&&l.fMargin!=null)?l.fMargin-l.cMargin:null;
         return '<tr><td class="muted">'+String(l.createdAt).replace('T',' ').slice(0,16)+'</td>'+
           '<td class="right">'+(l.cMargin!=null?l.cMargin.toFixed(1)+'%':'-')+'</td>'+
           '<td class="right">'+(l.fMargin!=null?l.fMargin.toFixed(1)+'%':'-')+'</td>'+
-          '<td class="right">'+deltaHtml(d)+'</td><td>'+esc(l.reason||'-')+'</td></tr>';
+          '<td class="right">'+deltaHtml(d)+'</td>'+
+          '<td>'+(l.author?esc(l.author):'<span class="muted">-</span>')+'</td>'+
+          '<td>'+esc(l.reason||'-')+'</td></tr>';
       }).join('')+'</tbody></table></div>'
       :'<div class="empty">기록이 없습니다. [수익률 저장]을 하면 그 시점의 두 수익률과 사유가 쌓입니다.</div>';
   }catch(e){box.innerHTML='<div class="empty">'+esc(e.message)+'</div>';}
@@ -917,6 +955,7 @@ function parseProjects(text){
   if(nameIdx<0)return {error:'머리글에서 "프로젝트명"(또는 계약명) 열을 찾지 못했습니다.'+
     (codeIdx>=0?' — "'+esc(H[codeIdx])+'" 는 번호 열로 인식했습니다.':''),diag:diagHtml(g)};
   const clientIdx=find(/고객|발주|클라이언트/);
+  const pmIdx=H.findIndex(h=>/담당|^PM$|PM\s*명|책임자/i.test(String(h)));
   const typeIdx=find(/정산\s*형태|형태|유형/);
   const statusIdx=find(/상태|진행/);
   const startIdx=find(/시작|착수/);
@@ -939,6 +978,7 @@ function parseProjects(text){
       ctx={name:raw,
         code:codeIdx>=0?(row[codeIdx]||'').trim():'',
         client:clientIdx>=0?row[clientIdx]||'':'',
+        pm:pmIdx>=0?(row[pmIdx]||'').trim():'',
         projType:typeIdx>=0?row[typeIdx]||'':'',
         status:statusNorm(statusIdx>=0?row[statusIdx]:''),
         rawStatus:statusIdx>=0?row[statusIdx]||'':'',
@@ -1001,7 +1041,7 @@ function showImp(r,note){
   impParsed=null;document.getElementById('impSubmit').disabled=true;
   if(r.error){box.innerHTML=r.diag||'';msg.className='msg err';msg.textContent='✗ '+r.error;return;}
   impParsed=r.items;
-  box.innerHTML='<div class="tw"><table><thead><tr><th>번호</th><th>프로젝트</th><th>유형</th><th>상태</th><th>클라이언트</th>'+
+  box.innerHTML='<div class="tw"><table><thead><tr><th>번호</th><th>프로젝트</th><th>담당 PM</th><th>유형</th><th>상태</th><th>클라이언트</th>'+
     '<th class="right">계약액</th><th class="right">MM</th><th class="right">계약 수익률</th></tr></thead><tbody>'+
     r.items.map(it=>{
       let mm=0,labor=0;it.rows.forEach(x=>{mm+=x.mm;labor+=x.mm*x.rate;});
@@ -1010,6 +1050,7 @@ function showImp(r,note){
       return '<tr><td class="muted">'+esc(it.code||'-')+'</td>'+
         '<td style="font-weight:650">'+esc(it.name)+
         (exists?' <span class="pill flat">기존</span>':'')+'</td>'+
+        '<td>'+(it.pm?esc(it.pm):'-')+'</td>'+
         '<td>'+(it.projType?esc(it.projType):'-')+'</td>'+
         '<td>'+esc(it.rawStatus||it.status)+'</td><td>'+esc(it.client||'-')+'</td>'+
         '<td class="right">'+won(it.cAmount)+'</td>'+
@@ -1066,7 +1107,8 @@ document.getElementById('impFetchAll').onclick=async()=>{
           if(!cur.cAmount&&it.cAmount)cur.cAmount=it.cAmount;
           if(!cur.client&&it.client)cur.client=it.client;
           if(!cur.projType&&it.projType)cur.projType=it.projType;
-          if(!cur.code&&it.code)cur.code=it.code;}
+          if(!cur.code&&it.code)cur.code=it.code;
+          if(!cur.pm&&it.pm)cur.pm=it.pm;}
         else merged.set(it.name,{...it,rows:[...it.rows]});
       }
     }
@@ -1221,6 +1263,23 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape')document.querySelectorAll('.modal-bg.show').forEach(m=>m.classList.remove('show'));
 });
+document.getElementById('btnReload').onclick=async()=>{
+  const b=document.getElementById('btnReload');b.disabled=true;
+  try{await refresh();if(curId!=null)loadProject();setConn(true,'DB 연결됨 · 방금 갱신');}
+  catch(e){setConn(false,'갱신 실패');}
+  finally{b.disabled=false;}
+};
+// 다른 창을 보고 돌아오면 자동으로 최신 데이터를 다시 읽는다 (입력 중이면 건너뜀)
+let lastSync=Date.now();
+document.addEventListener('visibilitychange',async()=>{
+  if(document.visibilityState!=='visible')return;
+  if(Date.now()-lastSync<15000)return;
+  if(document.querySelector('.modal-bg.show'))return;
+  const editing=document.activeElement&&/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName);
+  if(editing)return;
+  lastSync=Date.now();
+  try{await refresh();if(curId!=null)loadProject();}catch(e){}
+});
 document.getElementById('btnOut').onclick=async()=>{
   try{await fetch('/logout',{method:'POST'});}catch(e){}
   location.href='/login.html';
@@ -1245,11 +1304,12 @@ document.getElementById('pwForm').onsubmit=async e=>{
 async function refresh(){
   [projects,staff,rates,allRows]=await Promise.all([
     api('/projects'),api('/staff'),api('/rates'),api('/rows')]);
-  renderDash();renderStaff();renderRates();renderPjSelect();
+  renderDash();renderStaff();renderRates();renderPjSelect();renderPmList();
   if(!document.getElementById('tab-proj').classList.contains('hidden')){renderPhase();renderVs();}
 }
 (async function(){
   document.getElementById('appVer').textContent=APP_VERSION;
+  initMyName();
   try{
     const me=await fetch('/api/me').then(r=>r.json()).catch(()=>({}));
     if(me.authEnabled){document.getElementById('btnOut').style.display='inline-block';

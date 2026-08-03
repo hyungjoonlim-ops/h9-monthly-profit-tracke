@@ -456,7 +456,7 @@
 </div>
 
 <script>
-const APP_VERSION='v2.8 · 단가표 일괄 등록';
+const APP_VERSION='v2.9 · CTO·CEO직속 PM 단가';
 const GRADES=['초급','중급','고급','특급'];
 let projects=[],staff=[],rates={},allRows=[];
 let curId=null,cDraft=[],fDraft=[];
@@ -489,17 +489,32 @@ function deltaHtml(d,unit){
 }
 const normDept=t=>String(t||'').replace(/\s|\(.*?\)/g,'').toLowerCase();
 // 소속 이름 해석 — 단가표에 없는 표기(GUI·BE·FE·DEV·QA·PUB 등)를 매핑
-const DEPT_ALIAS={GUI:'Visual',PUB:'Visual',퍼블리싱:'Visual',
-  DEV:'서비스개발',BE:'서비스개발',FE:'서비스개발',QA:'서비스개발',개발:'서비스개발',
-  기획:'UX',UI:'Visual'};
+// 소속 표기 → 단가표 소속 매핑 (단가표에 같은 이름이 있으면 그것이 우선)
+const DEPT_ALIAS=(()=>{
+  const raw={
+    GUI:'Visual', PUB:'Visual', UI:'Visual', 퍼블리싱:'Visual',
+    DEV:'서비스개발', BE:'서비스개발', FE:'서비스개발', QA:'서비스개발', 개발:'서비스개발',
+    기획:'UX',
+  };
+  const out={};
+  Object.entries(raw).forEach(([k,v])=>{out[normDept(k)]=v;});
+  return out;
+})();
+// CTO · CEO(대표) 직속 조직은 표기가 어떻든 모두 PM 단가 기준을 따른다
+// ('CTO', 'CTO직속', 'CTO 직속실', 'CEO직속', '대표이사 직속' …)
+const DEPT_RULES=[
+  [/^(cto|ceo)/, 'PM'],
+  [/대표(이사)?/, 'PM'],
+];
 function resolveDept(name){
   const raw=String(name||'').trim();
   if(!raw)return '';
-  if(rates[raw])return raw;
-  const up=raw.toUpperCase();
-  if(DEPT_ALIAS[up]&&rates[DEPT_ALIAS[up]])return DEPT_ALIAS[up];
-  if(DEPT_ALIAS[raw]&&rates[DEPT_ALIAS[raw]])return DEPT_ALIAS[raw];
+  if(rates[raw])return raw;                 // 단가표에 같은 이름이 있으면 그대로
   const n=normDept(raw);
+  const a=DEPT_ALIAS[n];
+  if(a&&rates[a])return a;                  // 별칭 (GUI → Visual 등)
+  const r=(DEPT_RULES.find(([re])=>re.test(n))||[])[1];
+  if(r&&rates[r])return r;                  // 규칙 (CTO·CEO직속 → PM)
   return Object.keys(rates).find(d=>{const dn=normDept(d);return dn&&(dn===n||dn.includes(n)||n.includes(dn));})||'';
 }
 const rateOf=(dept,g)=>{const d=rates[dept]?dept:resolveDept(dept);return (d&&rates[d]&&rates[d][g]!=null)?rates[d][g]:0;};

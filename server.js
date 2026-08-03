@@ -480,8 +480,12 @@ const sheetId = (url) => {
 };
 const testUrl = (url) =>
   process.env.ALLOW_TEST_SHEET_URL === '1' && /^http:\/\/127\.0\.0\.1[:/]/.test(String(url || ''));
-const shareHint = (status) =>
-  '시트를 읽을 수 없습니다 (HTTP ' + status + '). 시트 공유를 "링크가 있는 모든 사용자 – 뷰어"로 설정했는지 확인하세요.';
+const shareHint = (status) => (status === 403 || status === 401)
+  ? '시트에 접근할 수 없습니다 (권한 없음). 구글시트에서 [공유] → 일반 액세스를 '
+    + '"링크가 있는 모든 사용자"로 바꾸고 역할은 "뷰어(보기)"로 두세요. 보기 권한만 있으면 읽어옵니다.'
+  : status === 404
+    ? '시트를 찾을 수 없습니다 (HTTP 404). 링크가 올바른지, 삭제되지 않았는지 확인하세요.'
+    : '시트를 읽을 수 없습니다 (HTTP ' + status + '). 잠시 후 다시 시도하거나 공유 설정을 확인하세요.';
 
 // 탭 하나 (링크의 gid)
 app.post('/api/sheet', async (req, res) => {

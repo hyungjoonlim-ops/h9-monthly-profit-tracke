@@ -73,29 +73,30 @@
   .barwrap::-webkit-scrollbar-track{background:var(--panel2);border-radius:5px}
   .barwrap::-webkit-scrollbar-thumb{background:#38506a;border-radius:5px}
   .barwrap::-webkit-scrollbar-thumb:hover{background:#4a678a}
-  /* 위 기준으로 정렬해야 모든 그룹의 0 기준선이 같은 높이에 온다
-     (이름이 한 줄/두 줄로 달라도 막대가 어긋나지 않게) */
-  .bars{display:flex;gap:14px;align-items:flex-start;min-height:200px;padding:4px 2px 0}
-  .bg{flex:0 0 96px;scroll-snap-align:start;display:flex;flex-direction:column;
-    align-items:center;gap:5px;cursor:pointer;border-radius:8px;padding:4px 2px}
-  .bg:hover{background:var(--panel2)}
-  .bg .dl{font-size:11.5px;font-weight:700;white-space:nowrap;height:15px;line-height:15px}
-  .bg .plot{position:relative;width:100%;height:132px}
-  .bg .zero{position:absolute;left:0;right:0;border-top:1px dashed #3a4d63}
-  .bg .pair{position:absolute;left:0;right:0;top:0;bottom:0;display:flex;
-    justify-content:center;gap:7px}
-  .bg .bar{width:24px;position:absolute;border-radius:3px 3px 0 0;min-height:2px}
-  .bg .bar.neg{border-radius:0 0 3px 3px}
-  .bg .bar.c{background:var(--warn)} .bg .bar.f{background:var(--accent)}
-  .bg .bar.none{background:repeating-linear-gradient(45deg,#2c3b4e,#2c3b4e 3px,transparent 3px,transparent 6px)}
-  .bg .vals{font-size:10.5px;color:var(--muted);white-space:nowrap;height:14px;line-height:14px}
-  .bg .vals .vc{color:var(--warn)} .bg .vals .vf{color:var(--accent)}
-  .bg .nm{font-size:11px;color:var(--ink2);text-align:center;line-height:1.25;
-    width:92px;height:34px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
-    background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:3px 7px;
+  /* 클래스 이름은 m- 로 구분한다 (다른 곳의 .bar 규칙과 섞이면 폭이 틀어진다).
+     위 기준 정렬이라 이름이 한 줄/두 줄로 달라도 0 기준선이 같은 높이에 온다. */
+  .mchart{display:flex;gap:26px;align-items:flex-start;min-height:190px;padding:4px 2px 0}
+  .mg{flex:0 0 96px;width:96px;box-sizing:border-box;scroll-snap-align:start;
+    display:flex;flex-direction:column;align-items:center;gap:6px;
+    cursor:pointer;border-radius:8px;padding:4px 2px}
+  .mg:hover{background:var(--panel2)}
+  .mg .mval{font-size:10.5px;color:var(--muted);white-space:nowrap;height:14px;line-height:14px}
+  .mg .mval .vc{color:var(--warn)} .mg .mval .vf{color:var(--accent)}
+  /* 막대 영역은 고정 폭 — 막대 14px 두 개 + 사이 8px = 36px */
+  .mg .mplot{position:relative;width:36px;min-width:36px;height:132px}
+  .mg .mzero{position:absolute;left:-6px;right:-6px;border-top:1px dashed #3a4d63}
+  .mg .mbar{position:absolute;width:14px;min-width:14px;max-width:14px;
+    border-radius:3px 3px 0 0;min-height:2px}
+  .mg .mbar.neg{border-radius:0 0 3px 3px}
+  .mg .mbar.c{left:0;background:var(--warn)}
+  .mg .mbar.f{left:22px;background:var(--accent)}
+  .mg .mbar.none{background:repeating-linear-gradient(45deg,#33465c,#33465c 3px,transparent 3px,transparent 6px)}
+  .mg .mname{font-size:11px;color:var(--ink2);text-align:center;line-height:1.25;
+    width:96px;height:34px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+    background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:3px 6px;
     box-sizing:border-box}
-  .bg.done .nm{border-color:#3d5b7a}
-  .bars .empty{padding:60px 12px;color:var(--muted);font-size:13px}
+  .mg.done .mname{border-color:#3d5b7a}
+  .mchart .empty{padding:60px 12px;color:var(--muted);font-size:13px}
   /* 삭제 확인 창 */
   #delBox h3{color:var(--bad);margin:0 0 10px;font-size:15px}
   #delWhat{font-size:13.5px;line-height:1.7;background:var(--panel2);border:1px solid var(--line);
@@ -150,8 +151,6 @@
   .modal .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
   .savebar{display:flex;gap:10px;align-items:center;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
   .muted{color:var(--muted)}
-  .bar{height:7px;background:var(--panel2);border-radius:4px;overflow:hidden;min-width:70px}
-  .bar>i{display:block;height:100%}
 </style>
 
 <header>
@@ -190,8 +189,8 @@
         <button class="ghost sm" id="barRight" title="오른쪽으로">→</button>
       </div>
     </div>
-    <div class="barwrap" id="barWrap"><div class="bars" id="barChart"></div></div>
-    <div class="hint" id="barHint">좌우로 스와이프하거나 끌어서 넘겨 보세요. 막대는 계약 시점과 완료 시점 수익률이고, 위 숫자는 변동(%p)입니다.</div>
+    <div class="barwrap" id="barWrap"><div class="mchart" id="barChart"></div></div>
+    <div class="hint" id="barHint">좌우로 스와이프하거나 끌어서 넘겨 보세요. 위 숫자는 <b>계약 시점 → 완료 시점</b> 수익률이고, 막대에 마우스를 올리면 변동(%p)이 나옵니다.</div>
   </div>
 
   <div class="panel">
@@ -545,7 +544,7 @@
 </div>
 
 <script>
-const APP_VERSION='v3.3 · 수익률 변동 그래프';
+const APP_VERSION='v3.4 · 그래프 폭 고정';
 const GRADES=['초급','중급','고급','특급'];
 let projects=[],staff=[],rates={},allRows=[];
 let curId=null,cDraft=[],fDraft=[];
@@ -813,29 +812,25 @@ function renderBars(list){
   const hi=Math.max(0,...vals),lo=Math.min(0,...vals);
   const span=(hi-lo)||1;
   const zero=PLOT_H*(hi/span);                       // 위에서부터 기준선까지
+  // 막대는 고정 폭(14px). 좌우 위치도 CSS 에 고정돼 있어 개수와 무관하게 일정하다.
   const bar=(v,k)=>{
-    const pos=k==='c'?'left:calc(50% - 31px)':'left:calc(50% + 7px)';
-    if(v==null)return '<div class="bar none '+k+'" style="height:4px;top:'+(zero-2).toFixed(1)+'px;'+
-      pos+'" title="미입력"></div>';
+    if(v==null)return '<div class="mbar none '+k+'" style="height:4px;top:'+
+      (zero-2).toFixed(1)+'px" title="미입력"></div>';
     const h=Math.max(2,Math.abs(v)/span*PLOT_H),neg=v<0;
-    return '<div class="bar '+k+(neg?' neg':'')+'" style="height:'+h.toFixed(1)+'px;top:'+
-      (neg?zero:zero-h).toFixed(1)+'px;'+pos+'"></div>';
+    return '<div class="mbar '+k+(neg?' neg':'')+'" style="height:'+h.toFixed(1)+'px;top:'+
+      (neg?zero:zero-h).toFixed(1)+'px"></div>';
   };
-  // 두 수익률은 막대 위에 겹쳐 쓰지 않고 한 줄로 모아 보여준다
+  // 그래프 위에는 수익률 숫자만 (변동 %p 는 아래 표와 툴팁에 있다)
   const pct=v=>v==null?'-':v.toFixed(0)+'%';
   el.innerHTML=items.map(x=>{
-    const prov=x.d!=null&&!isDone(x.p);
-    const dl=x.d==null?'<span class="muted">–</span>'
-      :'<span class="'+(x.d>=0?'up':'down')+'" style="color:'+(x.d>=0?'var(--good)':'var(--bad)')+'">'
-        +(x.d>=0?'▲ +':'▼ ')+x.d.toFixed(1)+'%p</span>'+(prov?' <span class="prov">잠정</span>':'');
-    return '<div class="bg'+(isDone(x.p)?' done':'')+'" data-bar="'+x.p.id+'" title="'+
+    const dt=x.d==null?'변동 미산출':'변동 '+(x.d>=0?'+':'')+x.d.toFixed(1)+'%p'+(isDone(x.p)?'':' (진행중 잠정)');
+    return '<div class="mg'+(isDone(x.p)?' done':'')+'" data-bar="'+x.p.id+'" title="'+
       esc(x.p.name)+' — 계약 '+(x.c!=null?x.c.toFixed(1)+'%':'-')+' → 완료 '+
-      (x.f!=null?x.f.toFixed(1)+'%':'미입력')+'">'+
-      '<div class="dl">'+dl+'</div>'+
-      '<div class="vals"><b class="vc">'+pct(x.c)+'</b> → <b class="vf">'+pct(x.f)+'</b></div>'+
-      '<div class="plot"><div class="zero" style="top:'+zero.toFixed(1)+'px"></div>'+
-        '<div class="pair">'+bar(x.c,'c')+bar(x.f,'f')+'</div></div>'+
-      '<div class="nm">'+esc(x.p.name)+'</div></div>';
+      (x.f!=null?x.f.toFixed(1)+'%':'미입력')+' · '+dt+'">'+
+      '<div class="mval"><b class="vc">'+pct(x.c)+'</b> → <b class="vf">'+pct(x.f)+'</b></div>'+
+      '<div class="mplot"><div class="mzero" style="top:'+zero.toFixed(1)+'px"></div>'+
+        bar(x.c,'c')+bar(x.f,'f')+'</div>'+
+      '<div class="mname">'+esc(x.p.name)+'</div></div>';
   }).join('');
   el.querySelectorAll('[data-bar]').forEach(g=>g.onclick=()=>{
     curId=+g.dataset.bar;switchTab('proj');loadProject();});

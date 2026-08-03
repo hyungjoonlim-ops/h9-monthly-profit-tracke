@@ -112,8 +112,9 @@ const mapProject = (r) => ({
   updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : null,
 });
 const mapStaff = (r) => ({
-  id: Number(r.id), name: r.name, dept: r.dept || '',
-  grade: Number(r.grade), active: !!r.active, memo: r.memo || '',
+  id: Number(r.id), name: r.name, dept: r.dept || '', team: r.team || '',
+  grade: Number(r.grade), career: r.career || '', title: r.title || '',
+  active: !!r.active, memo: r.memo || '',
 });
 const mapRow = (r) => ({
   id: Number(r.id), projectId: Number(r.project_id), phase: r.phase,
@@ -157,7 +158,8 @@ app.put('/api/rates', async (req, res) => {
 // ══ 직원 명부 ══════════════════════════════════════════
 app.get('/api/staff', async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT * FROM h9_staff ORDER BY dept, grade DESC, name');
+    const { rows } = await pool.query(
+      'SELECT * FROM h9_staff ORDER BY dept NULLS LAST, team NULLS LAST, name');
     res.json(rows.map(mapStaff));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -167,8 +169,10 @@ app.post('/api/staff', async (req, res) => {
   if (!txt(s.name)) return res.status(400).json({ error: '이름은 필수입니다.' });
   try {
     const { rows } = await pool.query(
-      `INSERT INTO h9_staff (name, dept, grade, active, memo) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-      [txt(s.name), txt(s.dept) || '', gr(s.grade), s.active !== false, txt(s.memo)]
+      `INSERT INTO h9_staff (name, dept, team, grade, career, title, active, memo)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [txt(s.name), txt(s.dept) || '', txt(s.team), gr(s.grade), txt(s.career),
+       txt(s.title), s.active !== false, txt(s.memo)]
     );
     res.json(mapStaff(rows[0]));
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -179,8 +183,10 @@ app.put('/api/staff/:id', async (req, res) => {
   if (!txt(s.name)) return res.status(400).json({ error: '이름은 필수입니다.' });
   try {
     const { rows } = await pool.query(
-      `UPDATE h9_staff SET name=$1, dept=$2, grade=$3, active=$4, memo=$5 WHERE id=$6 RETURNING *`,
-      [txt(s.name), txt(s.dept) || '', gr(s.grade), s.active !== false, txt(s.memo), req.params.id]
+      `UPDATE h9_staff SET name=$1, dept=$2, team=$3, grade=$4, career=$5,
+              title=$6, active=$7, memo=$8 WHERE id=$9 RETURNING *`,
+      [txt(s.name), txt(s.dept) || '', txt(s.team), gr(s.grade), txt(s.career),
+       txt(s.title), s.active !== false, txt(s.memo), req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: '인력을 찾을 수 없습니다.' });
     res.json(mapStaff(rows[0]));
@@ -211,13 +217,16 @@ app.post('/api/staff/bulk', async (req, res) => {
       if (!name) continue;
       const found = byName.get(name);
       if (found && !kept.has(found)) {
-        await client.query('UPDATE h9_staff SET dept=$1, grade=$2, active=true WHERE id=$3',
-          [txt(s.dept) || '', gr(s.grade), found]);
+        await client.query(
+          `UPDATE h9_staff SET dept=$1, team=$2, grade=$3,
+                  career=COALESCE($4,career), title=$5, active=true WHERE id=$6`,
+          [txt(s.dept) || '', txt(s.team), gr(s.grade), txt(s.career), txt(s.title), found]);
         kept.add(found); changed++;
       } else {
         const ins = await client.query(
-          `INSERT INTO h9_staff (name, dept, grade) VALUES ($1,$2,$3) RETURNING id`,
-          [name, txt(s.dept) || '', gr(s.grade)]);
+          `INSERT INTO h9_staff (name, dept, team, grade, career, title)
+           VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+          [name, txt(s.dept) || '', txt(s.team), gr(s.grade), txt(s.career), txt(s.title)]);
         kept.add(Number(ins.rows[0].id)); added++;
       }
     }

@@ -234,10 +234,11 @@
       </div>
       <div class="tw" style="margin-top:12px">
         <table>
-          <thead><tr><th style="min-width:150px">인력</th><th style="min-width:110px">소속</th>
-            <th style="min-width:82px">등급</th><th class="right" style="width:140px">단가/MM</th>
+          <thead><tr><th style="min-width:110px">소속</th><th style="min-width:82px">등급</th>
+            <th class="right" style="width:140px">단가/MM</th>
             <th class="right" style="width:96px">MM</th>
-            <th class="right" style="width:130px">인건비</th><th style="width:26px"></th></tr></thead>
+            <th class="right" style="width:130px">인건비</th>
+            <th style="width:26px"></th></tr></thead>
           <tbody id="fBody"></tbody>
           <tfoot><tr id="fFoot"></tr></tfoot>
         </table>
@@ -294,20 +295,22 @@
     </div>
     <div class="tw">
       <table>
-        <thead><tr><th style="min-width:130px">소속</th><th style="min-width:110px">이름</th>
-          <th style="width:110px">등급</th><th class="right">단가/MM</th><th style="width:60px">재직</th>
-          <th style="min-width:120px">메모</th><th style="width:30px"></th></tr></thead>
+        <thead><tr><th style="min-width:130px">부서(실)</th><th style="min-width:100px">부서(팀)</th>
+          <th style="min-width:100px">이름</th><th style="width:110px">기술등급</th>
+          <th class="right" style="width:130px">단가/MM</th><th style="min-width:110px">등급분류기준</th>
+          <th style="width:56px">재직</th><th style="width:30px"></th></tr></thead>
         <tbody id="stBody"></tbody>
       </table>
     </div>
+    <datalist id="deptList"></datalist>
     <div class="row" style="margin-top:12px;align-items:flex-end">
-      <div class="field"><label>소속</label><select id="nsDept"></select></div>
+      <div class="field"><label>부서(실)</label><select id="nsDept"></select></div>
       <div class="field"><label>이름</label><input id="nsName" placeholder="홍길동"></div>
       <div class="field"><label>등급</label><select id="nsGrade"></select></div>
       <button class="ghost" id="btnStAdd">직원 추가</button>
       <span class="status" id="stMsg"></span>
     </div>
-    <div class="hint">등급을 바꾸면 그 직원이 투입된 프로젝트의 완료 시점 인건비가 즉시 다시 계산됩니다. 계약 시점 인건비는 저장된 단가로 고정되어 변하지 않습니다.</div>
+    <div class="hint">부서(실)은 단가표의 소속으로 자동 해석됩니다(예: 서비스개발실 → 서비스개발). 부서(팀)이 "-" 인 직원은 <b>실장</b>으로 표시됩니다. 명부의 등급·단가는 프로젝트 투입 행을 새로 추가할 때 기본값으로 쓰입니다.</div>
   </div>
 
   <div class="panel">
@@ -367,12 +370,15 @@
       <button class="ghost" id="stImpFetch">현재 탭만</button>
       <button id="stImpFetchAll">모든 탭 일괄</button>
     </div>
-    <p class="hint" style="margin:0 0 10px"><b>소속 · 이름 · 등급</b> 3개 열을 붙여넣으세요 (탭/쉼표 구분, 제목 줄은 자동으로 건너뜁니다).
-      머리글이 있으면 열 순서가 달라도 인식합니다. 등급은 초급/중급/고급/특급.<br>
+    <p class="hint" style="margin:0 0 10px">인력 <b>현황 시트</b>의 머리글을 포함해 붙여넣으세요 —
+      <b>번호 · 부서(실) · 부서(팀) · 이름 · 기술등급(SDS) · 등급분류기준(경력)</b> 을 자동 인식합니다
+      (번호는 무시, 열 순서 달라도 됩니다). <b>부서(팀)이 "-" 이면 그 실의 실장</b>으로 등록됩니다.
+      기술등급은 초급/중급/고급/특급이며, '등급분류기준'·'경력' 열은 등급과 구분해 따로 저장합니다.
+      [모든 탭 일괄]은 이름에 <b>현황</b>이 들어간 탭이 있으면 그 탭만 가져옵니다.<br>
       <label style="display:inline-flex;gap:6px;align-items:center;margin-top:6px;color:var(--ink2)">
         <input type="checkbox" id="stImpReplace" style="width:auto" checked>
         <b>명부 전체 대체</b> — 목록에 없는 직원은 삭제(투입 이력이 있으면 재직 해제)</label></p>
-    <textarea id="stImpText" rows="8" placeholder="소속	이름	등급&#10;서비스개발	홍길동	고급&#10;Visual	김철수	중급"></textarea>
+    <textarea id="stImpText" rows="8" placeholder="번호	부서(실)	부서(팀)	이름	기술등급(SDS)	등급분류기준(경력)&#10;1	서비스개발실	-	인고은	특급	10년 이상&#10;2	서비스개발실	1팀	홍길동	고급	7년 이상"></textarea>
     <div id="stImpPreview" style="margin-top:10px;max-height:280px;overflow:auto"></div>
     <div class="msg" id="stImpMsg"></div>
     <div class="btns">
@@ -404,7 +410,7 @@
 </div>
 
 <script>
-const APP_VERSION='v2.3 · 입력 편의 개선';
+const APP_VERSION='v2.4 · 명부 6열 · 구조 통일';
 const GRADES=['초급','중급','고급','특급'];
 let projects=[],staff=[],rates={},allRows=[];
 let curId=null,cDraft=[],fDraft=[];
@@ -490,11 +496,7 @@ function contractStats(p,draft){
 function finalStats(p,draft){
   const rows=draft||rowsOf(p.id,'F');
   let mm=0,labor=0;
-  rows.forEach(r=>{
-    const st=r.staffId?staffById(r.staffId):null;
-    const dept=st?st.dept:r.dept, g=st?st.grade:r.grade;
-    mm+=r.mm;labor+=r.mm*rateOf(dept,g);
-  });
+  rows.forEach(r=>{mm+=r.mm;labor+=r.mm*(r.rate||rateOf(r.dept,r.grade));});
   const revenue=p.fRevenue>0?p.fRevenue:p.cAmount;
   const cost=labor+p.fCostOut+p.fCostEtc;
   const has=rows.length>0||p.fRevenue>0||p.fCostOut>0||p.fCostEtc>0;
@@ -670,10 +672,6 @@ function formProject(){
 }
 const deptOptions=sel=>Object.keys(rates).map(d=>'<option '+(d===sel?'selected':'')+'>'+esc(d)+'</option>').join('');
 const gradeOptions=sel=>GRADES.map((g,i)=>'<option value="'+i+'" '+(i===sel?'selected':'')+'>'+g+'</option>').join('');
-function staffOptions(sel){
-  return '<option value="">— 인력 미정 —</option>'+staff.filter(s=>s.active||s.id===sel)
-    .map(s=>'<option value="'+s.id+'" '+(s.id===sel?'selected':'')+'>'+esc(s.name)+' ('+esc(s.dept)+' '+GRADES[s.grade]+')</option>').join('');
-}
 function renderPhase(){
   const p=formProject();
   // 계약 시점 표
@@ -703,28 +701,22 @@ function renderPhase(){
   // 완료 시점 표
   const fb=document.getElementById('fBody');
   fb.innerHTML=fDraft.length?fDraft.map((r,i)=>{
-    const st=r.staffId?staffById(r.staffId):null;
-    const dept=st?st.dept:r.dept, g=st?st.grade:r.grade;
-    const rate=rateOf(dept,g);
-    return '<tr><td><select data-r="'+i+'" data-f="staffId">'+staffOptions(r.staffId)+'</select></td>'+
-      '<td>'+(st?'<span class="pill flat">'+esc(st.dept)+'</span>'
-        :'<select data-r="'+i+'" data-f="dept">'+deptOptions(r.dept)+'</select>')+'</td>'+
-      '<td>'+(st?'<span class="pill flat">'+GRADES[g]+'</span>'
-        :'<select data-r="'+i+'" data-f="grade">'+gradeOptions(r.grade)+'</select>')+'</td>'+
-      '<td class="right">'+won(rate)+'</td>'+
+    const rate=r.rate||rateOf(r.dept,r.grade);
+    return '<tr><td><select data-r="'+i+'" data-f="dept">'+deptOptions(r.dept)+'</select></td>'+
+      '<td><select data-r="'+i+'" data-f="grade">'+gradeOptions(r.grade)+'</select></td>'+
+      '<td><input class="num" data-r="'+i+'" data-f="rate" value="'+won(rate)+'" inputmode="numeric"></td>'+
       '<td><input class="num" data-r="'+i+'" data-f="mm" value="'+r.mm+'" inputmode="decimal"></td>'+
       '<td class="right">'+won(rate*r.mm)+'</td>'+
       '<td><span class="del-x" data-fdel="'+i+'">×</span></td></tr>';
-  }).join(''):'<tr><td colspan="7" class="empty">실제 투입 인력을 추가하거나 [← 계약 투입 복사]를 누르세요.</td></tr>';
+  }).join(''):'<tr><td colspan="6" class="empty">실제 투입을 추가하거나 [← 계약 투입 복사]를 누르세요.</td></tr>';
   const fs=p?finalStats(p,fDraft):{mm:0,labor:0};
   document.getElementById('fFoot').innerHTML=fDraft.length
-    ?'<td>합계</td><td></td><td></td><td></td><td class="right">'+fs.mm.toFixed(2)+
+    ?'<td>합계</td><td></td><td></td><td class="right">'+fs.mm.toFixed(2)+
      '</td><td class="right">'+won(fs.labor)+'</td><td></td>':'';
   fb.querySelectorAll('[data-r]').forEach(el=>el.onchange=e=>{
     const i=+e.target.dataset.r,f=e.target.dataset.f;
-    if(f==='staffId')fDraft[i].staffId=+e.target.value||null;
-    else if(f==='grade')fDraft[i].grade=+e.target.value;
-    else if(f==='dept')fDraft[i].dept=e.target.value;
+    if(f==='dept'){fDraft[i].dept=e.target.value;fDraft[i].rate=rateOf(fDraft[i].dept,fDraft[i].grade);}
+    else if(f==='grade'){fDraft[i].grade=+e.target.value;fDraft[i].rate=rateOf(fDraft[i].dept,fDraft[i].grade);}
     else fDraft[i][f]=pnum(e.target.value);
     renderPhase();renderVs();
   });
@@ -781,10 +773,11 @@ document.getElementById('cAdd').onclick=()=>{
 };
 document.getElementById('fAdd').onclick=()=>{
   const d=Object.keys(rates)[0]||'';
-  fDraft.push({dept:d,grade:1,mm:1,rate:0,staffId:null});renderPhase();renderVs();
+  fDraft.push({dept:d,grade:1,mm:1,rate:rateOf(d,1),staffId:null});renderPhase();renderVs();
 };
 document.getElementById('fCopy').onclick=()=>{
-  fDraft=cDraft.map(r=>({dept:r.dept,grade:r.grade,mm:r.mm,rate:0,staffId:null}));
+  fDraft=cDraft.map(r=>({dept:r.dept,grade:r.grade,mm:r.mm,
+    rate:r.rate||rateOf(r.dept,r.grade),staffId:null}));
   renderPhase();renderVs();
 };
 document.getElementById('btnNew').onclick=async()=>{
@@ -823,7 +816,8 @@ document.getElementById('btnSaveAll').onclick=async()=>{
     await api('/projects/'+p.id,{method:'PUT',body:JSON.stringify(p)});
     await api('/projects/'+p.id+'/rows/C',{method:'PUT',body:JSON.stringify(
       cDraft.filter(r=>r.mm>0).map(r=>({...r,rate:r.rate||rateOf(r.dept,r.grade)})))});
-    await api('/projects/'+p.id+'/rows/F',{method:'PUT',body:JSON.stringify(fDraft.filter(r=>r.mm>0))});
+    await api('/projects/'+p.id+'/rows/F',{method:'PUT',body:JSON.stringify(
+      fDraft.filter(r=>r.mm>0).map(r=>({...r,rate:r.rate||rateOf(r.dept,r.grade)})))});
     const c=contractStats(p,cDraft),f=finalStats(p,fDraft);
     await api('/projects/'+p.id+'/logs',{method:'POST',body:JSON.stringify({
       cMargin:c.margin,fMargin:f.margin,reason:p.reason,by:myName()})});
@@ -866,15 +860,16 @@ function renderStaff(){
   const body=document.getElementById('stBody');
   body.innerHTML=staff.length?staff.map(s=>
     '<tr'+(s.active?'':' style="opacity:.55"')+'>'+
-    '<td><select data-s="'+s.id+'" data-f="dept">'+deptOptions(s.dept)+
-      (rates[s.dept]?'':'<option selected>'+esc(s.dept)+'</option>')+'</select></td>'+
+    '<td><input data-s="'+s.id+'" data-f="dept" list="deptList" value="'+esc(s.dept)+'"></td>'+
+    '<td>'+(s.title?'<span class="pill warn">'+esc(s.title)+'</span>'
+      :'<input data-s="'+s.id+'" data-f="team" value="'+esc(s.team)+'">')+'</td>'+
     '<td><input data-s="'+s.id+'" data-f="name" value="'+esc(s.name)+'"></td>'+
     '<td><select data-s="'+s.id+'" data-f="grade">'+gradeOptions(s.grade)+'</select></td>'+
     '<td class="right">'+won(rateOf(s.dept,s.grade))+'</td>'+
+    '<td><input data-s="'+s.id+'" data-f="career" value="'+esc(s.career)+'"></td>'+
     '<td style="text-align:center"><input type="checkbox" style="width:auto" data-s="'+s.id+'" data-f="active" '+(s.active?'checked':'')+'></td>'+
-    '<td><input data-s="'+s.id+'" data-f="memo" value="'+esc(s.memo)+'"></td>'+
     '<td><span class="del-x" data-sdel="'+s.id+'">×</span></td></tr>').join('')
-    :'<tr><td colspan="7" class="empty">직원이 없습니다. [구글시트 일괄 등록]으로 소속·이름·등급을 넣으세요.</td></tr>';
+    :'<tr><td colspan="8" class="empty">직원이 없습니다. [구글시트 일괄 등록]으로 부서(실)·부서(팀)·이름·기술등급을 넣으세요.</td></tr>';
   body.querySelectorAll('[data-s]').forEach(el=>el.onchange=async e=>{
     const id=+e.target.dataset.s,f=e.target.dataset.f;
     const s=staff.find(x=>x.id===id);if(!s)return;
@@ -890,6 +885,7 @@ function renderStaff(){
     try{await api('/staff/'+id,{method:'DELETE'});await refresh();}
     catch(err){alert('삭제 실패: '+err.message);}
   });
+  document.getElementById('deptList').innerHTML=Object.keys(rates).map(d=>'<option value="'+esc(d)+'">').join('');
   const nd=document.getElementById('nsDept');
   nd.innerHTML=deptOptions(nd.value);
   const ng=document.getElementById('nsGrade');
@@ -1037,26 +1033,48 @@ function parseProjects(text){
 function parseStaffSheet(text){
   const g=grid(text);
   if(!g.length)return {error:'내용이 없습니다.'};
-  const H=g[0];
-  const hasHead=H.some(h=>/소속|이름|등급|성명|부서/.test(h));
-  let dI=0,nI=1,gI=2;
-  if(hasHead){
-    const find=re=>H.findIndex(h=>re.test(h));
-    dI=find(/소속|부서|파트/);nI=find(/이름|성명/);gI=find(/등급/);
-    if(nI<0)return {error:'"이름" 열을 찾지 못했습니다.',diag:diagHtml(g)};
-    if(dI<0)dI=nI===0?1:0;
-    if(gI<0)gI=Math.max(dI,nI)+1;
+  // 머리글 행 찾기 (제목 행이 위에 있을 수 있으므로 앞 8행에서 탐색)
+  let hi=-1;
+  for(let i=0;i<Math.min(g.length,8);i++){
+    if(g[i].some(h=>/이름|성명/.test(h))&&g[i].some(h=>/등급|부서|소속/.test(h))){hi=i;break;}
+  }
+  const H=hi>=0?g[hi]:g[0];
+  let dI,tI,nI,gI,cI;
+  if(hi>=0){
+    // 부서(실) / 부서(팀) 구분 — '실'이 든 열과 '팀'이 든 열
+    dI=H.findIndex(h=>/실\)|^실$|부서\s*\(?실|소속|본부|그룹/.test(h));
+    tI=H.findIndex(h=>/팀\)|^팀$|부서\s*\(?팀/.test(h));
+    if(dI<0)dI=H.findIndex(h=>/부서|소속|파트/.test(h));
+    nI=H.findIndex(h=>/이름|성명/.test(h));
+    // 기술등급(SDS) — '등급분류기준'·'경력' 열은 제외
+    gI=H.findIndex(h=>/등급/.test(h)&&!/분류|기준|경력/.test(h));
+    if(gI<0)gI=H.findIndex(h=>/등급/.test(h));
+    cI=H.findIndex(h=>/등급\s*분류|분류\s*기준|경력/.test(h));
+    if(nI<0)return {error:'"이름"(또는 성명) 열을 찾지 못했습니다.',diag:diagHtml(g)};
+  }else{
+    // 머리글이 없으면 소속·이름·등급 3개 열로 본다
+    dI=0;nI=1;gI=2;tI=-1;cI=-1;
   }
   const list=[];
-  for(const row of (hasHead?g.slice(1):g)){
+  for(const row of (hi>=0?g.slice(hi+1):g)){
     const name=(row[nI]||'').trim();
-    if(!name||/소속|이름|성명|등급/.test(name))continue;
-    if(/^(미정|미배정|TBD|-)$/i.test(name))continue;
-    const gi=parseGrade(row[gI]);
-    list.push({name,dept:resolveDept(row[dI])||(row[dI]||'').trim(),grade:gi==null?1:gi});
+    if(!name||/이름|성명/.test(name))continue;
+    if(/^(미정|미배정|TBD|-|합계|소계)$/i.test(name))continue;
+    const rawTeam=tI>=0?(row[tI]||'').trim():'';
+    // 부서(팀)이 '-' 이면 그 실의 실장
+    const isHead=/^[-–—]$/.test(rawTeam);
+    const gi=parseGrade(gI>=0?row[gI]:'');
+    list.push({
+      name,
+      dept:dI>=0?(row[dI]||'').trim():'',
+      team:isHead?'':rawTeam,
+      title:isHead?'실장':'',
+      grade:gi==null?1:gi,
+      career:cI>=0?(row[cI]||'').trim():'',
+    });
   }
-  if(!list.length)return {error:'등록할 직원이 없습니다. 소속·이름·등급 열을 확인하세요.',diag:diagHtml(g)};
-  return {list};
+  if(!list.length)return {error:'등록할 직원이 없습니다. 부서(실)·부서(팀)·이름·기술등급 열을 확인하세요.',diag:diagHtml(g)};
+  return {list,cols:{실:dI,팀:tI,이름:nI,기술등급:gI,등급분류기준:cI}};
 }
 
 // ── 프로젝트 일괄 등록 모달 ───────────────────────────
@@ -1178,12 +1196,19 @@ function showStImp(r,note){
   stImpParsed=r.list;
   const byDept=new Map();
   r.list.forEach(s=>{const k=s.dept||'(소속 미지정)';byDept.set(k,(byDept.get(k)||0)+1);});
-  box.innerHTML='<div class="tw"><table><thead><tr><th>소속</th><th>이름</th><th>등급</th><th class="right">단가/MM</th></tr></thead><tbody>'+
-    r.list.slice(0,60).map(s=>'<tr><td>'+esc(s.dept||'-')+'</td><td style="font-weight:650">'+esc(s.name)+'</td>'+
-      '<td>'+GRADES[s.grade]+'</td><td class="right">'+won(rateOf(s.dept,s.grade))+'</td></tr>').join('')+
+  const heads=r.list.filter(x=>x.title).length;
+  box.innerHTML='<div class="tw"><table><thead><tr><th>부서(실)</th><th>부서(팀)</th><th>이름</th>'+
+    '<th>기술등급</th><th class="right">단가/MM</th><th>등급분류기준</th></tr></thead><tbody>'+
+    r.list.slice(0,60).map(s=>'<tr><td>'+esc(s.dept||'-')+'</td>'+
+      '<td>'+(s.title?'<span class="pill warn">'+esc(s.title)+'</span>':esc(s.team||'-'))+'</td>'+
+      '<td style="font-weight:650">'+esc(s.name)+'</td>'+
+      '<td>'+GRADES[s.grade]+'</td><td class="right">'+won(rateOf(s.dept,s.grade))+'</td>'+
+      '<td class="muted">'+esc(s.career||'')+'</td></tr>').join('')+
     '</tbody></table></div><div class="hint">총 '+r.list.length+'명'+
-    (r.list.length>60?' (앞 60명만 표시)':'')+' · 소속별: '+
-    [...byDept.entries()].map(([k,v])=>esc(k)+' '+v+'명').join(', ')+(note?'<br>'+note:'')+'</div>';
+    (r.list.length>60?' (앞 60명만 표시)':'')+(heads?' · 실장 '+heads+'명':'')+' · 부서(실)별: '+
+    [...byDept.entries()].map(([k,v])=>esc(k)+' '+v+'명').join(', ')+
+    '<br><span class="muted">단가가 0인 부서는 단가표에 같은 이름의 소속을 추가하거나 자동 매핑(서비스개발실→서비스개발 등)으로 해석됩니다.</span>'+
+    (note?'<br>'+note:'')+'</div>';
   msg.className='msg';msg.textContent='';
   document.getElementById('stImpSubmit').disabled=false;
 }
@@ -1217,7 +1242,10 @@ document.getElementById('stImpFetchAll').onclick=async()=>{
   try{
     const r=await api('/sheet-all',{method:'POST',body:JSON.stringify({url})});
     const all=[],ok=[],skip=[];const seen=new Set();
-    for(const sh of r.sheets){
+    // '현황' 이 들어간 탭이 있으면 그 탭만 사용 (예: 인력 현황 시트)
+    const target=r.sheets.filter(sh=>/현황/.test(sh.name));
+    const sheets=target.length?target:r.sheets;
+    for(const sh of sheets){
       const p=parseStaffSheet(sh.rows.map(x=>x.join('\t')).join('\n'));
       if(p.error||!p.list||!p.list.length){
         const head=(sh.rows[0]||[]).filter(x=>String(x).trim()).slice(0,8).join(' | ');
@@ -1225,6 +1253,7 @@ document.getElementById('stImpFetchAll').onclick=async()=>{
       ok.push(sh.name+'('+p.list.length+')');
       p.list.forEach(s=>{const k=s.name.trim();if(seen.has(k))return;seen.add(k);all.push(s);});
     }
+    const scopeNote=target.length?'"현황" 탭만 사용: '+target.map(x=>esc(x.name)).join(', ')+'<br>':'';
     const skipHtml=skip.length?'<br><b>건너뛴 탭</b>'+skip.map(x=>
       '<div style="margin:3px 0 3px 8px">· <b>'+esc(x.name)+'</b> — '+esc(x.why)+
       (x.head?'<br><span class="muted" style="font-family:monospace;font-size:11px">머리글: '+esc(x.head)+'</span>':'')+
@@ -1234,7 +1263,7 @@ document.getElementById('stImpFetchAll').onclick=async()=>{
       msg.className='msg err';msg.textContent='✗ 모든 탭에서 직원을 찾지 못했습니다.';return;
     }
     document.getElementById('stImpText').value='';
-    showStImp({list:all},'📑 인식된 탭 '+ok.length+'/'+r.sheets.length+'개: '+ok.join(', ')+skipHtml);
+    showStImp({list:all},scopeNote+'📑 인식된 탭 '+ok.length+'/'+sheets.length+'개: '+ok.join(', ')+skipHtml);
     msg.className='msg ok';msg.textContent='✓ '+ok.length+'개 탭에서 '+all.length+'명을 모았습니다.';
   }catch(e){msg.className='msg err';msg.textContent='✗ '+e.message;}
   finally{btn.disabled=false;}

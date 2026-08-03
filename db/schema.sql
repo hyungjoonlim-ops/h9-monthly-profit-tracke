@@ -33,6 +33,9 @@ create table if not exists h9_staff (
   memo       text,
   created_at timestamptz not null default now()
 );
+alter table h9_staff add column if not exists team text;    -- 부서(팀)
+alter table h9_staff add column if not exists career text;  -- 등급분류기준(경력)
+alter table h9_staff add column if not exists title text;   -- 직책 (부서(팀)이 '-' 이면 실장)
 create index if not exists idx_h9_staff_dept on h9_staff(dept);
 
 -- 프로젝트 — 계약 시점 값과 완료 시점 값을 한 행에 나란히 둔다

@@ -104,6 +104,13 @@
   #delWhat b{color:var(--ink)}
   .val.good{color:var(--good)} .val.warn{color:var(--warn)} .val.bad{color:var(--bad)}
   .tw{overflow-x:auto}
+  /* 행이 많은 표는 일정 높이만 보이고 안에서 스크롤 (머리글은 고정) */
+  .tw.scrolly{overflow-y:auto;overscroll-behavior-y:contain}
+  .tw.scrolly thead th{position:sticky;top:0;z-index:2}
+  .tw.scrolly::-webkit-scrollbar{width:10px;height:10px}
+  .tw.scrolly::-webkit-scrollbar-track{background:var(--panel2);border-radius:5px}
+  .tw.scrolly::-webkit-scrollbar-thumb{background:#38506a;border-radius:5px}
+  .tw.scrolly::-webkit-scrollbar-thumb:hover{background:#4a678a}
   table{width:100%;border-collapse:collapse;font-size:13px}
   th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
   thead th{font-size:11.5px;color:var(--muted);font-weight:600;background:var(--panel2)}
@@ -367,10 +374,11 @@
 <section id="tab-staff" class="hidden">
   <div class="panel">
     <div class="toolbar">
-      <h2>직원 명부 <span class="tag" id="stCount"></span></h2>
+      <h2>직원 명부 <span class="tag" id="stCount"></span>
+        <span class="tag" id="stScrollTip" style="display:none">· 명부 안에서 스크롤</span></h2>
       <div class="sp"><button class="sm" id="btnStImp">구글시트 일괄 등록</button></div>
     </div>
-    <div class="tw">
+    <div class="tw scrolly" id="stWrap">
       <table>
         <thead><tr><th style="min-width:130px">부서(실)</th><th style="min-width:100px">부서(팀)</th>
           <th style="min-width:100px">이름</th><th style="width:110px">기술등급</th>
@@ -544,7 +552,7 @@
 </div>
 
 <script>
-const APP_VERSION='v3.4 · 그래프 폭 고정';
+const APP_VERSION='v3.5 · 명부 10건 스크롤';
 const GRADES=['초급','중급','고급','특급'];
 let projects=[],staff=[],rates={},allRows=[];
 let curId=null,cDraft=[],fDraft=[];
@@ -1296,6 +1304,20 @@ document.getElementById('btnLogs').onclick=async()=>{
 };
 
 // ── 직원 명부 · 단가 ──────────────────────────────────
+// 표를 n행 높이로 제한한다 (행 높이를 재서 계산하므로 글꼴·입력칸 크기가 바뀌어도 맞는다)
+function fitRows(wrapId,n,tipId){
+  const wrap=document.getElementById(wrapId);if(!wrap)return;
+  const tip=tipId?document.getElementById(tipId):null;
+  const tb=wrap.querySelector('tbody'),rows=tb?tb.rows:null;
+  const many=!!rows&&rows.length>n;
+  if(tip)tip.style.display=many?'':'none';
+  if(!many){wrap.style.maxHeight='';return;}                   // n행 이하면 그대로 다 보여준다
+  const head=wrap.querySelector('thead');
+  const rh=rows[0].getBoundingClientRect().height;
+  const hh=head?head.getBoundingClientRect().height:0;
+  if(!rh)return;                                               // 숨어 있으면 0 — 보일 때 다시 계산된다
+  wrap.style.maxHeight=Math.round(hh+rh*n+2)+'px';
+}
 function renderStaff(){
   document.getElementById('stCount').textContent=staff.length+'명';
   const body=document.getElementById('stBody');
@@ -1339,6 +1361,7 @@ function renderStaff(){
   document.getElementById('deptList').innerHTML=Object.keys(rates).map(d=>'<option value="'+esc(d)+'">').join('');
   const ng=document.getElementById('nsGrade');
   if(!ng.options.length)ng.innerHTML=gradeOptions(1);
+  fitRows('stWrap',10,'stScrollTip');   // 10명까지만 보이고 나머지는 명부 안에서 스크롤
 }
 document.getElementById('btnStAdd').onclick=async()=>{
   const name=document.getElementById('nsName').value.trim();
@@ -1976,7 +1999,13 @@ document.getElementById('btnReset').onclick=async()=>{
 function switchTab(name){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
   ['dash','proj','staff'].forEach(n=>document.getElementById('tab-'+n).classList.toggle('hidden',n!==name));
+  // 숨은 상태에서는 행 높이를 잴 수 없으므로 화면에 보일 때 다시 계산한다
+  if(name==='staff')fitRows('stWrap',10,'stScrollTip');
 }
+// 창 크기가 바뀌면 (줄바꿈으로 행 높이가 달라질 수 있어) 다시 계산
+window.addEventListener('resize',()=>{
+  if(!document.getElementById('tab-staff').classList.contains('hidden'))fitRows('stWrap',10,'stScrollTip');
+});
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   switchTab(t.dataset.tab);
   if(t.dataset.tab==='proj')loadProject();

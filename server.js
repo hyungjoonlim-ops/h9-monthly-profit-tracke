@@ -474,51 +474,103 @@ function parseCsv(text) {
   if (row.some((x) => x.trim() !== '')) rows.push(row);
   return rows;
 }
-const sheetId = (url) => {
-  const m = String(url || '').match(/^https:\/\/docs\.google\.com\/spreadsheets\/d\/([A-Za-z0-9_-]+)/);
-  return m ? m[1] : null;
-};
 const testUrl = (url) =>
   process.env.ALLOW_TEST_SHEET_URL === '1' && /^http:\/\/127\.0\.0\.1[:/]/.test(String(url || ''));
-const shareHint = (status) => (status === 403 || status === 401)
-  ? '시트에 접근할 수 없습니다 (권한 없음). 구글시트에서 [공유] → 일반 액세스를 '
-    + '"링크가 있는 모든 사용자"로 바꾸고 역할은 "뷰어(보기)"로 두세요. 보기 권한만 있으면 읽어옵니다.'
-  : status === 404
-    ? '시트를 찾을 수 없습니다 (HTTP 404). 링크가 올바른지, 삭제되지 않았는지 확인하세요.'
-    : '시트를 읽을 수 없습니다 (HTTP ' + status + '). 잠시 후 다시 시도하거나 공유 설정을 확인하세요.';
+
+// 링크 종류를 판별해 시도할 주소 목록을 만든다
+//  ① 일반 시트         https://docs.google.com/spreadsheets/d/<ID>/edit#gid=0
+//  ② 웹에 게시된 시트   https://docs.google.com/spreadsheets/d/e/2PACX-.../pub?output=csv
+//  ③ Apps Script 웹앱  https://script.google.com/macros/s/.../exec
+function sheetTargets(url, kind) {
+  const u = String(url || '').trim();
+  const gid = (u.match(/[#?&]gid=(\d+)/) || [])[1] || '0';
+  const out = [];
+  const pub = u.match(/^https:\/\/docs\.google\.com\/spreadsheets\/d\/e\/([A-Za-z0-9_-]+)/);
+  if (pub) {
+    const base = `https://docs.google.com/spreadsheets/d/e/${pub[1]}/pub`;
+    if (kind === 'xlsx') out.push(`${base}?output=xlsx`);
+    out.push(`${base}?gid=${gid}&single=true&output=csv`, `${base}?output=csv`);
+    return { kind: 'published', urls: out };
+  }
+  const normal = u.match(/^https:\/\/docs\.google\.com\/spreadsheets\/d\/([A-Za-z0-9_-]+)/);
+  if (normal) {
+    const id = normal[1];
+    if (kind === 'xlsx') {
+      out.push(`https://docs.google.com/spreadsheets/d/${id}/export?format=xlsx`);
+    } else {
+      out.push(`https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${gid}`);
+      out.push(`https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&gid=${gid}`);
+      out.push(`https://docs.google.com/spreadsheets/d/${id}/pub?gid=${gid}&single=true&output=csv`);
+    }
+    return { kind: 'sheet', urls: out };
+  }
+  if (/^https:\/\/script\.google(usercontent)?\.com\//.test(u)) return { kind: 'script', urls: [u] };
+  if (testUrl(u)) return { kind: 'test', urls: [u] };
+  return { kind: null, urls: [] };
+}
+
+// 시도한 주소별 결과를 모아 원인을 짚어주는 안내문
+function shareHint(tries) {
+  const denied = tries.some((t) => t.status === 401 || t.status === 403 || t.html);
+  const notFound = tries.every((t) => t.status === 404);
+  const detail = ' (시도: ' + tries.map((t) => (t.status || t.err)).join(', ') + ')';
+  if (notFound) return '시트를 찾을 수 없습니다. 링크가 올바른지, 삭제되지 않았는지 확인하세요.' + detail;
+  if (denied) {
+    return '시트를 읽을 수 없습니다 — 아래를 확인해 주세요.' + detail
+      + ' ① 파일이 업로드된 엑셀(.xlsx) 이면 읽을 수 없습니다 → 시트를 열고 [파일] → [Google 스프레드시트로 저장]으로 변환한 뒤 새 링크를 넣으세요.'
+      + ' ② [공유] → 일반 액세스를 "링크가 있는 모든 사용자 · 뷰어"로 설정하세요.'
+      + ' ③ 회사 정책으로 외부 공유가 막혀 있으면 [파일] → [공유] → [웹에 게시]로 CSV 게시 후 그 링크를 넣으세요.'
+      + ' ④ 위 방법이 모두 어려우면 시트 범위를 복사해 아래 칸에 붙여넣으면 됩니다.';
+  }
+  return '시트를 읽을 수 없습니다. 잠시 후 다시 시도하거나 공유 설정을 확인하세요.' + detail;
+}
+
+// 후보 주소를 차례로 시도해 첫 성공을 반환
+async function fetchSheet(url, kind) {
+  const { kind: k, urls } = sheetTargets(url, kind);
+  if (!k) return { error: '구글시트 링크 형식이 아닙니다. https://docs.google.com/spreadsheets/… 링크를 붙여넣어 주세요.' };
+  const tries = [];
+  for (const target of urls) {
+    try {
+      const r = await fetch(target, { redirect: 'follow' });
+      const ct = r.headers.get('content-type') || '';
+      const html = ct.includes('text/html');
+      tries.push({ url: target, status: r.status, html });
+      if (r.ok && !html) return { res: r, url: target };
+    } catch (e) {
+      tries.push({ url: target, err: e.message });
+    }
+  }
+  return { error: shareHint(tries) };
+}
 
 // 탭 하나 (링크의 gid)
 app.post('/api/sheet', async (req, res) => {
   try {
-    const url = String((req.body || {}).url || '').trim();
-    const id = sheetId(url);
-    let target;
-    if (id) {
-      const gid = (url.match(/[#?&]gid=(\d+)/) || [])[1] || '0';
-      target = `https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${gid}`;
-    } else if (testUrl(url)) target = url;
-    else return res.status(400).json({ error: '구글시트 링크 형식이 아닙니다.' });
-    const r = await fetch(target, { redirect: 'follow' });
-    const ct = r.headers.get('content-type') || '';
-    if (!r.ok || ct.includes('text/html')) return res.status(400).json({ error: shareHint(r.status) });
-    res.json({ rows: parseCsv((await r.text()).replace(/^﻿/, '')) });
+    const got = await fetchSheet(String((req.body || {}).url || ''), 'csv');
+    if (got.error) return res.status(400).json({ error: got.error });
+    const text = (await got.res.text()).replace(/^﻿/, '');
+    // Apps Script 웹앱이 JSON 으로 응답하는 경우도 허용
+    if (text.trim().startsWith('[') || text.trim().startsWith('{')) {
+      try {
+        const j = JSON.parse(text);
+        const rows = Array.isArray(j) ? j : (j.rows || j.values || []);
+        if (Array.isArray(rows) && rows.length) {
+          return res.json({ rows: rows.map((r) => (Array.isArray(r) ? r.map((c) => String(c == null ? '' : c)) : [String(r)])) });
+        }
+      } catch (e) { /* CSV 로 계속 */ }
+    }
+    res.json({ rows: parseCsv(text) });
   } catch (e) { res.status(500).json({ error: '시트 가져오기 실패: ' + e.message }); }
 });
 
 // 모든 탭 (xlsx 로 통째로 받아 파싱)
 app.post('/api/sheet-all', async (req, res) => {
   try {
-    const url = String((req.body || {}).url || '').trim();
-    const id = sheetId(url);
-    let target;
-    if (id) target = `https://docs.google.com/spreadsheets/d/${id}/export?format=xlsx`;
-    else if (testUrl(url)) target = url;
-    else return res.status(400).json({ error: '구글시트 링크 형식이 아닙니다.' });
-    const r = await fetch(target, { redirect: 'follow' });
-    const ct = r.headers.get('content-type') || '';
-    if (!r.ok || ct.includes('text/html')) return res.status(400).json({ error: shareHint(r.status) });
+    const got = await fetchSheet(String((req.body || {}).url || ''), 'xlsx');
+    if (got.error) return res.status(400).json({ error: got.error });
     const XLSX = (await import('xlsx')).default || (await import('xlsx'));
-    const wb = XLSX.read(Buffer.from(await r.arrayBuffer()), { type: 'buffer' });
+    const wb = XLSX.read(Buffer.from(await got.res.arrayBuffer()), { type: 'buffer' });
     res.json({
       sheets: wb.SheetNames.map((name) => ({
         name,

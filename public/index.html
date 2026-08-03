@@ -342,7 +342,7 @@
   <div class="modal">
     <h3>프로젝트 일괄 등록 (구글시트)</h3>
     <div class="row" style="align-items:flex-end;margin-bottom:10px">
-      <div class="field grow"><label>구글시트 링크 — 공유 <b>"링크가 있는 모든 사용자 · 뷰어(보기)"</b> 로 설정하면 읽어옵니다</label>
+      <div class="field grow"><label>구글시트 링크 — 공유 <b>"링크가 있는 모든 사용자 · 뷰어(보기)"</b> 또는 <b>웹에 게시</b> 링크</label>
         <input id="impUrl" placeholder="https://docs.google.com/spreadsheets/d/…"></div>
       <button class="ghost" id="impFetch">현재 탭만</button>
       <button id="impFetchAll">모든 탭 일괄</button>
@@ -368,7 +368,7 @@
   <div class="modal" style="max-width:700px">
     <h3>직원 명부 일괄 등록 (구글시트)</h3>
     <div class="row" style="align-items:flex-end;margin-bottom:10px">
-      <div class="field grow"><label>구글시트 링크 — 공유 <b>"링크가 있는 모든 사용자 · 뷰어(보기)"</b> 로 설정하면 읽어옵니다</label>
+      <div class="field grow"><label>구글시트 링크 — 공유 <b>"링크가 있는 모든 사용자 · 뷰어(보기)"</b> 또는 <b>웹에 게시</b> 링크</label>
         <input id="stImpUrl" placeholder="https://docs.google.com/spreadsheets/d/…"></div>
       <button class="ghost" id="stImpFetch">현재 탭만</button>
       <button id="stImpFetchAll">모든 탭 일괄</button>
@@ -413,7 +413,7 @@
 </div>
 
 <script>
-const APP_VERSION='v2.5 · 인건비 변동 서술';
+const APP_VERSION='v2.6 · 시트 읽기 경로 다중화';
 const GRADES=['초급','중급','고급','특급'];
 let projects=[],staff=[],rates={},allRows=[];
 let curId=null,cDraft=[],fDraft=[];

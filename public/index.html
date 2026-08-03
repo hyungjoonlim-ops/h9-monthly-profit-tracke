@@ -57,6 +57,11 @@
   .card .lbl .tag{margin-left:4px}
   /* 진행중 프로젝트의 잠정 변동 — 확정값과 구분해 흐리게 */
   .prov{opacity:.55;font-size:11px;white-space:nowrap}
+  /* 삭제 확인 창 */
+  #delBox h3{color:var(--bad);margin:0 0 10px;font-size:15px}
+  #delWhat{font-size:13.5px;line-height:1.7;background:var(--panel2);border:1px solid var(--line);
+    border-radius:7px;padding:10px 12px;margin-bottom:8px;word-break:break-all}
+  #delWhat b{color:var(--ink)}
   .val.good{color:var(--good)} .val.warn{color:var(--warn)} .val.bad{color:var(--bad)}
   .tw{overflow-x:auto}
   table{width:100%;border-collapse:collapse;font-size:13px}
@@ -91,7 +96,11 @@
   .phase .row .field{min-width:0}
   /* 라벨은 한 줄로 — 두 카드의 입력칸 높이가 어긋나지 않게 */
   .phase .row label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  @media (max-width:820px){.phase .row{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  /* 좁아져도 4열을 유지해 완료(정산) 월이 첫 줄에 남게 한다 (칸만 좁아진다).
+     month 입력칸은 기본 최소 폭이 있어 따로 풀어 준다 */
+  .phase .row input[type=month]{min-width:0;padding-left:6px;padding-right:4px}
+  @media (max-width:1100px){.phase .row{gap:8px}}
+  @media (max-width:600px){.phase .row{grid-template-columns:repeat(2,minmax(0,1fr))}}
   .phase select,.phase input{min-width:0}
   .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;
     justify-content:center;z-index:100;padding:20px}
@@ -332,7 +341,8 @@
   <div class="panel">
     <div class="toolbar">
       <h2>소속별 · 등급별 단가표 <span class="tag">원/MM</span></h2>
-      <div class="sp"><button class="sm" id="btnRtImp">단가표 일괄 등록</button></div>
+      <div class="sp"><button class="ghost sm" id="btnRtFill">직원 소속 채우기</button>
+        <button class="sm" id="btnRtImp">단가표 일괄 등록</button></div>
     </div>
     <div class="tw">
       <table>
@@ -456,6 +466,17 @@
   </div>
 </div>
 
+<!-- 모달: 삭제 확인 (모든 삭제 동작이 이 창을 거친다) -->
+<div class="modal-bg" id="delModal">
+  <div class="modal" id="delBox" style="max-width:420px">
+    <h3 id="delTitle">정말 삭제하시겠습니까?</h3>
+    <div id="delWhat"></div>
+    <div class="hint" id="delNote">삭제하면 되돌릴 수 없습니다.</div>
+    <div class="btns"><button class="ghost" id="delNo">취소</button>
+      <button class="danger" id="delYes">삭제</button></div>
+  </div>
+</div>
+
 <!-- 모달: 비밀번호 변경 -->
 <div class="modal-bg" id="pwModal">
   <form class="modal" id="pwForm" style="max-width:380px">
@@ -469,7 +490,7 @@
 </div>
 
 <script>
-const APP_VERSION='v3.0 · 진행중/완료 구분 집계';
+const APP_VERSION='v3.1 · 삭제 확인창';
 const GRADES=['초급','중급','고급','특급'];
 let projects=[],staff=[],rates={},allRows=[];
 let curId=null,cDraft=[],fDraft=[];
@@ -501,6 +522,8 @@ function deltaHtml(d,unit){
             :'<span class="delta down">▼ '+d.toFixed(1)+u+'</span>';
 }
 const normDept=t=>String(t||'').replace(/\s|\(.*?\)/g,'').toLowerCase();
+// 이름 비교용 키 — 앞뒤·중간 공백과 대소문자 차이를 무시 (서버의 판정 규칙과 동일)
+const key=t=>String(t==null?'':t).replace(/\s+/g,' ').trim().toLowerCase();
 // 소속 이름 해석 — 단가표에 없는 표기(GUI·BE·FE·DEV·QA·PUB 등)를 매핑
 // 소속 표기 → 단가표 소속 매핑 (단가표에 같은 이름이 있으면 그것이 우선)
 const DEPT_ALIAS=(()=>{
@@ -546,6 +569,34 @@ function initMyName(){
   el.onchange=()=>{localStorage.setItem('h9_user',el.value.trim());renderDash();};
   el.onblur=el.onchange;
 }
+// ── 삭제 확인 ─────────────────────────────────────────
+// 모든 삭제는 이 창을 거친다. 무엇을 지우는지 보여주고 '삭제' 를 눌러야 진행된다.
+//   await askDelete({what:'<b>홍길동</b> 직원', note:'...'})  → true / false
+let delResolve=null;
+function askDelete(o){
+  const opt=typeof o==='string'?{what:o}:(o||{});
+  document.getElementById('delTitle').textContent=opt.title||'정말 삭제하시겠습니까?';
+  document.getElementById('delWhat').innerHTML=opt.what||'';
+  document.getElementById('delNote').textContent=opt.note||'삭제하면 되돌릴 수 없습니다.';
+  document.getElementById('delYes').textContent=opt.ok||'삭제';
+  document.getElementById('delModal').classList.add('show');
+  document.getElementById('delNo').focus();
+  return new Promise(res=>{delResolve=res;});
+}
+function closeDelete(ok){
+  document.getElementById('delModal').classList.remove('show');
+  const r=delResolve;delResolve=null;
+  if(r)r(!!ok);
+}
+document.getElementById('delYes').onclick=()=>closeDelete(true);
+document.getElementById('delNo').onclick=()=>closeDelete(false);
+document.getElementById('delModal').onclick=e=>{if(e.target.id==='delModal')closeDelete(false);};
+document.addEventListener('keydown',e=>{
+  if(!delResolve)return;
+  if(e.key==='Escape')closeDelete(false);
+  if(e.key==='Enter'&&document.activeElement!==document.getElementById('delNo'))closeDelete(true);
+});
+
 // 담당 PM 후보 — 소속·팀·직책에 PM 이 들어간 직원만 (이미 지정된 담당 PM 은 항상 유지)
 const isPm=s=>['dept','team','title'].some(k=>/pm|피엠/i.test(String(s[k]||'')));
 function pmCandidates(){
@@ -815,8 +866,10 @@ function renderPhase(){
     else cDraft[i][f]=pnum(e.target.value);
     renderPhase();renderVs();
   });
-  cb.querySelectorAll('[data-cdel]').forEach(x=>x.onclick=e=>{
-    cDraft.splice(+e.target.dataset.cdel,1);renderPhase();renderVs();});
+  cb.querySelectorAll('[data-cdel]').forEach(x=>x.onclick=async e=>{
+    const i=+e.target.dataset.cdel;
+    if(!await askDelete(rowDelOpt(cDraft[i],'계약 시점 투입')))return;
+    cDraft.splice(i,1);renderPhase();renderVs();});
 
   // 완료 시점 표
   const fb=document.getElementById('fBody');
@@ -840,8 +893,17 @@ function renderPhase(){
     else fDraft[i][f]=pnum(e.target.value);
     renderPhase();renderVs();
   });
-  fb.querySelectorAll('[data-fdel]').forEach(x=>x.onclick=e=>{
-    fDraft.splice(+e.target.dataset.fdel,1);renderPhase();renderVs();});
+  fb.querySelectorAll('[data-fdel]').forEach(x=>x.onclick=async e=>{
+    const i=+e.target.dataset.fdel;
+    if(!await askDelete(rowDelOpt(fDraft[i],'완료 시점 투입')))return;
+    fDraft.splice(i,1);renderPhase();renderVs();});
+}
+// 투입 행 삭제 확인 문구 — 어떤 행을 지우는지 소속·등급·MM 으로 보여준다
+function rowDelOpt(r,label){
+  const rate=r.rate||rateOf(r.dept,r.grade);
+  return {what:label+' 행<br><b>'+esc(r.dept||'(소속 미지정)')+' · '+GRADES[r.grade]+'</b>'+
+      ' <span class="muted">'+r.mm+'MM · '+won(rate*r.mm)+'</span>',
+    note:'화면에서만 지워집니다. [수익률 저장]을 눌러야 실제로 반영됩니다.'};
 }
 // 인건비 변동을 소속·등급 단위로 비교해 원인을 문장으로 서술
 const gLabel=x=>GRADES[Math.max(0,Math.min(3,Math.round(x)))];
@@ -1015,7 +1077,10 @@ document.getElementById('btnSaveInfo').onclick=async()=>{
 };
 document.getElementById('btnDel').onclick=async()=>{
   const p=curProject();if(!p)return;
-  if(!confirm('"'+p.name+'" 프로젝트와 투입·이력을 모두 삭제할까요? 되돌릴 수 없습니다.'))return;
+  const nC=rowsOf(p.id,'C').length,nF=rowsOf(p.id,'F').length;
+  if(!await askDelete({
+    what:'<b>'+esc(p.name)+'</b>'+(p.code?' <span class="muted">('+esc(p.code)+')</span>':'')+' 프로젝트',
+    note:'계약 투입 '+nC+'행 · 완료 투입 '+nF+'행과 변동 이력까지 함께 삭제됩니다. 되돌릴 수 없습니다.'}))return;
   try{await api('/projects/'+p.id,{method:'DELETE'});curId=null;await refresh();loadProject();}
   catch(e){alert('삭제 실패: '+e.message);}
 };
@@ -1102,7 +1167,9 @@ function renderStaff(){
   });
   body.querySelectorAll('[data-sdel]').forEach(x=>x.onclick=async e=>{
     const id=+e.target.dataset.sdel;const s=staff.find(y=>y.id===id);
-    if(!confirm('"'+(s?s.name:id)+'" 직원을 삭제할까요?'))return;
+    if(!await askDelete({
+      what:'<b>'+esc(s?s.name:id)+'</b>'+(s?' <span class="muted">'+esc([s.dept,s.team,s.title].filter(Boolean).join(' · ')||'-')+' · '+GRADES[s.grade]+'</span>':'')+' 직원',
+      note:'명부에서 삭제됩니다. 투입 이력이 있는 직원은 재직 해제로 남습니다.'}))return;
     try{await api('/staff/'+id,{method:'DELETE'});await refresh();}
     catch(err){alert('삭제 실패: '+err.message);}
   });
@@ -1137,14 +1204,38 @@ function renderRates(){
   body.querySelectorAll('[data-rt]').forEach(el=>el.oninput=e=>{
     commify(e.target);
     rates[e.target.dataset.rt][+e.target.dataset.g]=pnum(e.target.value);});
-  body.querySelectorAll('[data-rtdel]').forEach(x=>x.onclick=e=>{
+  body.querySelectorAll('[data-rtdel]').forEach(x=>x.onclick=async e=>{
     if(Object.keys(rates).length<=1)return;
-    delete rates[e.target.dataset.rtdel];renderRates();renderStaff();});
+    const d=e.target.dataset.rtdel;
+    const used=staff.filter(s=>resolveDept(s.dept)===d).length;
+    if(!await askDelete({what:'단가표의 <b>'+esc(d)+'</b> 소속'+
+        (used?' <span class="muted">(이 단가를 쓰는 직원 '+used+'명)</span>':''),
+      note:'화면에서만 지워집니다. [단가표 저장]을 눌러야 실제로 반영됩니다.'}))return;
+    delete rates[d];renderRates();renderStaff();});
 }
 document.getElementById('btnRtAdd').onclick=()=>{
   const n=document.getElementById('nrDept').value.trim();
   if(!n||rates[n])return;
   rates[n]=[0,0,0,0];document.getElementById('nrDept').value='';renderRates();renderStaff();
+};
+// 직원 명부에 있는 소속 중 단가표에 없는 것을 채운다.
+// CTO·CEO(대표) 직속은 PM 단가를 그대로 복사해 넣고, 그 밖에는 이름이 닮은 소속의 단가를 가져온다.
+document.getElementById('btnRtFill').onclick=()=>{
+  const s=document.getElementById('rtMsg');
+  const pm=rates['PM'];
+  const added=[],blank=[];
+  [...new Set(staff.map(x=>String(x.dept||'').trim()).filter(Boolean))].forEach(d=>{
+    if(rates[d])return;                       // 이미 단가표에 있음
+    const src=resolveDept(d);                 // PM 규칙·별칭·유사도로 찾은 원본 소속
+    if(src&&rates[src]){rates[d]=[...rates[src]];added.push(d+' ← '+src);}
+    else if(pm&&/^(cto|ceo)/.test(normDept(d))){rates[d]=[...pm];added.push(d+' ← PM');}
+    else {rates[d]=[0,0,0,0];blank.push(d);}
+  });
+  renderRates();renderStaff();
+  if(!added.length&&!blank.length){s.className='status';s.textContent='추가할 소속이 없습니다 (명부의 소속이 모두 단가표에 있습니다).';}
+  else{s.className='status';s.textContent='✓ '+(added.length?added.length+'개 소속을 단가 복사로 추가 ('+added.join(', ')+')':'')
+    +(blank.length?(added.length?' · ':'')+blank.length+'개는 단가 0으로 추가 ('+blank.join(', ')+') — 직접 입력하세요':'')
+    +' · [단가표 저장]을 누르세요.';}
 };
 document.getElementById('btnRtSave').onclick=async()=>{
   const s=document.getElementById('rtMsg');s.className='status';s.textContent='저장 중…';
@@ -1544,6 +1635,17 @@ document.getElementById('stImpSubmit').onclick=async()=>{
   const msg=document.getElementById('stImpMsg');const btn=document.getElementById('stImpSubmit');
   btn.disabled=true;msg.className='msg';msg.textContent='등록 중…';
   const replace=document.getElementById('stImpReplace').checked;
+  // 전체 대체는 명부에서 직원이 사라질 수 있으므로 먼저 확인한다
+  if(replace){
+    const names=new Set(stImpParsed.map(s=>key(s.name)));
+    const gone=staff.filter(s=>!names.has(key(s.name)));
+    if(gone.length&&!await askDelete({title:'명부를 전체 대체할까요?',
+      what:'시트에 없는 직원 <b>'+gone.length+'명</b>이 명부에서 빠집니다.<br>'+
+        '<span class="muted">'+gone.slice(0,8).map(s=>esc(s.name)).join(', ')+
+        (gone.length>8?' 외 '+(gone.length-8)+'명':'')+'</span>',
+      note:'투입 이력이 있는 직원은 삭제되지 않고 재직 해제로 남습니다.',ok:'전체 대체'})){
+      btn.disabled=false;msg.textContent='';return;}
+  }
   try{
     const r=await api('/staff/bulk',{method:'POST',body:JSON.stringify({list:stImpParsed,replace})});
     msg.className='msg ok';
@@ -1683,7 +1785,13 @@ document.getElementById('btnReset').onclick=async()=>{
   const msg=document.getElementById('rsMsg');msg.className='msg';
   if(document.getElementById('rsConfirm').value.trim()!=='초기화'){
     msg.className='msg err';msg.textContent='✗ 확인 문구에 "초기화"를 정확히 입력하세요.';return;}
-  if(!confirm('프로젝트·투입·이력을 모두 삭제합니다. 되돌릴 수 없습니다. 계속할까요?'))return;
+  const rsS=document.getElementById('rsStaff').checked,rsR=document.getElementById('rsRates').checked;
+  if(!await askDelete({title:'정말 초기화하시겠습니까?',
+    what:'프로젝트 <b>'+projects.length+'건</b>과 투입·변동 이력 전체'+
+      (rsS?'<br>직원 명부 <b>'+staff.length+'명</b>':'')+
+      (rsR?'<br>단가표 <b>'+Object.keys(rates).length+'개 소속</b>':'')+
+      (!rsS&&!rsR?'<br><span class="muted">직원 명부와 단가표는 그대로 둡니다</span>':''),
+    note:'모두 삭제되며 되돌릴 수 없습니다.',ok:'초기화'}))return;
   const btn=document.getElementById('btnReset');btn.disabled=true;msg.textContent='초기화 중…';
   try{
     const r=await api('/reset',{method:'POST',body:JSON.stringify({confirm:'초기화',

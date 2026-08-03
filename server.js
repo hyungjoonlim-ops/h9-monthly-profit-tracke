@@ -100,6 +100,9 @@ const YM = /^\d{4}-\d{2}$/;
 const ym = (v) => (YM.test(String(v || '')) ? v : null);
 const gr = (v) => Math.max(0, Math.min(3, Math.round(num(v))));
 const txt = (v) => (v == null || String(v).trim() === '' ? null : String(v).trim());
+// 일괄 등록 중복 판정용 키 — 앞뒤·중간 공백과 대소문자 차이를 무시한다
+// ('이즐  충전소 운영' 과 '이즐 충전소 운영' 을 같은 것으로 본다)
+const key = (v) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim().toLowerCase();
 
 const mapProject = (r) => ({
   id: Number(r.id), code: r.code || '', name: r.name, client: r.client || '',
@@ -208,15 +211,28 @@ app.post('/api/staff/bulk', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const before = await client.query('SELECT id, name FROM h9_staff');
-    const byName = new Map(before.rows.map((r) => [r.name.trim(), Number(r.id)]));
+    const before = await client.query('SELECT id, name FROM h9_staff ORDER BY id');
+    // 동명이인이 있을 수 있으므로 이름 → id 목록(큐)으로 둔다.
+    // 같은 이름이 시트에 2번 나오면 기존 2개 행에 차례로 매칭돼 중복 생성되지 않는다.
+    const byName = new Map();
+    before.rows.forEach((r) => {
+      const k = key(r.name);
+      if (!byName.has(k)) byName.set(k, []);
+      byName.get(k).push(Number(r.id));
+    });
     const kept = new Set();
-    let added = 0, changed = 0;
+    let added = 0, changed = 0, skipped = 0;
+    // 시트 안에서 완전히 같은 내용이 반복되면 한 번만 반영한다
+    const seen = new Set();
     for (const s of list) {
       const name = txt(s.name);
       if (!name) continue;
-      const found = byName.get(name);
-      if (found && !kept.has(found)) {
+      const dup = [key(name), key(s.dept), key(s.team), gr(s.grade)].join('|');
+      if (seen.has(dup)) { skipped++; continue; }
+      seen.add(dup);
+      const queue = byName.get(key(name)) || [];
+      const found = queue.find((id) => !kept.has(id));
+      if (found) {
         await client.query(
           `UPDATE h9_staff SET dept=$1, team=$2, grade=$3,
                   career=COALESCE($4,career), title=$5, active=true WHERE id=$6`,
@@ -246,7 +262,7 @@ app.post('/api/staff/bulk', async (req, res) => {
       }
     }
     await client.query('COMMIT');
-    res.json({ ok: true, added, changed, removed, deactivated });
+    res.json({ ok: true, added, changed, removed, deactivated, skipped });
   } catch (e) {
     await client.query('ROLLBACK');
     res.status(500).json({ error: e.message });
@@ -388,8 +404,41 @@ app.post('/api/projects/:id/logs', async (req, res) => {
 
 // ══ 프로젝트 일괄 등록 (구글시트) ══════════════════════
 // [{name, client, projType, status, startYm, endYm, cAmount, rows:[{dept,grade,mm,rate}]}]
+// 한 번의 일괄 등록 안에서 같은 프로젝트가 여러 번(여러 탭 등) 나오면 하나로 합친다.
+// 번호가 같으면 같은 프로젝트, 번호가 없으면 이름으로 판단한다.
+function mergeImports(list) {
+  const out = [];
+  const byKey = new Map();
+  let merged = 0;
+  for (const p of list) {
+    const name = txt(p.name);
+    if (!name) continue;
+    const code = txt(p.code);
+    const kCode = code ? 'c:' + key(code) : null;
+    const kName = 'n:' + key(name);
+    const hit = (kCode && byKey.get(kCode)) || byKey.get(kName);
+    if (!hit) {
+      const t = { ...p, name, code, rows: Array.isArray(p.rows) ? [...p.rows] : [] };
+      out.push(t);
+      byKey.set(kName, t);
+      if (kCode) byKey.set(kCode, t);
+      continue;
+    }
+    merged++;
+    // 비어 있는 항목만 뒤에 나온 값으로 채우고, 투입 행은 이어 붙인다
+    for (const f of ['client', 'projType', 'status', 'pm', 'startYm', 'endYm']) {
+      if (!txt(hit[f]) && txt(p[f])) hit[f] = p[f];
+    }
+    if (!(num(hit.cAmount) > 0) && num(p.cAmount) > 0) hit.cAmount = p.cAmount;
+    if (!txt(hit.code) && code) { hit.code = code; byKey.set('c:' + key(code), hit); }
+    if (Array.isArray(p.rows)) hit.rows.push(...p.rows);
+  }
+  return { list: out, merged };
+}
+
 app.post('/api/projects/import', async (req, res) => {
-  const list = Array.isArray(req.body) ? req.body : [];
+  const raw = Array.isArray(req.body) ? req.body : [];
+  const { list, merged } = mergeImports(raw);
   if (!list.length) return res.status(400).json({ error: '가져올 프로젝트가 없습니다.' });
   const client = await pool.connect();
   try {
@@ -399,10 +448,17 @@ app.post('/api/projects/import', async (req, res) => {
       const name = txt(p.name);
       if (!name) continue;
       const code = txt(p.code);
-      // 프로젝트번호가 있으면 번호로, 없으면 이름으로 기존 프로젝트를 찾는다
-      const found = code
+      // 기존 프로젝트 찾기 — ① 프로젝트번호 ② 이름(공백·대소문자 무시)
+      // 번호로 못 찾아도 같은 이름이 이미 있으면 그것을 갱신하므로 중복 생성되지 않는다
+      let found = code
         ? await client.query('SELECT id FROM h9_projects WHERE code=$1', [code])
-        : await client.query('SELECT id FROM h9_projects WHERE name=$1', [name]);
+        : { rows: [] };
+      if (!found.rows[0]) {
+        found = await client.query(
+          `SELECT id FROM h9_projects
+            WHERE lower(btrim(regexp_replace(name, '\\s+', ' ', 'g'))) = $1
+            ORDER BY id LIMIT 1`, [key(name)]);
+      }
       let pid;
       if (found.rows[0]) {
         pid = Number(found.rows[0].id);
@@ -445,7 +501,7 @@ app.post('/api/projects/import', async (req, res) => {
       }
     }
     await client.query('COMMIT');
-    res.json({ ok: true, created, updated, rowCount });
+    res.json({ ok: true, created, updated, rowCount, merged });
   } catch (e) {
     await client.query('ROLLBACK');
     res.status(500).json({ error: e.message });

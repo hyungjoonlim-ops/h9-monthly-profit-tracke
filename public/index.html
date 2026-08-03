@@ -22,7 +22,7 @@
   .tab{padding:10px 18px;cursor:pointer;font-size:13.5px;color:var(--ink2);border-bottom:2px solid transparent}
   .tab:hover{color:var(--ink)}
   .tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
-  main{padding:20px 24px 60px;max-width:1500px}
+  main{padding:20px 24px 60px;max-width:1840px}
   section.hidden{display:none}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:16px}
   .panel.danger{border-color:#7a3b34}
@@ -53,6 +53,10 @@
   .card .lbl{font-size:11.5px;color:var(--muted);margin-bottom:6px}
   .card .val{font-size:23px;font-weight:750;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
   .card .foot{font-size:11.5px;color:var(--muted);margin-top:4px}
+  .card .val .unit{font-size:13px;font-weight:600;color:var(--muted);margin-left:2px}
+  .card .lbl .tag{margin-left:4px}
+  /* 진행중 프로젝트의 잠정 변동 — 확정값과 구분해 흐리게 */
+  .prov{opacity:.55;font-size:11px;white-space:nowrap}
   .val.good{color:var(--good)} .val.warn{color:var(--warn)} .val.bad{color:var(--bad)}
   .tw{overflow-x:auto}
   table{width:100%;border-collapse:collapse;font-size:13px}
@@ -75,13 +79,19 @@
   .status{font-size:12.5px;color:var(--muted)} .status.err{color:var(--bad)}
   .del-x{color:var(--bad);cursor:pointer;font-weight:700;padding:0 4px}
   .two{display:grid;grid-template-columns:1fr;gap:16px}
-  @media (min-width:1750px){.two{grid-template-columns:1fr 1fr}}
+  @media (min-width:1500px){.two{grid-template-columns:1fr 1fr}}
   .phase{border:1px solid var(--line);border-radius:9px;padding:14px;background:var(--panel)}
   .phase.c{border-left:3px solid var(--warn)}
   .phase.f{border-left:3px solid var(--accent)}
   .phase h3{font-size:13.5px;margin:0 0 12px;font-weight:700;display:flex;gap:8px;align-items:center}
   .phase .tw table{min-width:620px}
-  .phase .row{margin-bottom:2px}
+  /* 두 시점 카드의 입력칸을 같은 4열 그리드로 맞춘다
+     (계약 시점은 4번째 칸이 비고, 완료 시점은 그 자리에 완료(정산) 월이 들어간다) */
+  .phase .row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:2px}
+  .phase .row .field{min-width:0}
+  /* 라벨은 한 줄로 — 두 카드의 입력칸 높이가 어긋나지 않게 */
+  .phase .row label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  @media (max-width:820px){.phase .row{grid-template-columns:repeat(2,minmax(0,1fr))}}
   .phase select,.phase input{min-width:0}
   .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;
     justify-content:center;z-index:100;padding:20px}
@@ -117,7 +127,7 @@
 <!-- ═══════════ 대시보드 ═══════════ -->
 <section id="tab-dash">
   <div class="panel">
-    <h2>전체 요약 <span class="tag">계약 시점 대비 완료 시점</span></h2>
+    <h2>전체 요약 <span class="tag">완료 수익률·변동은 상태가 '완료'인 프로젝트만 집계 (진행중은 잠정치)</span></h2>
     <div class="cards" id="dashCards"></div>
   </div>
 
@@ -148,15 +158,17 @@
         <tfoot><tr id="dashFoot"></tr></tfoot>
       </table>
     </div>
-    <div class="hint">행을 클릭하면 그 프로젝트의 수익률 입력 화면으로 이동합니다. 계약 수익률은 계약 시점 투입계획으로 산출한 기준값이고, 완료 수익률은 실제 투입·매출로 산출한 결과값입니다.</div>
+    <div class="hint">행을 클릭하면 그 프로젝트의 수익률 입력 화면으로 이동합니다. 계약 수익률은 계약 시점 투입계획으로 산출한 기준값이고, 완료 수익률은 실제 투입·매출로 산출한 결과값입니다.
+      <b>상태가 '진행중'인 프로젝트의 변동은 아직 확정이 아니므로 <span class="prov">잠정</span> 으로 표시되고 합계·요약에서 제외됩니다.</b> 최종 변동을 반영하려면 상태를 '완료'로 바꿔 주세요.</div>
   </div>
 
   <div class="panel">
-    <h2>유형별 수익률 <span class="tag">정산 형태 기준</span></h2>
+    <h2>유형별 수익률 <span class="tag">정산 형태 기준 · 완료 수익률과 변동은 완료 프로젝트만 집계</span></h2>
     <div class="tw">
       <table>
         <thead><tr>
-          <th>유형</th><th class="right">건수</th><th class="right">계약액 합계</th>
+          <th>유형</th><th class="right">건수</th><th class="right">진행중 / 완료</th>
+          <th class="right">계약액 합계</th>
           <th class="right">계약 수익률</th><th class="right">완료 수익률</th><th class="right">변동</th>
         </tr></thead>
         <tbody id="typeBody"></tbody>
@@ -179,7 +191,7 @@
     <div class="row">
       <div class="field" style="max-width:130px"><label>프로젝트번호</label><input id="fCode" placeholder="예: C-2601"></div>
       <div class="field grow"><label>프로젝트명 *</label><input id="fName" placeholder="예: 이즐 충전소 운영"></div>
-      <div class="field"><label>클라이언트</label><input id="fClient"></div>
+      <div class="field"><label>클라이언트</label><input id="fClient" list="clientList" placeholder="고객사"></div>
       <div class="field"><label>담당 PM</label><input id="fPm" list="pmList" placeholder="담당자"></div>
       <div class="field"><label>유형 (정산 형태)</label><input id="fType" placeholder="예: 월 정산"></div>
       <div class="field"><label>상태</label><select id="fStatus"><option>진행중</option><option>완료</option><option>보류</option></select></div>
@@ -193,6 +205,7 @@
       <span class="status" id="lastEdit" style="margin-left:auto"></span>
     </div>
     <datalist id="pmList"></datalist>
+    <datalist id="clientList"></datalist>
   </div>
 
   <div class="cards" id="vsCards"></div>
@@ -202,7 +215,7 @@
     <div class="phase c">
       <h3>① 계약 시점 (기준) <span class="pill warn">고정 기준</span></h3>
       <div class="row">
-        <div class="field" style="min-width:200px"><label>계약액 (VAT 제외)</label><input id="cAmount" class="num" inputmode="numeric" value="0"></div>
+        <div class="field"><label>계약액 (VAT 제외)</label><input id="cAmount" class="num" inputmode="numeric" value="0"></div>
         <div class="field"><label>외주비</label><input id="cOut" class="num" inputmode="numeric" value="0"></div>
         <div class="field"><label>부대비</label><input id="cEtc" class="num" inputmode="numeric" value="0"></div>
       </div>
@@ -227,7 +240,7 @@
     <div class="phase f">
       <h3>② 완료 시점 (실적) <span class="pill flat">실제 결과</span></h3>
       <div class="row">
-        <div class="field" style="min-width:200px"><label>실제 매출 (0 = 계약액과 동일)</label><input id="fRev" class="num" inputmode="numeric" value="0"></div>
+        <div class="field"><label title="0으로 두면 계약액과 동일하게 봅니다">실제 매출 (0 = 계약액)</label><input id="fRev" class="num" inputmode="numeric" value="0"></div>
         <div class="field"><label>외주비</label><input id="fOut" class="num" inputmode="numeric" value="0"></div>
         <div class="field"><label>부대비</label><input id="fEtc" class="num" inputmode="numeric" value="0"></div>
         <div class="field"><label>완료(정산) 월</label><input type="month" id="fClosed"></div>
@@ -456,7 +469,7 @@
 </div>
 
 <script>
-const APP_VERSION='v2.9 · CTO·CEO직속 PM 단가';
+const APP_VERSION='v3.0 · 진행중/완료 구분 집계';
 const GRADES=['초급','중급','고급','특급'];
 let projects=[],staff=[],rates={},allRows=[];
 let curId=null,cDraft=[],fDraft=[];
@@ -533,9 +546,24 @@ function initMyName(){
   el.onchange=()=>{localStorage.setItem('h9_user',el.value.trim());renderDash();};
   el.onblur=el.onchange;
 }
+// 담당 PM 후보 — 소속·팀·직책에 PM 이 들어간 직원만 (이미 지정된 담당 PM 은 항상 유지)
+const isPm=s=>['dept','team','title'].some(k=>/pm|피엠/i.test(String(s[k]||'')));
+function pmCandidates(){
+  const assigned=projects.map(p=>p.pm).filter(Boolean);
+  let names=staff.filter(isPm).map(s=>s.name);
+  if(names.length===0&&assigned.length===0)names=staff.map(s=>s.name); // PM 소속이 없으면 전체 표시
+  return [...new Set([...names,...assigned])].sort((a,b)=>a.localeCompare(b,'ko'));
+}
 function renderPmList(){
-  const names=[...new Set([...staff.map(s=>s.name),...projects.map(p=>p.pm).filter(Boolean)])];
-  document.getElementById('pmList').innerHTML=names.map(n=>'<option value="'+esc(n)+'">').join('');
+  document.getElementById('pmList').innerHTML=
+    pmCandidates().map(n=>'<option value="'+esc(n)+'">').join('');
+}
+// 클라이언트 후보 — 등록된 프로젝트에 있는 고객사만 (가나다 정렬)
+function renderClientList(){
+  const names=[...new Set(projects.map(p=>(p.client||'').trim()).filter(Boolean))]
+    .sort((a,b)=>a.localeCompare(b,'ko'));
+  document.getElementById('clientList').innerHTML=
+    names.map(n=>'<option value="'+esc(n)+'">').join('');
 }
 function setConn(ok,msg){
   document.getElementById('dot').className='dot '+(ok?'on':'off');
@@ -567,29 +595,57 @@ function finalStats(p,draft){
 const curProject=()=>projects.find(p=>p.id===curId)||null;
 
 // ── 대시보드 ──────────────────────────────────────────
+// 진행중 프로젝트는 아직 최종 실적이 아니므로 완료 수익률·변동 집계에서 제외한다.
+// (화면에는 '잠정' 으로만 보여주고 요약·합계 수치에는 넣지 않는다)
+const isDone=p=>p.status==='완료';
+const pctOf=(rev,cost)=>rev>0?(rev-cost)/rev*100:null;
+function aggregate(list){
+  let cAmt=0,cCost=0,fRev=0,fCost=0,bAmt=0,bCost=0,doneWith=0,ongoing=0;
+  list.forEach(p=>{
+    const c=contractStats(p),fs=finalStats(p);
+    if(p.cAmount>0){cAmt+=p.cAmount;cCost+=c.cost;}
+    if(isDone(p)){
+      if(fs.has&&fs.revenue>0){
+        fRev+=fs.revenue;fCost+=fs.cost;doneWith++;
+        // 변동은 같은(완료된) 프로젝트의 계약 기준과 비교해야 의미가 있다
+        if(p.cAmount>0){bAmt+=p.cAmount;bCost+=c.cost;}
+      }
+    }else if(p.status==='진행중')ongoing++;
+  });
+  const cM=pctOf(cAmt,cCost),fM=pctOf(fRev,fCost),bM=pctOf(bAmt,bCost);
+  return {cAmt,cCost,fRev,fCost,cM,fM,bM,
+    delta:(bM!=null&&fM!=null)?fM-bM:null,doneWith,ongoing};
+}
 function renderDash(){
   const f=document.getElementById('dashFilter').value;
   const mine=document.getElementById('dashMine').checked;
   const me=myName();
   const list=projects.filter(p=>(f==='all'||p.status===f)
     &&(!mine||!me||String(p.pm||'').trim()===me));
-  let cAmt=0,cCost=0,fRev=0,fCost=0,done=0;
-  projects.forEach(p=>{
-    const c=contractStats(p),fs=finalStats(p);
-    if(p.cAmount>0){cAmt+=p.cAmount;cCost+=c.cost;}
-    if(fs.has&&fs.revenue>0){fRev+=fs.revenue;fCost+=fs.cost;done++;}
-  });
-  const cM=cAmt>0?(cAmt-cCost)/cAmt*100:null;
-  const fM=fRev>0?(fRev-fCost)/fRev*100:null;
+  const a=aggregate(projects);
+  const nOn=projects.filter(p=>p.status==='진행중').length;
+  const nDone=projects.filter(isDone).length;
+  const nHold=projects.filter(p=>p.status==='보류').length;
+  const onAmt=projects.filter(p=>p.status==='진행중').reduce((s,p)=>s+p.cAmount,0);
+  const onM=(()=>{const o=projects.filter(p=>p.status==='진행중');
+    let r=0,c=0;o.forEach(p=>{if(p.cAmount>0){r+=p.cAmount;c+=contractStats(p).cost;}});
+    return pctOf(r,c);})();
   document.getElementById('dashCards').innerHTML=
     '<div class="card"><div class="lbl">등록 프로젝트</div><div class="val">'+projects.length+'</div>'+
-      '<div class="foot">진행중 '+projects.filter(p=>p.status==='진행중').length+' · 완료 '+projects.filter(p=>p.status==='완료').length+'</div></div>'+
-    '<div class="card"><div class="lbl">계약액 합계</div><div class="val">'+won(cAmt)+'</div>'+
-      '<div class="foot">계약 원가 '+won(cCost)+'</div></div>'+
-    '<div class="card"><div class="lbl">계약 기준 수익률</div><div class="val '+cls(cM)+'">'+(cM!=null?cM.toFixed(1)+'%':'-')+'</div>'+
+      '<div class="foot">진행중 '+nOn+' · 완료 '+nDone+(nHold?' · 보류 '+nHold:'')+'</div></div>'+
+    '<div class="card"><div class="lbl">진행중</div><div class="val">'+nOn+'<span class="unit">건</span></div>'+
+      '<div class="foot">계약액 '+won(onAmt)+(onM!=null?' · 계약 기준 '+onM.toFixed(1)+'%':'')+'</div></div>'+
+    '<div class="card"><div class="lbl">완료</div><div class="val">'+nDone+'<span class="unit">건</span></div>'+
+      '<div class="foot">'+(nDone?'실적 입력 '+a.doneWith+'건 / '+nDone+'건':'완료된 프로젝트 없음')+'</div></div>'+
+    '<div class="card"><div class="lbl">계약액 합계</div><div class="val">'+won(a.cAmt)+'</div>'+
+      '<div class="foot">계약 원가 '+won(a.cCost)+'</div></div>'+
+    '<div class="card"><div class="lbl">계약 기준 수익률</div><div class="val '+cls(a.cM)+'">'+(a.cM!=null?a.cM.toFixed(1)+'%':'-')+'</div>'+
       '<div class="foot">전 프로젝트 가중 평균</div></div>'+
-    '<div class="card hl"><div class="lbl">완료 시점 수익률</div><div class="val '+cls(fM)+'">'+(fM!=null?fM.toFixed(1)+'%':'-')+'</div>'+
-      '<div class="foot">'+(cM!=null&&fM!=null?'계약 대비 '+deltaHtml(fM-cM):'실적 입력 '+done+'건')+'</div></div>';
+    '<div class="card hl"><div class="lbl">완료 수익률 <span class="tag">완료 '+a.doneWith+'건</span></div>'+
+      '<div class="val '+cls(a.fM)+'">'+(a.fM!=null?a.fM.toFixed(1)+'%':'-')+'</div>'+
+      '<div class="foot">'+(a.delta!=null
+        ?'같은 프로젝트 계약 기준 '+a.bM.toFixed(1)+'% 대비 '+deltaHtml(a.delta)
+        :'완료 프로젝트의 실적이 입력되면 표시됩니다')+'</div></div>';
 
   const body=document.getElementById('dashBody');
   document.getElementById('pjCount').textContent=list.length+'건';
@@ -598,6 +654,10 @@ function renderDash(){
   body.innerHTML=list.map(p=>{
     const c=contractStats(p),fs=finalStats(p);
     const d=(c.margin!=null&&fs.margin!=null)?fs.margin-c.margin:null;
+    // 진행중이면 아직 최종 변동이 아니므로 '잠정' 으로 표시하고 합계에서는 뺀다
+    const dCell=d==null?'<span class="delta flat">–</span>'
+      :isDone(p)?deltaHtml(d)
+      :'<span class="prov" title="진행중 — 잠정치이며 요약·합계에서 제외됩니다">'+deltaHtml(d)+' 잠정</span>';
     return '<tr class="clickable" data-go="'+p.id+'">'+
       '<td class="muted">'+esc(p.code||'-')+'</td>'+
       '<td style="font-weight:650">'+esc(p.name)+'</td>'+
@@ -609,56 +669,55 @@ function renderDash(){
       '<td class="right">'+(c.margin!=null?'<span class="pill '+cls(c.margin)+'">'+c.margin.toFixed(1)+'%</span>':'-')+'</td>'+
       '<td class="right">'+(fs.has?won(fs.revenue):'-')+'</td>'+
       '<td class="right">'+(fs.margin!=null?'<span class="pill '+cls(fs.margin)+'">'+fs.margin.toFixed(1)+'%</span>':'-')+'</td>'+
-      '<td class="right">'+deltaHtml(d)+'</td>'+
+      '<td class="right">'+dCell+'</td>'+
       '<td class="muted">'+esc(p.reason||'')+'</td></tr>';
   }).join('');
   body.querySelectorAll('[data-go]').forEach(tr=>tr.onclick=()=>{
     curId=+tr.dataset.go;switchTab('proj');loadProject();
   });
-  let lc=0,lcc=0,lf=0,lfc=0;
-  list.forEach(p=>{const c=contractStats(p),fs=finalStats(p);
-    if(p.cAmount>0){lc+=p.cAmount;lcc+=c.cost;}
-    if(fs.has&&fs.revenue>0){lf+=fs.revenue;lfc+=fs.cost;}});
-  const m1=lc>0?(lc-lcc)/lc*100:null,m2=lf>0?(lf-lfc)/lf*100:null;
+  // 합계 — 완료 수익률·변동은 목록 중 '완료' 프로젝트만으로 계산
+  const la=aggregate(list);
   document.getElementById('dashFoot').innerHTML=
-    '<td></td><td>합계 '+list.length+'건</td><td></td><td></td><td></td><td></td>'+
-    '<td class="right">'+won(lc)+'</td><td class="right">'+(m1!=null?m1.toFixed(1)+'%':'-')+'</td>'+
-    '<td class="right">'+won(lf)+'</td><td class="right">'+(m2!=null?m2.toFixed(1)+'%':'-')+'</td>'+
-    '<td class="right">'+((m1!=null&&m2!=null)?deltaHtml(m2-m1):'–')+'</td><td></td>';
+    '<td></td><td>합계 '+list.length+'건</td><td></td><td></td><td></td>'+
+    '<td class="muted">완료 '+la.doneWith+'건 기준</td>'+
+    '<td class="right">'+won(la.cAmt)+'</td><td class="right">'+(la.cM!=null?la.cM.toFixed(1)+'%':'-')+'</td>'+
+    '<td class="right">'+won(la.fRev)+'</td><td class="right">'+(la.fM!=null?la.fM.toFixed(1)+'%':'-')+'</td>'+
+    '<td class="right">'+(la.delta!=null?deltaHtml(la.delta):'–')+'</td><td></td>';
   renderTypeDash();
 }
 function renderTypeDash(){
   const map=new Map();
   projects.forEach(p=>{
     const k=(p.projType||'').trim()||'(유형 미지정)';
-    if(!map.has(k))map.set(k,{n:0,cAmt:0,cCost:0,fRev:0,fCost:0});
-    const o=map.get(k);o.n++;
-    const c=contractStats(p),fs=finalStats(p);
-    if(p.cAmount>0){o.cAmt+=p.cAmount;o.cCost+=c.cost;}
-    if(fs.has&&fs.revenue>0){o.fRev+=fs.revenue;o.fCost+=fs.cost;}
+    if(!map.has(k))map.set(k,[]);
+    map.get(k).push(p);
   });
   const body=document.getElementById('typeBody');
-  if(!map.size){body.innerHTML='<tr><td colspan="6" class="empty">데이터가 없습니다.</td></tr>';return;}
-  body.innerHTML=[...map.entries()].sort((a,b)=>b[1].cAmt-a[1].cAmt).map(([k,o])=>{
-    const cM=o.cAmt>0?(o.cAmt-o.cCost)/o.cAmt*100:null;
-    const fM=o.fRev>0?(o.fRev-o.fCost)/o.fRev*100:null;
-    return '<tr><td style="font-weight:650">'+esc(k)+'</td><td class="right">'+o.n+'</td>'+
+  if(!map.size){body.innerHTML='<tr><td colspan="7" class="empty">데이터가 없습니다.</td></tr>';return;}
+  body.innerHTML=[...map.entries()]
+    .map(([k,ps])=>[k,ps,aggregate(ps)])
+    .sort((a,b)=>b[2].cAmt-a[2].cAmt).map(([k,ps,o])=>{
+    const nDone=ps.filter(isDone).length;
+    return '<tr><td style="font-weight:650">'+esc(k)+'</td>'+
+      '<td class="right">'+ps.length+'</td>'+
+      '<td class="right muted">'+o.ongoing+' / '+nDone+'</td>'+
       '<td class="right">'+won(o.cAmt)+'</td>'+
-      '<td class="right">'+(cM!=null?'<span class="pill '+cls(cM)+'">'+cM.toFixed(1)+'%</span>':'-')+'</td>'+
-      '<td class="right">'+(fM!=null?'<span class="pill '+cls(fM)+'">'+fM.toFixed(1)+'%</span>':'-')+'</td>'+
-      '<td class="right">'+((cM!=null&&fM!=null)?deltaHtml(fM-cM):'–')+'</td></tr>';
+      '<td class="right">'+(o.cM!=null?'<span class="pill '+cls(o.cM)+'">'+o.cM.toFixed(1)+'%</span>':'-')+'</td>'+
+      '<td class="right">'+(o.fM!=null?'<span class="pill '+cls(o.fM)+'">'+o.fM.toFixed(1)+'%</span>':'-')+'</td>'+
+      '<td class="right">'+(o.delta!=null?deltaHtml(o.delta):'–')+'</td></tr>';
   }).join('');
 }
 document.getElementById('dashFilter').onchange=renderDash;
 document.getElementById('dashMine').onchange=renderDash;
 document.getElementById('btnCsv').onclick=()=>{
-  const rows=[['번호','프로젝트','담당PM','클라이언트','유형','상태','계약액','계약수익률(%)','완료매출','완료수익률(%)','변동(%p)','사유']];
+  const rows=[['번호','프로젝트','담당PM','클라이언트','유형','상태','계약액','계약수익률(%)','완료매출','완료수익률(%)','변동(%p)','변동확정','사유']];
   projects.forEach(p=>{
     const c=contractStats(p),fs=finalStats(p);
+    const d=(c.margin!=null&&fs.margin!=null)?(fs.margin-c.margin).toFixed(2):'';
     rows.push([p.code,p.name,p.pm,p.client,p.projType,p.status,Math.round(p.cAmount),
       c.margin!=null?c.margin.toFixed(2):'',fs.has?Math.round(fs.revenue):'',
       fs.margin!=null?fs.margin.toFixed(2):'',
-      (c.margin!=null&&fs.margin!=null)?(fs.margin-c.margin).toFixed(2):'',p.reason||'']);
+      d,d===''?'':(isDone(p)?'확정':'잠정(진행중)'),p.reason||'']);
   });
   const csv='﻿'+rows.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
   const a=document.createElement('a');
@@ -1374,7 +1433,8 @@ document.getElementById('impSubmit').onclick=async()=>{
   try{
     const r=await api('/projects/import',{method:'POST',body:JSON.stringify(impParsed)});
     msg.className='msg ok';
-    msg.textContent='✓ 신규 '+r.created+'건 · 업데이트 '+r.updated+'건 · 계약 투입 '+r.rowCount+'행이 등록되었습니다.';
+    msg.textContent='✓ 신규 '+r.created+'건 · 기존 갱신 '+r.updated+'건 · 계약 투입 '+r.rowCount+'행'
+      +(r.merged?' (중복 '+r.merged+'건은 기존 프로젝트에 합침)':'')+'이 등록되었습니다.';
     await refresh();
     setTimeout(()=>impModal.classList.remove('show'),1500);
   }catch(e){msg.className='msg err';msg.textContent='✗ '+e.message;btn.disabled=false;}
@@ -1487,7 +1547,8 @@ document.getElementById('stImpSubmit').onclick=async()=>{
   try{
     const r=await api('/staff/bulk',{method:'POST',body:JSON.stringify({list:stImpParsed,replace})});
     msg.className='msg ok';
-    msg.textContent='✓ 신규 '+r.added+'명 · 업데이트 '+r.changed+'명'+
+    msg.textContent='✓ 신규 '+r.added+'명 · 기존 갱신 '+r.changed+'명'+
+      (r.skipped?' · 중복 '+r.skipped+'명 제외':'')+
       (r.removed?' · 삭제 '+r.removed+'명':'')+(r.deactivated?' · 재직 해제 '+r.deactivated+'명':'');
     await refresh();
     setTimeout(()=>stImpModal.classList.remove('show'),1500);
@@ -1693,7 +1754,7 @@ document.getElementById('pwForm').onsubmit=async e=>{
 async function refresh(){
   [projects,staff,rates,allRows]=await Promise.all([
     api('/projects'),api('/staff'),api('/rates'),api('/rows')]);
-  renderDash();renderStaff();renderRates();renderPjSelect();renderPmList();
+  renderDash();renderStaff();renderRates();renderPjSelect();renderPmList();renderClientList();
   if(!document.getElementById('tab-proj').classList.contains('hidden')){renderPhase();renderVs();}
 }
 (async function(){

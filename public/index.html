@@ -15,7 +15,7 @@
     padding:14px 24px;border-bottom:1px solid var(--line);background:var(--panel)}
   h1{font-size:17px;margin:0;font-weight:700}
   .sub{font-size:12px;color:var(--muted)}
-  .right{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px}
+  header .right{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px}
   .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block;margin-right:5px}
   .dot.on{background:var(--good)} .dot.off{background:var(--bad)}
   nav{display:flex;gap:2px;padding:0 24px;border-bottom:1px solid var(--line);background:var(--panel)}
@@ -74,12 +74,15 @@
   .msg.err{color:var(--bad)} .msg.ok{color:var(--good)}
   .status{font-size:12.5px;color:var(--muted)} .status.err{color:var(--bad)}
   .del-x{color:var(--bad);cursor:pointer;font-weight:700;padding:0 4px}
-  .two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-  @media (max-width:1100px){.two{grid-template-columns:1fr}}
+  .two{display:grid;grid-template-columns:1fr;gap:16px}
+  @media (min-width:1750px){.two{grid-template-columns:1fr 1fr}}
   .phase{border:1px solid var(--line);border-radius:9px;padding:14px;background:var(--panel)}
   .phase.c{border-left:3px solid var(--warn)}
   .phase.f{border-left:3px solid var(--accent)}
   .phase h3{font-size:13.5px;margin:0 0 12px;font-weight:700;display:flex;gap:8px;align-items:center}
+  .phase .tw table{min-width:620px}
+  .phase .row{margin-bottom:2px}
+  .phase select,.phase input{min-width:0}
   .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;
     justify-content:center;z-index:100;padding:20px}
   .modal-bg.show{display:flex}
@@ -199,13 +202,17 @@
     <div class="phase c">
       <h3>① 계약 시점 (기준) <span class="pill warn">고정 기준</span></h3>
       <div class="row">
-        <div class="field grow"><label>계약액 (VAT 제외)</label><input id="cAmount" class="num" inputmode="numeric" value="0"></div>
+        <div class="field" style="min-width:200px"><label>계약액 (VAT 제외)</label><input id="cAmount" class="num" inputmode="numeric" value="0"></div>
         <div class="field"><label>외주비</label><input id="cOut" class="num" inputmode="numeric" value="0"></div>
         <div class="field"><label>부대비</label><input id="cEtc" class="num" inputmode="numeric" value="0"></div>
       </div>
       <div class="tw" style="margin-top:12px">
         <table>
-          <thead><tr><th>소속</th><th>등급</th><th class="right">단가/MM</th><th class="right">MM</th><th class="right">인건비</th><th></th></tr></thead>
+          <thead><tr><th style="min-width:110px">소속</th><th style="min-width:82px">등급</th>
+            <th class="right" style="width:140px">단가/MM</th>
+            <th class="right" style="width:96px">MM</th>
+            <th class="right" style="width:130px">인건비</th>
+            <th style="width:26px"></th></tr></thead>
           <tbody id="cBody"></tbody>
           <tfoot><tr id="cFoot"></tr></tfoot>
         </table>
@@ -220,14 +227,17 @@
     <div class="phase f">
       <h3>② 완료 시점 (실적) <span class="pill flat">실제 결과</span></h3>
       <div class="row">
-        <div class="field grow"><label>실제 매출 (0 = 계약액과 동일)</label><input id="fRev" class="num" inputmode="numeric" value="0"></div>
+        <div class="field" style="min-width:200px"><label>실제 매출 (0 = 계약액과 동일)</label><input id="fRev" class="num" inputmode="numeric" value="0"></div>
         <div class="field"><label>외주비</label><input id="fOut" class="num" inputmode="numeric" value="0"></div>
         <div class="field"><label>부대비</label><input id="fEtc" class="num" inputmode="numeric" value="0"></div>
         <div class="field"><label>완료(정산) 월</label><input type="month" id="fClosed"></div>
       </div>
       <div class="tw" style="margin-top:12px">
         <table>
-          <thead><tr><th>인력 / 소속</th><th>등급</th><th class="right">단가/MM</th><th class="right">MM</th><th class="right">인건비</th><th></th></tr></thead>
+          <thead><tr><th style="min-width:150px">인력</th><th style="min-width:110px">소속</th>
+            <th style="min-width:82px">등급</th><th class="right" style="width:140px">단가/MM</th>
+            <th class="right" style="width:96px">MM</th>
+            <th class="right" style="width:130px">인건비</th><th style="width:26px"></th></tr></thead>
           <tbody id="fBody"></tbody>
           <tfoot><tr id="fFoot"></tr></tfoot>
         </table>
@@ -394,7 +404,7 @@
 </div>
 
 <script>
-const APP_VERSION='v2.2 · 동시 편집 보호';
+const APP_VERSION='v2.3 · 입력 편의 개선';
 const GRADES=['초급','중급','고급','특급'];
 let projects=[],staff=[],rates={},allRows=[];
 let curId=null,cDraft=[],fDraft=[];
@@ -407,6 +417,13 @@ async function api(path,opts){
   return r.status===204?null:r.json();
 }
 const won=n=>Math.round(n||0).toLocaleString('ko-KR');
+// 금액 입력칸에 천단위 쉼표 (MM 같은 소수 입력에는 적용하지 않음)
+function commify(el){
+  const neg=/^-/.test(el.value.trim());
+  const v=el.value.replace(/[^0-9]/g,'');
+  el.value=v===''?'':(neg?'-':'')+Number(v).toLocaleString('ko-KR');
+}
+const MONEY_IDS=['cAmount','cOut','cEtc','fRev','fOut','fEtc'];
 const pnum=s=>{const v=parseFloat(String(s).replace(/[^0-9.\-]/g,''));return isNaN(v)?0:v;};
 const esc=s=>String(s==null?'':s).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
 const cls=m=>m==null?'':m>=20?'good':m>=0?'warn':'bad';
@@ -589,10 +606,11 @@ document.getElementById('btnCsv').onclick=()=>{
 // ── 프로젝트 화면 ─────────────────────────────────────
 function renderPjSelect(){
   const sel=document.getElementById('pjSelect');
-  sel.innerHTML=projects.length
-    ?projects.map(p=>'<option value="'+p.id+'" '+(p.id===curId?'selected':'')+'>'+
+  sel.innerHTML=(projects.length
+    ?'<option value="">— 프로젝트 선택 —</option>'+projects.map(p=>'<option value="'+p.id+'" '+(p.id===curId?'selected':'')+'>'+
         (p.code?'['+esc(p.code)+'] ':'')+esc(p.name)+'</option>').join('')
-    :'<option value="">— 등록된 프로젝트 없음 —</option>';
+    :'<option value="">— 등록된 프로젝트 없음 —</option>');
+  sel.value=curId==null?'':String(curId);
   sel.onchange=()=>{curId=+sel.value||null;loadProject();};
 }
 function loadProject(){
@@ -600,7 +618,9 @@ function loadProject(){
   const p=curProject();
   const ids=['fCode','fName','fClient','fPm','fType','fStart','fEnd','cAmount','cOut','cEtc','fRev','fOut','fEtc','fClosed','fReason'];
   if(!p){ids.forEach(i=>{const el=document.getElementById(i);if(el)el.value='';});
-    document.getElementById('cAmount').value='0';
+    MONEY_IDS.forEach(i=>{document.getElementById(i).value='0';});
+    document.getElementById('fStatus').value='진행중';
+    document.getElementById('lastEdit').textContent='';
     cDraft=[];fDraft=[];renderPhase();renderVs();return;}
   document.getElementById('fCode').value=p.code||'';
   document.getElementById('fName').value=p.name;
@@ -612,12 +632,12 @@ function loadProject(){
   document.getElementById('fStatus').value=p.status;
   document.getElementById('fStart').value=p.startYm||'';
   document.getElementById('fEnd').value=p.endYm||'';
-  document.getElementById('cAmount').value=p.cAmount;
-  document.getElementById('cOut').value=p.cCostOut;
-  document.getElementById('cEtc').value=p.cCostEtc;
-  document.getElementById('fRev').value=p.fRevenue;
-  document.getElementById('fOut').value=p.fCostOut;
-  document.getElementById('fEtc').value=p.fCostEtc;
+  document.getElementById('cAmount').value=won(p.cAmount);
+  document.getElementById('cOut').value=won(p.cCostOut);
+  document.getElementById('cEtc').value=won(p.cCostEtc);
+  document.getElementById('fRev').value=won(p.fRevenue);
+  document.getElementById('fOut').value=won(p.fCostOut);
+  document.getElementById('fEtc').value=won(p.fCostEtc);
   document.getElementById('fClosed').value=p.fClosedAt||'';
   document.getElementById('fReason').value=p.reason||'';
   cDraft=rowsOf(p.id,'C').map(r=>({...r}));
@@ -662,7 +682,7 @@ function renderPhase(){
     const rate=r.rate||rateOf(r.dept,r.grade);
     return '<tr><td><select data-c="'+i+'" data-f="dept">'+deptOptions(r.dept)+'</select></td>'+
       '<td><select data-c="'+i+'" data-f="grade">'+gradeOptions(r.grade)+'</select></td>'+
-      '<td><input class="num" data-c="'+i+'" data-f="rate" value="'+rate+'" inputmode="numeric"></td>'+
+      '<td><input class="num" data-c="'+i+'" data-f="rate" value="'+won(rate)+'" inputmode="numeric"></td>'+
       '<td><input class="num" data-c="'+i+'" data-f="mm" value="'+r.mm+'" inputmode="decimal"></td>'+
       '<td class="right">'+won(rate*r.mm)+'</td>'+
       '<td><span class="del-x" data-cdel="'+i+'">×</span></td></tr>';
@@ -686,18 +706,20 @@ function renderPhase(){
     const st=r.staffId?staffById(r.staffId):null;
     const dept=st?st.dept:r.dept, g=st?st.grade:r.grade;
     const rate=rateOf(dept,g);
-    return '<tr><td><select data-r="'+i+'" data-f="staffId">'+staffOptions(r.staffId)+'</select>'+
-      (st?'':'<select data-r="'+i+'" data-f="dept" style="margin-top:4px">'+deptOptions(r.dept)+'</select>')+'</td>'+
+    return '<tr><td><select data-r="'+i+'" data-f="staffId">'+staffOptions(r.staffId)+'</select></td>'+
+      '<td>'+(st?'<span class="pill flat">'+esc(st.dept)+'</span>'
+        :'<select data-r="'+i+'" data-f="dept">'+deptOptions(r.dept)+'</select>')+'</td>'+
       '<td>'+(st?'<span class="pill flat">'+GRADES[g]+'</span>'
         :'<select data-r="'+i+'" data-f="grade">'+gradeOptions(r.grade)+'</select>')+'</td>'+
       '<td class="right">'+won(rate)+'</td>'+
       '<td><input class="num" data-r="'+i+'" data-f="mm" value="'+r.mm+'" inputmode="decimal"></td>'+
       '<td class="right">'+won(rate*r.mm)+'</td>'+
       '<td><span class="del-x" data-fdel="'+i+'">×</span></td></tr>';
-  }).join(''):'<tr><td colspan="6" class="empty">실제 투입 인력을 추가하거나 [← 계약 투입 복사]를 누르세요.</td></tr>';
+  }).join(''):'<tr><td colspan="7" class="empty">실제 투입 인력을 추가하거나 [← 계약 투입 복사]를 누르세요.</td></tr>';
   const fs=p?finalStats(p,fDraft):{mm:0,labor:0};
   document.getElementById('fFoot').innerHTML=fDraft.length
-    ?'<td>합계</td><td></td><td></td><td class="right">'+fs.mm.toFixed(2)+'</td><td class="right">'+won(fs.labor)+'</td><td></td>':'';
+    ?'<td>합계</td><td></td><td></td><td></td><td class="right">'+fs.mm.toFixed(2)+
+     '</td><td class="right">'+won(fs.labor)+'</td><td></td>':'';
   fb.querySelectorAll('[data-r]').forEach(el=>el.onchange=e=>{
     const i=+e.target.dataset.r,f=e.target.dataset.f;
     if(f==='staffId')fDraft[i].staffId=+e.target.value||null;
@@ -712,7 +734,9 @@ function renderPhase(){
 function renderVs(){
   const p=formProject();
   const cards=document.getElementById('vsCards'),vb=document.getElementById('varBody');
-  if(!p){cards.innerHTML='';vb.innerHTML='<tr><td colspan="5" class="empty">프로젝트를 선택하세요.</td></tr>';return;}
+  if(!p){cards.innerHTML='<div class="card" style="grid-column:1/-1"><div class="lbl">프로젝트 미선택</div>'+
+    '<div class="foot" style="margin-top:2px">위에서 프로젝트를 선택하거나 [+ 새 프로젝트] · [구글시트 일괄 등록]으로 만드세요.</div></div>';
+    vb.innerHTML='<tr><td colspan="5" class="empty">프로젝트를 선택하세요.</td></tr>';return;}
   const c=contractStats(p,cDraft),f=finalStats(p,fDraft);
   const d=(c.margin!=null&&f.margin!=null)?f.margin-c.margin:null;
   cards.innerHTML=
@@ -747,8 +771,9 @@ function renderVs(){
 }
 ['fCode','fName','fClient','fPm','fType','fStatus','fStart','fEnd','cAmount','cOut','cEtc','fRev','fOut','fEtc','fClosed'].forEach(id=>{
   const el=document.getElementById(id);
-  el.oninput=()=>{renderPhase();renderVs();};
-  el.onchange=()=>{renderPhase();renderVs();};
+  const money=MONEY_IDS.includes(id);
+  el.oninput=()=>{if(money)commify(el);renderPhase();renderVs();};
+  el.onchange=()=>{if(money)commify(el);renderPhase();renderVs();};
 });
 document.getElementById('cAdd').onclick=()=>{
   const d=Object.keys(rates)[0]||'';
@@ -886,10 +911,11 @@ function renderRates(){
   const keys=Object.keys(rates);
   body.innerHTML=keys.length?keys.map(d=>
     '<tr><td style="font-weight:650">'+esc(d)+'</td>'+
-    rates[d].map((v,g)=>'<td><input class="num" data-rt="'+esc(d)+'" data-g="'+g+'" value="'+v+'" inputmode="numeric"></td>').join('')+
+    rates[d].map((v,g)=>'<td><input class="num" data-rt="'+esc(d)+'" data-g="'+g+'" value="'+won(v)+'" inputmode="numeric"></td>').join('')+
     '<td><span class="del-x" data-rtdel="'+esc(d)+'">×</span></td></tr>').join('')
     :'<tr><td colspan="6" class="empty">단가표가 없습니다. 아래에서 소속을 추가하세요.</td></tr>';
   body.querySelectorAll('[data-rt]').forEach(el=>el.oninput=e=>{
+    commify(e.target);
     rates[e.target.dataset.rt][+e.target.dataset.g]=pnum(e.target.value);});
   body.querySelectorAll('[data-rtdel]').forEach(x=>x.onclick=e=>{
     if(Object.keys(rates).length<=1)return;
@@ -1258,7 +1284,7 @@ function switchTab(name){
 }
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
   switchTab(t.dataset.tab);
-  if(t.dataset.tab==='proj'){if(curId==null&&projects.length)curId=projects[0].id;loadProject();}
+  if(t.dataset.tab==='proj')loadProject();
 });
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape')document.querySelectorAll('.modal-bg.show').forEach(m=>m.classList.remove('show'));

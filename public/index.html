@@ -57,6 +57,8 @@
   .card .lbl .tag{margin-left:4px}
   /* 진행중 프로젝트의 잠정 변동 — 확정값과 구분해 흐리게 */
   .prov{opacity:.55;font-size:11px;white-space:nowrap}
+  /* 저장 안 된 변경 표시 */
+  .status.dirty{color:var(--warn);font-weight:600}
   /* 삭제 확인 창 */
   #delBox h3{color:var(--bad);margin:0 0 10px;font-size:15px}
   #delWhat{font-size:13.5px;line-height:1.7;background:var(--panel2);border:1px solid var(--line);
@@ -211,6 +213,7 @@
       <button id="btnSaveInfo">프로젝트 정보 저장</button>
       <button class="danger sm" id="btnDel">삭제</button>
       <span class="status" id="infoMsg"></span>
+      <span class="status dirty" id="dirtyMark"></span>
       <span class="status" id="lastEdit" style="margin-left:auto"></span>
     </div>
     <datalist id="pmList"></datalist>
@@ -490,7 +493,7 @@
 </div>
 
 <script>
-const APP_VERSION='v3.1 · 삭제 확인창';
+const APP_VERSION='v3.2 · 입력 보호';
 const GRADES=['초급','중급','고급','특급'];
 let projects=[],staff=[],rates={},allRows=[];
 let curId=null,cDraft=[],fDraft=[];
@@ -784,7 +787,15 @@ function renderPjSelect(){
         (p.code?'['+esc(p.code)+'] ':'')+esc(p.name)+'</option>').join('')
     :'<option value="">— 등록된 프로젝트 없음 —</option>');
   sel.value=curId==null?'':String(curId);
-  sel.onchange=()=>{curId=+sel.value||null;loadProject();};
+  // 다른 프로젝트로 옮길 때도 저장 안 한 입력이 있으면 먼저 확인
+  sel.onchange=async()=>{
+    const to=+sel.value||null,from=curId;
+    if(isDirty()&&!await askDelete({title:'저장하지 않은 변경이 있습니다',
+      what:'<b>'+esc((curProject()||{}).name||'')+'</b> 의 입력 중인 값',
+      note:'다른 프로젝트로 옮기면 저장 안 된 입력이 사라집니다.',ok:'버리고 이동'})){
+      sel.value=from==null?'':String(from);return;}
+    curId=to;loadProject();
+  };
 }
 function loadProject(){
   renderPjSelect();
@@ -794,7 +805,7 @@ function loadProject(){
     MONEY_IDS.forEach(i=>{document.getElementById(i).value='0';});
     document.getElementById('fStatus').value='진행중';
     document.getElementById('lastEdit').textContent='';
-    cDraft=[];fDraft=[];renderPhase();renderVs();return;}
+    cDraft=[];fDraft=[];renderPhase();renderVs();cleanSnap=null;updateDirty();return;}
   document.getElementById('fCode').value=p.code||'';
   document.getElementById('fName').value=p.name;
   document.getElementById('fClient').value=p.client||'';
@@ -816,6 +827,7 @@ function loadProject(){
   cDraft=rowsOf(p.id,'C').map(r=>({...r}));
   fDraft=rowsOf(p.id,'F').map(r=>({...r}));
   renderPhase();renderVs();
+  markClean();   // 불러온 직후가 '저장된 상태'
 }
 // 화면 입력값을 프로젝트 객체에 반영한 사본
 function formProject(){
@@ -841,6 +853,30 @@ function formProject(){
     reason:document.getElementById('fReason').value.trim(),
   };
 }
+// ── 저장 안 한 입력 보호 ───────────────────────────────
+// 프로젝트를 불러온 직후 상태를 기억해 두고, 지금 화면과 달라졌으면 '수정 중' 으로 본다.
+// 수정 중이면 자동 새로고침이 값을 덮어쓰지 않는다 (덮어써서 입력이 사라지던 문제).
+let cleanSnap=null;
+const FORM_IDS=['fCode','fName','fClient','fPm','fType','fStatus','fStart','fEnd',
+  'cAmount','cOut','cEtc','fRev','fOut','fEtc','fClosed','fReason'];
+function snapshot(){
+  const rows=d=>d.map(r=>[r.dept,r.grade,+r.mm||0,+r.rate||0].join('~')).join('|');
+  return JSON.stringify({id:curId,
+    form:FORM_IDS.map(i=>{const el=document.getElementById(i);return el?el.value:'';}),
+    c:rows(cDraft),f:rows(fDraft)});
+}
+const markClean=()=>{cleanSnap=snapshot();updateDirty();};
+const isDirty=()=>cleanSnap!=null&&curId!=null&&snapshot()!==cleanSnap;
+// 저장 안 한 변경이 있으면 화면에 알려 준다
+function updateDirty(){
+  const el=document.getElementById('dirtyMark');
+  if(el)el.textContent=isDirty()?'● 저장 안 된 변경 있음':'';
+}
+// 창을 닫거나 다른 곳으로 이동할 때 경고
+window.addEventListener('beforeunload',e=>{
+  if(!isDirty())return;
+  e.preventDefault();e.returnValue='';
+});
 const deptOptions=sel=>Object.keys(rates).map(d=>'<option '+(d===sel?'selected':'')+'>'+esc(d)+'</option>').join('');
 const gradeOptions=sel=>GRADES.map((g,i)=>'<option value="'+i+'" '+(i===sel?'selected':'')+'>'+g+'</option>').join('');
 function renderPhase(){
@@ -897,6 +933,7 @@ function renderPhase(){
     const i=+e.target.dataset.fdel;
     if(!await askDelete(rowDelOpt(fDraft[i],'완료 시점 투입')))return;
     fDraft.splice(i,1);renderPhase();renderVs();});
+  updateDirty();   // 행 추가·삭제도 '저장 안 된 변경' 에 반영
 }
 // 투입 행 삭제 확인 문구 — 어떤 행을 지우는지 소속·등급·MM 으로 보여준다
 function rowDelOpt(r,label){
@@ -1039,9 +1076,14 @@ function renderVs(){
 ['fCode','fName','fClient','fPm','fType','fStatus','fStart','fEnd','cAmount','cOut','cEtc','fRev','fOut','fEtc','fClosed'].forEach(id=>{
   const el=document.getElementById(id);
   const money=MONEY_IDS.includes(id);
-  el.oninput=()=>{if(money)commify(el);renderPhase();renderVs();};
-  el.onchange=()=>{if(money)commify(el);renderPhase();renderVs();};
+  // 요약만 다시 그린다. 투입 표를 글자마다 다시 그리면 표 안의 입력칸이
+  // 새로 만들어져 포커스가 풀리고 입력 중인 값이 엉키는 문제가 생긴다.
+  el.oninput=()=>{if(money)commify(el);renderVs();};
+  el.onchange=()=>{if(money)commify(el);renderVs();};
 });
+// 프로젝트 화면의 어떤 입력이든 바뀌면 '저장 안 된 변경' 표시를 갱신한다
+['input','change'].forEach(ev=>
+  document.getElementById('tab-proj').addEventListener(ev,()=>updateDirty()));
 document.getElementById('cAdd').onclick=()=>{
   const d=Object.keys(rates)[0]||'';
   cDraft.push({dept:d,grade:1,mm:1,rate:rateOf(d,1),staffId:null});renderPhase();renderVs();
@@ -1072,7 +1114,9 @@ document.getElementById('btnSaveInfo').onclick=async()=>{
     await refresh();loadProject();
     s.textContent='✓ 저장되었습니다.';setTimeout(()=>s.textContent='',2500);
   }catch(e){s.className='status err';s.textContent='✗ '+e.message;
-    if(/먼저 저장/.test(e.message)&&confirm(e.message+'\n\n지금 새로고침할까요? (입력 중인 값은 사라집니다)')){
+    if(/먼저 저장/.test(e.message)&&await askDelete({title:'다른 사용자가 먼저 저장했습니다',
+      what:e.message,note:'새로고침하면 지금 입력한 값이 사라집니다. 필요하면 먼저 값을 복사해 두세요.',
+      ok:'버리고 새로고침'})){
       await refresh();loadProject();}}
 };
 document.getElementById('btnDel').onclick=async()=>{
@@ -1102,7 +1146,9 @@ document.getElementById('btnSaveAll').onclick=async()=>{
     await refresh();loadProject();
     s.textContent='✓ 수익률이 저장되고 이력에 기록되었습니다.';setTimeout(()=>s.textContent='',3000);
   }catch(e){s.className='status err';s.textContent='✗ '+e.message;
-    if(/먼저 저장/.test(e.message)&&confirm(e.message+'\n\n지금 새로고침할까요? (입력 중인 값은 사라집니다)')){
+    if(/먼저 저장/.test(e.message)&&await askDelete({title:'다른 사용자가 먼저 저장했습니다',
+      what:e.message,note:'새로고침하면 지금 입력한 값이 사라집니다. 필요하면 먼저 값을 복사해 두세요.',
+      ok:'버리고 새로고침'})){
       await refresh();loadProject();}}
   finally{btn.disabled=false;}
 };
@@ -1822,20 +1868,37 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Escape')document.querySelectorAll('.modal-bg.show').forEach(m=>m.classList.remove('show'));
 });
 document.getElementById('btnReload').onclick=async()=>{
+  // 저장 안 한 입력이 있으면 먼저 확인 (새로고침하면 사라진다)
+  if(isDirty()&&!await askDelete({title:'저장하지 않은 변경이 있습니다',
+    what:'<b>'+esc((curProject()||{}).name||'')+'</b> 의 입력 중인 값',
+    note:'새로고침하면 저장 안 된 입력이 사라지고 DB 값으로 돌아갑니다.',ok:'버리고 새로고침'}))return;
   const b=document.getElementById('btnReload');b.disabled=true;
   try{await refresh();if(curId!=null)loadProject();setConn(true,'DB 연결됨 · 방금 갱신');}
   catch(e){setConn(false,'갱신 실패');}
   finally{b.disabled=false;}
 };
-// 다른 창을 보고 돌아오면 자동으로 최신 데이터를 다시 읽는다 (입력 중이면 건너뜀)
+// 다른 창을 보고 돌아오면 최신 데이터를 다시 읽는다.
+// 단, 저장하지 않은 입력이 있으면 절대 덮어쓰지 않고 안내만 한다.
 let lastSync=Date.now();
 document.addEventListener('visibilitychange',async()=>{
   if(document.visibilityState!=='visible')return;
   if(Date.now()-lastSync<15000)return;
   if(document.querySelector('.modal-bg.show'))return;
-  const editing=document.activeElement&&/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName);
-  if(editing)return;
   lastSync=Date.now();
+  // 수정 중이면 목록만 조용히 확인하고, 화면 값은 그대로 둔다
+  if(isDirty()){
+    try{
+      const fresh=await api('/projects');
+      const mine=curProject(),now=fresh.find(x=>x.id===curId);
+      if(mine&&now&&now.updatedAt&&now.updatedAt!==mine.updatedAt){
+        const s=document.getElementById('allMsg');
+        s.className='status err';
+        s.textContent='⚠ 다른 사용자가 이 프로젝트를 저장했습니다'
+          +(now.updatedBy?' ('+now.updatedBy+')':'')+'. 지금 저장하면 차단될 수 있습니다 — 입력값을 복사해 두고 [새로고침] 하세요.';
+      }
+    }catch(e){}
+    return;
+  }
   try{await refresh();if(curId!=null)loadProject();}catch(e){}
 });
 document.getElementById('btnOut').onclick=async()=>{

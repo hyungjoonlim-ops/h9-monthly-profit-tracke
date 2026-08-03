@@ -317,7 +317,10 @@
   </div>
 
   <div class="panel">
-    <h2>소속별 · 등급별 단가표 <span class="tag">원/MM</span></h2>
+    <div class="toolbar">
+      <h2>소속별 · 등급별 단가표 <span class="tag">원/MM</span></h2>
+      <div class="sp"><button class="sm" id="btnRtImp">단가표 일괄 등록</button></div>
+    </div>
     <div class="tw">
       <table>
         <thead><tr><th style="min-width:150px">소속</th><th class="right">초급</th><th class="right">중급</th>
@@ -401,6 +404,36 @@
   </div>
 </div>
 
+<!-- 모달: 단가표 일괄 등록 -->
+<div class="modal-bg" id="rtImpModal">
+  <div class="modal" style="max-width:760px">
+    <h3>단가표 일괄 등록</h3>
+    <div class="row" style="align-items:flex-end;margin-bottom:10px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel2)">
+      <div class="field grow"><label><b>엑셀 파일 업로드</b> (.xlsx · .xls · .csv)</label>
+        <input type="file" id="rtImpFile" accept=".xlsx,.xls,.csv"></div>
+      <button id="rtImpUpload">파일에서 불러오기</button>
+    </div>
+    <div class="row" style="align-items:flex-end;margin-bottom:10px">
+      <div class="field grow"><label>또는 구글시트 링크</label>
+        <input id="rtImpUrl" placeholder="https://docs.google.com/spreadsheets/d/…"></div>
+      <button class="ghost" id="rtImpFetch">시트에서 불러오기</button>
+    </div>
+    <p class="hint" style="margin:0 0 10px">회사 단가표를 그대로 붙여넣어도 됩니다. 두 가지 형태를 인식합니다:<br>
+      ① <b>가로형</b> — 첫 열이 소속, 그 뒤에 <b>초급 · 중급 · 고급 · 특급</b> 열 (열 순서 무관)<br>
+      ② <b>세로형</b> — <b>소속 · 등급 · 단가</b> 3개 열<br>
+      금액의 쉼표·"원"·공백은 자동으로 제거됩니다.</p>
+    <textarea id="rtImpText" rows="7" placeholder="소속	초급	중급	고급	특급&#10;서비스개발	4,700,000	5,500,000	7,200,000	9,500,000&#10;Visual	4,900,000	5,700,000	6,200,000	9,100,000"></textarea>
+    <div id="rtImpPreview" style="margin-top:10px;max-height:300px;overflow:auto"></div>
+    <label style="display:flex;gap:6px;align-items:center;margin-top:10px;color:var(--ink2);font-size:12.5px">
+      <input type="checkbox" id="rtImpReplace" style="width:auto"> <b>단가표 전체 대체</b> — 체크하지 않으면 기존 소속은 유지하고 겹치는 소속만 갱신합니다</label>
+    <div class="msg" id="rtImpMsg"></div>
+    <div class="btns">
+      <button class="ghost" id="rtImpCancel">취소</button>
+      <button id="rtImpSubmit" disabled>등록</button>
+    </div>
+  </div>
+</div>
+
 <!-- 모달: 변동 이력 -->
 <div class="modal-bg" id="logModal">
   <div class="modal" style="max-width:760px">
@@ -423,7 +456,7 @@
 </div>
 
 <script>
-const APP_VERSION='v2.7 · 엑셀 업로드';
+const APP_VERSION='v2.8 · 단가표 일괄 등록';
 const GRADES=['초급','중급','고급','특급'];
 let projects=[],staff=[],rates={},allRows=[];
 let curId=null,cDraft=[],fDraft=[];
@@ -1443,6 +1476,129 @@ document.getElementById('stImpSubmit').onclick=async()=>{
       (r.removed?' · 삭제 '+r.removed+'명':'')+(r.deactivated?' · 재직 해제 '+r.deactivated+'명':'');
     await refresh();
     setTimeout(()=>stImpModal.classList.remove('show'),1500);
+  }catch(e){msg.className='msg err';msg.textContent='✗ '+e.message;btn.disabled=false;}
+};
+
+// ── 단가표 일괄 등록 ──────────────────────────────────
+// 가로형(소속 + 초급/중급/고급/특급 열) 과 세로형(소속·등급·단가) 을 모두 인식
+function parseRates(text){
+  const g=grid(text);
+  if(!g.length)return {error:'내용이 없습니다.'};
+  const clean=t=>String(t||'').replace(/\s/g,'');
+  // 가로형: 등급 라벨이 3개 이상 있는 행을 머리글로 본다
+  let hi=-1,col={};
+  for(let i=0;i<Math.min(g.length,10);i++){
+    const idx={};
+    g[i].forEach((h,j)=>{
+      const t=clean(h);
+      if(/^초급/.test(t))idx[0]=j;else if(/^중급/.test(t))idx[1]=j;
+      else if(/^고급/.test(t))idx[2]=j;else if(/^특급/.test(t))idx[3]=j;
+    });
+    if(Object.keys(idx).length>=3){hi=i;col=idx;break;}
+  }
+  const out={};
+  if(hi>=0){
+    const firstG=Math.min(...Object.values(col));
+    let dI=g[hi].findIndex((h,j)=>j<firstG&&/소속|부서|직군|구분|실|파트/.test(String(h)));
+    if(dI<0)dI=0;
+    for(const row of g.slice(hi+1)){
+      const dept=(row[dI]||'').trim();
+      if(!dept||/소속|합계|비고/.test(dept))continue;
+      const v=[0,1,2,3].map(k=>col[k]!=null?pnum(row[col[k]]):0);
+      if(!v.some(x=>x>0))continue;
+      out[dept]=v;
+    }
+    if(!Object.keys(out).length)return {error:'단가 값을 읽지 못했습니다. 소속 행과 등급별 금액을 확인하세요.',diag:diagHtml(g)};
+    return {rates:out,form:'가로형'};
+  }
+  // 세로형: 소속 / 등급 / 단가
+  let hj=-1,dI=-1,gI=-1,vI=-1;
+  for(let i=0;i<Math.min(g.length,10);i++){
+    const f=re=>g[i].findIndex(h=>re.test(String(h)));
+    const a=f(/소속|부서|직군|구분|파트/),b=f(/등급/),c=f(/단가|금액|원/);
+    if(a>=0&&b>=0&&c>=0){hj=i;dI=a;gI=b;vI=c;break;}
+  }
+  if(hj<0)return {error:'단가표 형태를 인식하지 못했습니다. 첫 열에 소속, 그 뒤에 초급·중급·고급·특급 금액을 두거나 소속·등급·단가 3개 열로 만들어 주세요.',diag:diagHtml(g)};
+  for(const row of g.slice(hj+1)){
+    const dept=(row[dI]||'').trim();const gi=parseGrade(row[gI]);const val=pnum(row[vI]);
+    if(!dept||gi==null||!(val>0))continue;
+    if(!out[dept])out[dept]=[0,0,0,0];
+    out[dept][gi]=val;
+  }
+  if(!Object.keys(out).length)return {error:'단가 값을 읽지 못했습니다.',diag:diagHtml(g)};
+  return {rates:out,form:'세로형'};
+}
+const rtImpModal=document.getElementById('rtImpModal');
+let rtImpParsed=null;
+function showRtImp(r,note){
+  const box=document.getElementById('rtImpPreview'),msg=document.getElementById('rtImpMsg');
+  rtImpParsed=null;document.getElementById('rtImpSubmit').disabled=true;
+  if(r.error){box.innerHTML=r.diag||'';msg.className='msg err';msg.textContent='✗ '+r.error;return;}
+  rtImpParsed=r.rates;
+  const keys=Object.keys(r.rates);
+  box.innerHTML='<div class="tw"><table><thead><tr><th>소속</th><th class="right">초급</th>'+
+    '<th class="right">중급</th><th class="right">고급</th><th class="right">특급</th><th>구분</th></tr></thead><tbody>'+
+    keys.map(d=>'<tr><td style="font-weight:650">'+esc(d)+'</td>'+
+      r.rates[d].map(v=>'<td class="right">'+(v>0?won(v):'<span class="muted">0</span>')+'</td>').join('')+
+      '<td>'+(rates[d]?'<span class="pill flat">갱신</span>':'<span class="pill warn">신규</span>')+'</td></tr>').join('')+
+    '</tbody></table></div><div class="hint">'+(r.form?r.form+' 인식 · ':'')+keys.length+'개 소속'+
+    (note?'<br>'+note:'')+'</div>';
+  msg.className='msg';msg.textContent='';
+  document.getElementById('rtImpSubmit').disabled=false;
+}
+function rtImpRender(){
+  const t=document.getElementById('rtImpText').value;
+  if(!t.trim()){document.getElementById('rtImpPreview').innerHTML='';rtImpParsed=null;
+    document.getElementById('rtImpSubmit').disabled=true;return;}
+  showRtImp(parseRates(t));
+}
+document.getElementById('btnRtImp').onclick=()=>{document.getElementById('rtImpMsg').textContent='';rtImpModal.classList.add('show');};
+document.getElementById('rtImpCancel').onclick=()=>rtImpModal.classList.remove('show');
+rtImpModal.onclick=e=>{if(e.target===rtImpModal)rtImpModal.classList.remove('show');};
+document.getElementById('rtImpText').oninput=rtImpRender;
+document.getElementById('rtImpUpload').onclick=async()=>{
+  const msg=document.getElementById('rtImpMsg');msg.className='msg';
+  const btn=document.getElementById('rtImpUpload');btn.disabled=true;msg.textContent='파일을 읽는 중…';
+  try{
+    const sheets=await uploadSheetFile('rtImpFile');
+    const nm=document.getElementById('rtImpFile').files[0].name;
+    let best=null;
+    for(const sh of sheets){
+      const r=parseRates(sh.rows.map(x=>x.join('\t')).join('\n'));
+      if(!r.error&&(!best||Object.keys(r.rates).length>Object.keys(best.r.rates).length))best={r,name:sh.name};
+    }
+    if(!best)throw new Error('파일에서 단가표를 찾지 못했습니다. 소속과 등급별 금액이 있는 탭인지 확인하세요.');
+    document.getElementById('rtImpText').value='';
+    showRtImp(best.r,'📄 '+esc(nm)+' · 탭 <b>'+esc(best.name)+'</b>');
+    msg.className='msg ok';msg.textContent='✓ 단가표를 읽었습니다. 확인 후 [등록]을 누르세요.';
+  }catch(e){msg.className='msg err';msg.textContent='✗ '+e.message;}
+  finally{btn.disabled=false;}
+};
+document.getElementById('rtImpFetch').onclick=async()=>{
+  const msg=document.getElementById('rtImpMsg');msg.className='msg';
+  const url=document.getElementById('rtImpUrl').value.trim();
+  if(!url){msg.className='msg err';msg.textContent='구글시트 링크를 입력하세요.';return;}
+  const btn=document.getElementById('rtImpFetch');btn.disabled=true;msg.textContent='시트를 읽는 중…';
+  try{
+    const r=await api('/sheet',{method:'POST',body:JSON.stringify({url})});
+    document.getElementById('rtImpText').value=r.rows.map(x=>x.join('\t')).join('\n');
+    rtImpRender();
+  }catch(e){msg.className='msg err';msg.textContent='✗ '+e.message;}
+  finally{btn.disabled=false;}
+};
+document.getElementById('rtImpSubmit').onclick=async()=>{
+  if(!rtImpParsed)return;
+  const msg=document.getElementById('rtImpMsg');const btn=document.getElementById('rtImpSubmit');
+  btn.disabled=true;msg.className='msg';msg.textContent='등록 중…';
+  const replace=document.getElementById('rtImpReplace').checked;
+  try{
+    const next=replace?{...rtImpParsed}:{...rates,...rtImpParsed};
+    await api('/rates',{method:'PUT',body:JSON.stringify(next)});
+    await refresh();
+    msg.className='msg ok';
+    msg.textContent='✓ 단가표 '+Object.keys(next).length+'개 소속이 저장되었습니다.'+
+      (replace?' (전체 대체)':' (겹치는 소속만 갱신)');
+    setTimeout(()=>rtImpModal.classList.remove('show'),1400);
   }catch(e){msg.className='msg err';msg.textContent='✗ '+e.message;btn.disabled=false;}
 };
 

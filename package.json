@@ -1,12 +1,11 @@
 {
-  "name": "h9-monthly-profit-tracker",
+  "name": "h9-project-profit",
   "version": "1.0.0",
-  "description": "H9 프로젝트별 월간 수익률 변동 관리 — 월별 매출/원가 입력으로 수익률 추이를 추적하는 웹 프로그램",
+  "description": "H9 프로젝트 수익률 관리 — 계약 시점 vs 완료 시점 수익률과 변동 관리",
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "setup": "node setup-db.js"
+    "start": "node server.js"
   },
   "dependencies": {
     "cookie-session": "^2.1.1",

@@ -102,7 +102,7 @@ const gr = (v) => Math.max(0, Math.min(3, Math.round(num(v))));
 const txt = (v) => (v == null || String(v).trim() === '' ? null : String(v).trim());
 
 const mapProject = (r) => ({
-  id: Number(r.id), name: r.name, client: r.client || '',
+  id: Number(r.id), code: r.code || '', name: r.name, client: r.client || '',
   projType: r.proj_type || '', status: r.status,
   startYm: r.start_ym, endYm: r.end_ym,
   cAmount: num(r.c_amount), cCostOut: num(r.c_cost_out), cCostEtc: num(r.c_cost_etc),
@@ -251,7 +251,7 @@ app.get('/api/projects', async (req, res) => {
 });
 
 const projParams = (p) => [
-  txt(p.name), txt(p.client), txt(p.projType), txt(p.status) || '진행중',
+  txt(p.code), txt(p.name), txt(p.client), txt(p.projType), txt(p.status) || '진행중',
   ym(p.startYm), ym(p.endYm),
   num(p.cAmount), num(p.cCostOut), num(p.cCostEtc),
   num(p.fRevenue), num(p.fCostOut), num(p.fCostEtc),
@@ -264,10 +264,10 @@ app.post('/api/projects', async (req, res) => {
   try {
     const { rows } = await pool.query(
       `INSERT INTO h9_projects
-         (name, client, proj_type, status, start_ym, end_ym,
+         (code, name, client, proj_type, status, start_ym, end_ym,
           c_amount, c_cost_out, c_cost_etc, f_revenue, f_cost_out, f_cost_etc,
           f_closed_at, reason, memo)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
       projParams(p)
     );
     res.json(mapProject(rows[0]));
@@ -279,11 +279,11 @@ app.put('/api/projects/:id', async (req, res) => {
   if (!txt(p.name)) return res.status(400).json({ error: '프로젝트명은 필수입니다.' });
   try {
     const { rows } = await pool.query(
-      `UPDATE h9_projects SET name=$1, client=$2, proj_type=$3, status=$4,
-              start_ym=$5, end_ym=$6, c_amount=$7, c_cost_out=$8, c_cost_etc=$9,
-              f_revenue=$10, f_cost_out=$11, f_cost_etc=$12, f_closed_at=$13,
-              reason=$14, memo=$15, updated_at=now()
-       WHERE id=$16 RETURNING *`,
+      `UPDATE h9_projects SET code=$1, name=$2, client=$3, proj_type=$4, status=$5,
+              start_ym=$6, end_ym=$7, c_amount=$8, c_cost_out=$9, c_cost_etc=$10,
+              f_revenue=$11, f_cost_out=$12, f_cost_etc=$13, f_closed_at=$14,
+              reason=$15, memo=$16, updated_at=now()
+       WHERE id=$17 RETURNING *`,
       [...projParams(p), req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: '프로젝트를 찾을 수 없습니다.' });
@@ -372,25 +372,30 @@ app.post('/api/projects/import', async (req, res) => {
     for (const p of list) {
       const name = txt(p.name);
       if (!name) continue;
-      const found = await client.query('SELECT id FROM h9_projects WHERE name=$1', [name]);
+      const code = txt(p.code);
+      // 프로젝트번호가 있으면 번호로, 없으면 이름으로 기존 프로젝트를 찾는다
+      const found = code
+        ? await client.query('SELECT id FROM h9_projects WHERE code=$1', [code])
+        : await client.query('SELECT id FROM h9_projects WHERE name=$1', [name]);
       let pid;
       if (found.rows[0]) {
         pid = Number(found.rows[0].id);
         // 계약 정보만 갱신 — 완료 시점 입력값은 건드리지 않는다
         await client.query(
           `UPDATE h9_projects SET
-             client=COALESCE($1,client), proj_type=COALESCE($2,proj_type),
-             status=COALESCE($3,status), start_ym=COALESCE($4,start_ym), end_ym=COALESCE($5,end_ym),
-             c_amount=CASE WHEN $6>0 THEN $6 ELSE c_amount END, updated_at=now()
-           WHERE id=$7`,
-          [txt(p.client), txt(p.projType), txt(p.status), ym(p.startYm), ym(p.endYm),
-           num(p.cAmount), pid]);
+             name=$1, client=COALESCE($2,client), proj_type=COALESCE($3,proj_type),
+             status=COALESCE($4,status), start_ym=COALESCE($5,start_ym), end_ym=COALESCE($6,end_ym),
+             c_amount=CASE WHEN $7>0 THEN $7 ELSE c_amount END,
+             code=COALESCE($8,code), updated_at=now()
+           WHERE id=$9`,
+          [name, txt(p.client), txt(p.projType), txt(p.status), ym(p.startYm), ym(p.endYm),
+           num(p.cAmount), code, pid]);
         updated++;
       } else {
         const ins = await client.query(
-          `INSERT INTO h9_projects (name, client, proj_type, status, start_ym, end_ym, c_amount)
-           VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
-          [name, txt(p.client), txt(p.projType), txt(p.status) || '진행중',
+          `INSERT INTO h9_projects (code, name, client, proj_type, status, start_ym, end_ym, c_amount)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+          [code, name, txt(p.client), txt(p.projType), txt(p.status) || '진행중',
            ym(p.startYm), ym(p.endYm), num(p.cAmount)]);
         pid = Number(ins.rows[0].id);
         created++;

@@ -38,6 +38,7 @@ create index if not exists idx_h9_staff_dept on h9_staff(dept);
 -- 프로젝트 — 계약 시점 값과 완료 시점 값을 한 행에 나란히 둔다
 create table if not exists h9_projects (
   id              bigserial primary key,
+  code            text,                        -- 프로젝트번호 / 계약번호
   name            text not null,
   client          text,                        -- 발주처
   proj_type       text,                        -- 정산 형태/유형 (월 정산, 30/30/40 …)
@@ -58,6 +59,8 @@ create table if not exists h9_projects (
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now()
 );
+alter table h9_projects add column if not exists code text;
+create index if not exists idx_h9_projects_code on h9_projects(code);
 create index if not exists idx_h9_projects_type on h9_projects(proj_type);
 create index if not exists idx_h9_projects_status on h9_projects(status);
 

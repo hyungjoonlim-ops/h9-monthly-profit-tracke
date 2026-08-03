@@ -59,6 +59,43 @@
   .prov{opacity:.55;font-size:11px;white-space:nowrap}
   /* 저장 안 된 변경 표시 */
   .status.dirty{color:var(--warn);font-weight:600}
+
+  /* ── 프로젝트별 수익률 변동 막대그래프 (좌우 스와이프) ── */
+  .lgd{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted)}
+  .lgd .sw{width:10px;height:10px;border-radius:2px;display:inline-block}
+  .lgd .sw.c{background:var(--warn)} .lgd .sw.f{background:var(--accent)}
+  .barwrap{overflow-x:auto;overflow-y:hidden;padding-bottom:6px;
+    scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;
+    overscroll-behavior-x:contain;cursor:grab}
+  .barwrap.drag{cursor:grabbing;scroll-snap-type:none}
+  .barwrap.drag *{pointer-events:none}
+  .barwrap::-webkit-scrollbar{height:9px}
+  .barwrap::-webkit-scrollbar-track{background:var(--panel2);border-radius:5px}
+  .barwrap::-webkit-scrollbar-thumb{background:#38506a;border-radius:5px}
+  .barwrap::-webkit-scrollbar-thumb:hover{background:#4a678a}
+  /* 위 기준으로 정렬해야 모든 그룹의 0 기준선이 같은 높이에 온다
+     (이름이 한 줄/두 줄로 달라도 막대가 어긋나지 않게) */
+  .bars{display:flex;gap:14px;align-items:flex-start;min-height:200px;padding:4px 2px 0}
+  .bg{flex:0 0 96px;scroll-snap-align:start;display:flex;flex-direction:column;
+    align-items:center;gap:5px;cursor:pointer;border-radius:8px;padding:4px 2px}
+  .bg:hover{background:var(--panel2)}
+  .bg .dl{font-size:11.5px;font-weight:700;white-space:nowrap;height:15px;line-height:15px}
+  .bg .plot{position:relative;width:100%;height:132px}
+  .bg .zero{position:absolute;left:0;right:0;border-top:1px dashed #3a4d63}
+  .bg .pair{position:absolute;left:0;right:0;top:0;bottom:0;display:flex;
+    justify-content:center;gap:7px}
+  .bg .bar{width:24px;position:absolute;border-radius:3px 3px 0 0;min-height:2px}
+  .bg .bar.neg{border-radius:0 0 3px 3px}
+  .bg .bar.c{background:var(--warn)} .bg .bar.f{background:var(--accent)}
+  .bg .bar.none{background:repeating-linear-gradient(45deg,#2c3b4e,#2c3b4e 3px,transparent 3px,transparent 6px)}
+  .bg .vals{font-size:10.5px;color:var(--muted);white-space:nowrap;height:14px;line-height:14px}
+  .bg .vals .vc{color:var(--warn)} .bg .vals .vf{color:var(--accent)}
+  .bg .nm{font-size:11px;color:var(--ink2);text-align:center;line-height:1.25;
+    width:92px;height:34px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+    background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:3px 7px;
+    box-sizing:border-box}
+  .bg.done .nm{border-color:#3d5b7a}
+  .bars .empty{padding:60px 12px;color:var(--muted);font-size:13px}
   /* 삭제 확인 창 */
   #delBox h3{color:var(--bad);margin:0 0 10px;font-size:15px}
   #delWhat{font-size:13.5px;line-height:1.7;background:var(--panel2);border:1px solid var(--line);
@@ -140,6 +177,21 @@
   <div class="panel">
     <h2>전체 요약 <span class="tag">완료 수익률·변동은 상태가 '완료'인 프로젝트만 집계 (진행중은 잠정치)</span></h2>
     <div class="cards" id="dashCards"></div>
+  </div>
+
+  <!-- 프로젝트별 수익률 변동 막대그래프 (좌우 스와이프) -->
+  <div class="panel">
+    <div class="toolbar">
+      <h2>프로젝트별 수익률 변동 <span class="tag" id="barCount"></span></h2>
+      <div class="sp">
+        <span class="lgd"><i class="sw c"></i>계약 시점</span>
+        <span class="lgd"><i class="sw f"></i>완료 시점</span>
+        <button class="ghost sm" id="barLeft" title="왼쪽으로">←</button>
+        <button class="ghost sm" id="barRight" title="오른쪽으로">→</button>
+      </div>
+    </div>
+    <div class="barwrap" id="barWrap"><div class="bars" id="barChart"></div></div>
+    <div class="hint" id="barHint">좌우로 스와이프하거나 끌어서 넘겨 보세요. 막대는 계약 시점과 완료 시점 수익률이고, 위 숫자는 변동(%p)입니다.</div>
   </div>
 
   <div class="panel">
@@ -493,7 +545,7 @@
 </div>
 
 <script>
-const APP_VERSION='v3.2 · 입력 보호';
+const APP_VERSION='v3.3 · 수익률 변동 그래프';
 const GRADES=['초급','중급','고급','특급'];
 let projects=[],staff=[],rates={},allRows=[];
 let curId=null,cDraft=[],fDraft=[];
@@ -701,6 +753,7 @@ function renderDash(){
         ?'같은 프로젝트 계약 기준 '+a.bM.toFixed(1)+'% 대비 '+deltaHtml(a.delta)
         :'완료 프로젝트의 실적이 입력되면 표시됩니다')+'</div></div>';
 
+  renderBars(list);
   const body=document.getElementById('dashBody');
   document.getElementById('pjCount').textContent=list.length+'건';
   if(!list.length){body.innerHTML='<tr><td colspan="12" class="empty">프로젝트가 없습니다. 프로젝트 수익률 탭에서 등록하거나 구글시트로 일괄 등록하세요.</td></tr>';
@@ -739,6 +792,75 @@ function renderDash(){
     '<td class="right">'+(la.delta!=null?deltaHtml(la.delta):'–')+'</td><td></td>';
   renderTypeDash();
 }
+// ── 프로젝트별 수익률 변동 막대그래프 ────────────────────
+// 수익률이 입력된 프로젝트만 계약/완료 두 막대로 나란히 보여주고, 많으면 좌우로 넘겨 본다.
+const PLOT_H=132;
+function renderBars(list){
+  const wrap=document.getElementById('barWrap'),el=document.getElementById('barChart');
+  // 계약 수익률이 산출되는(계약액이 입력된) 프로젝트만
+  const items=list.map(p=>{
+    const c=contractStats(p),f=finalStats(p);
+    return {p,c:c.margin,f:f.margin,
+      d:(c.margin!=null&&f.margin!=null)?f.margin-c.margin:null};
+  }).filter(x=>x.c!=null||x.f!=null);
+  document.getElementById('barCount').textContent=items.length?items.length+'건':'';
+  if(!items.length){
+    el.innerHTML='<div class="empty">수익률이 입력된 프로젝트가 없습니다. 프로젝트 수익률 탭에서 계약액과 투입을 입력하세요.</div>';
+    document.getElementById('barHint').style.display='none';return;}
+  document.getElementById('barHint').style.display='';
+  // 0 을 기준선으로 두고 위(+)·아래(−) 로 뻗는다
+  const vals=items.flatMap(x=>[x.c,x.f]).filter(v=>v!=null);
+  const hi=Math.max(0,...vals),lo=Math.min(0,...vals);
+  const span=(hi-lo)||1;
+  const zero=PLOT_H*(hi/span);                       // 위에서부터 기준선까지
+  const bar=(v,k)=>{
+    const pos=k==='c'?'left:calc(50% - 31px)':'left:calc(50% + 7px)';
+    if(v==null)return '<div class="bar none '+k+'" style="height:4px;top:'+(zero-2).toFixed(1)+'px;'+
+      pos+'" title="미입력"></div>';
+    const h=Math.max(2,Math.abs(v)/span*PLOT_H),neg=v<0;
+    return '<div class="bar '+k+(neg?' neg':'')+'" style="height:'+h.toFixed(1)+'px;top:'+
+      (neg?zero:zero-h).toFixed(1)+'px;'+pos+'"></div>';
+  };
+  // 두 수익률은 막대 위에 겹쳐 쓰지 않고 한 줄로 모아 보여준다
+  const pct=v=>v==null?'-':v.toFixed(0)+'%';
+  el.innerHTML=items.map(x=>{
+    const prov=x.d!=null&&!isDone(x.p);
+    const dl=x.d==null?'<span class="muted">–</span>'
+      :'<span class="'+(x.d>=0?'up':'down')+'" style="color:'+(x.d>=0?'var(--good)':'var(--bad)')+'">'
+        +(x.d>=0?'▲ +':'▼ ')+x.d.toFixed(1)+'%p</span>'+(prov?' <span class="prov">잠정</span>':'');
+    return '<div class="bg'+(isDone(x.p)?' done':'')+'" data-bar="'+x.p.id+'" title="'+
+      esc(x.p.name)+' — 계약 '+(x.c!=null?x.c.toFixed(1)+'%':'-')+' → 완료 '+
+      (x.f!=null?x.f.toFixed(1)+'%':'미입력')+'">'+
+      '<div class="dl">'+dl+'</div>'+
+      '<div class="vals"><b class="vc">'+pct(x.c)+'</b> → <b class="vf">'+pct(x.f)+'</b></div>'+
+      '<div class="plot"><div class="zero" style="top:'+zero.toFixed(1)+'px"></div>'+
+        '<div class="pair">'+bar(x.c,'c')+bar(x.f,'f')+'</div></div>'+
+      '<div class="nm">'+esc(x.p.name)+'</div></div>';
+  }).join('');
+  el.querySelectorAll('[data-bar]').forEach(g=>g.onclick=()=>{
+    curId=+g.dataset.bar;switchTab('proj');loadProject();});
+  // 좌우 버튼은 넘길 내용이 있을 때만
+  const more=wrap.scrollWidth>wrap.clientWidth+4;
+  ['barLeft','barRight'].forEach(id=>document.getElementById(id).style.display=more?'':'none');
+}
+// 마우스로 끌어서 넘기기 (터치는 브라우저 기본 스와이프)
+(function(){
+  const wrap=document.getElementById('barWrap');
+  let down=false,x0=0,s0=0,moved=0;
+  wrap.addEventListener('pointerdown',e=>{
+    if(e.pointerType!=='mouse')return;
+    down=true;moved=0;x0=e.clientX;s0=wrap.scrollLeft;});
+  wrap.addEventListener('pointermove',e=>{
+    if(!down)return;
+    const dx=e.clientX-x0;moved=Math.max(moved,Math.abs(dx));
+    if(moved>4)wrap.classList.add('drag');
+    wrap.scrollLeft=s0-dx;});
+  const up=()=>{down=false;setTimeout(()=>wrap.classList.remove('drag'),0);};
+  wrap.addEventListener('pointerup',up);wrap.addEventListener('pointerleave',up);
+  const page=()=>Math.max(220,wrap.clientWidth-120);
+  document.getElementById('barLeft').onclick=()=>wrap.scrollBy({left:-page(),behavior:'smooth'});
+  document.getElementById('barRight').onclick=()=>wrap.scrollBy({left:page(),behavior:'smooth'});
+})();
 function renderTypeDash(){
   const map=new Map();
   projects.forEach(p=>{

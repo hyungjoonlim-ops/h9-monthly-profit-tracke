@@ -347,6 +347,11 @@
       <button class="ghost" id="impFetch">현재 탭만</button>
       <button id="impFetchAll">모든 탭 일괄</button>
     </div>
+    <div class="row" style="align-items:flex-end;margin-bottom:10px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel2)">
+      <div class="field grow"><label><b>엑셀 파일 업로드</b> — 구글시트 권한 없이 바로 등록 (.xlsx · .xls · .csv)</label>
+        <input type="file" id="impFile" accept=".xlsx,.xls,.csv"></div>
+      <button id="impUpload">파일에서 불러오기</button>
+    </div>
     <p class="hint" style="margin:0 0 10px">
       머리글 행을 포함해 붙여넣으세요. <b>프로젝트명</b>(또는 계약명)은 필수이고, 나머지는 있으면 자동 인식합니다:
       <b>프로젝트번호 · 클라이언트(고객사) · 담당 PM · 상태 · 시작 · 종료 · MM · 금액 · 정산 형태 · 파트 · 등급</b>.
@@ -372,6 +377,11 @@
         <input id="stImpUrl" placeholder="https://docs.google.com/spreadsheets/d/…"></div>
       <button class="ghost" id="stImpFetch">현재 탭만</button>
       <button id="stImpFetchAll">모든 탭 일괄</button>
+    </div>
+    <div class="row" style="align-items:flex-end;margin-bottom:10px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel2)">
+      <div class="field grow"><label><b>엑셀 파일 업로드</b> — 구글시트 권한 없이 바로 등록 (.xlsx · .xls · .csv)</label>
+        <input type="file" id="stImpFile" accept=".xlsx,.xls,.csv"></div>
+      <button id="stImpUpload">파일에서 불러오기</button>
     </div>
     <p class="hint" style="margin:0 0 10px">인력 <b>현황 시트</b>의 머리글을 포함해 붙여넣으세요 —
       <b>번호 · 부서(실) · 부서(팀) · 이름 · 기술등급(SDS) · 등급분류기준(경력)</b> 을 자동 인식합니다
@@ -413,7 +423,7 @@
 </div>
 
 <script>
-const APP_VERSION='v2.6 · 시트 읽기 경로 다중화';
+const APP_VERSION='v2.7 · 엑셀 업로드';
 const GRADES=['초급','중급','고급','특급'];
 let projects=[],staff=[],rates={},allRows=[];
 let curId=null,cDraft=[],fDraft=[];
@@ -1184,6 +1194,18 @@ function parseStaffSheet(text){
   return {list,cols:{실:dI,팀:tI,이름:nI,기술등급:gI,등급분류기준:cI}};
 }
 
+// 파일(.xlsx/.xls/.csv)을 서버에 올려 시트 목록으로 받는다 (/api/sheet-all 과 같은 형태)
+async function uploadSheetFile(inputId){
+  const inp=document.getElementById(inputId);
+  const f=inp.files&&inp.files[0];
+  if(!f)throw new Error('파일을 선택하세요.');
+  if(f.size>20*1024*1024)throw new Error('20MB 이하 파일만 올릴 수 있습니다.');
+  const r=await fetch('/api/upload-sheet',{method:'POST',
+    headers:{'Content-Type':f.type||'application/octet-stream'},body:f});
+  if(!r.ok){let m='파일 업로드 실패';try{m=(await r.json()).error||m;}catch(e){}throw new Error(m);}
+  return (await r.json()).sheets||[];
+}
+
 // ── 프로젝트 일괄 등록 모달 ───────────────────────────
 const impModal=document.getElementById('impModal');
 let impParsed=null;
@@ -1236,14 +1258,10 @@ document.getElementById('impFetch').onclick=async()=>{
   }catch(e){msg.className='msg err';msg.textContent='✗ '+e.message;}
   finally{btn.disabled=false;}
 };
-document.getElementById('impFetchAll').onclick=async()=>{
-  const msg=document.getElementById('impMsg');msg.className='msg';
-  const url=document.getElementById('impUrl').value.trim();
-  if(!url){msg.className='msg err';msg.textContent='구글시트 링크를 입력하세요.';return;}
-  const btn=document.getElementById('impFetchAll');btn.disabled=true;
-  msg.textContent='모든 탭을 읽는 중… (탭이 많으면 20초 이상 걸릴 수 있습니다)';
-  try{
-    const r=await api('/sheet-all',{method:'POST',body:JSON.stringify({url})});
+function processProjectSheets(sheets,label){
+  const msg=document.getElementById('impMsg');
+  {
+    const r={sheets};
     const merged=new Map(),ok=[],skip=[],unknown=new Set();
     for(const sh of r.sheets){
       const p=parseProjects(sh.rows.map(x=>x.join('\t')).join('\n'));
@@ -1274,9 +1292,30 @@ document.getElementById('impFetchAll').onclick=async()=>{
       return;
     }
     document.getElementById('impText').value='';
-    showImp({items,unknown:[...unknown]},'📑 인식된 탭 '+ok.length+'/'+r.sheets.length+'개: '+ok.join(', ')+skipHtml);
+    showImp({items,unknown:[...unknown]},(label?label+'<br>':'')+'📑 인식된 탭 '+ok.length+'/'+r.sheets.length+'개: '+ok.join(', ')+skipHtml);
     msg.className='msg ok';
     msg.textContent='✓ '+ok.length+'개 탭에서 프로젝트 '+items.length+'건을 모았습니다. 확인 후 [등록]을 누르세요.';
+  }
+}
+document.getElementById('impFetchAll').onclick=async()=>{
+  const msg=document.getElementById('impMsg');msg.className='msg';
+  const url=document.getElementById('impUrl').value.trim();
+  if(!url){msg.className='msg err';msg.textContent='구글시트 링크를 입력하세요.';return;}
+  const btn=document.getElementById('impFetchAll');btn.disabled=true;
+  msg.textContent='모든 탭을 읽는 중… (탭이 많으면 20초 이상 걸릴 수 있습니다)';
+  try{
+    const r=await api('/sheet-all',{method:'POST',body:JSON.stringify({url})});
+    processProjectSheets(r.sheets,'');
+  }catch(e){msg.className='msg err';msg.textContent='✗ '+e.message;}
+  finally{btn.disabled=false;}
+};
+document.getElementById('impUpload').onclick=async()=>{
+  const msg=document.getElementById('impMsg');msg.className='msg';
+  const btn=document.getElementById('impUpload');btn.disabled=true;msg.textContent='파일을 읽는 중…';
+  try{
+    const sheets=await uploadSheetFile('impFile');
+    const nm=document.getElementById('impFile').files[0].name;
+    processProjectSheets(sheets,'📄 업로드 파일: <b>'+esc(nm)+'</b>');
   }catch(e){msg.className='msg err';msg.textContent='✗ '+e.message;}
   finally{btn.disabled=false;}
 };
@@ -1341,18 +1380,15 @@ document.getElementById('stImpFetch').onclick=async()=>{
   }catch(e){msg.className='msg err';msg.textContent='✗ '+e.message;}
   finally{btn.disabled=false;}
 };
-document.getElementById('stImpFetchAll').onclick=async()=>{
-  const msg=document.getElementById('stImpMsg');msg.className='msg';
-  const url=document.getElementById('stImpUrl').value.trim();
-  if(!url){msg.className='msg err';msg.textContent='구글시트 링크를 입력하세요.';return;}
-  const btn=document.getElementById('stImpFetchAll');btn.disabled=true;msg.textContent='모든 탭을 읽는 중…';
-  try{
-    const r=await api('/sheet-all',{method:'POST',body:JSON.stringify({url})});
+function processStaffSheets(sheets,label){
+  const msg=document.getElementById('stImpMsg');
+  {
+    const r={sheets};
     const all=[],ok=[],skip=[];const seen=new Set();
     // '현황' 이 들어간 탭이 있으면 그 탭만 사용 (예: 인력 현황 시트)
     const target=r.sheets.filter(sh=>/현황/.test(sh.name));
-    const sheets=target.length?target:r.sheets;
-    for(const sh of sheets){
+    const use=target.length?target:r.sheets;
+    for(const sh of use){
       const p=parseStaffSheet(sh.rows.map(x=>x.join('\t')).join('\n'));
       if(p.error||!p.list||!p.list.length){
         const head=(sh.rows[0]||[]).filter(x=>String(x).trim()).slice(0,8).join(' | ');
@@ -1370,8 +1406,28 @@ document.getElementById('stImpFetchAll').onclick=async()=>{
       msg.className='msg err';msg.textContent='✗ 모든 탭에서 직원을 찾지 못했습니다.';return;
     }
     document.getElementById('stImpText').value='';
-    showStImp({list:all},scopeNote+'📑 인식된 탭 '+ok.length+'/'+sheets.length+'개: '+ok.join(', ')+skipHtml);
+    showStImp({list:all},(label?label+'<br>':'')+scopeNote+'📑 인식된 탭 '+ok.length+'/'+use.length+'개: '+ok.join(', ')+skipHtml);
     msg.className='msg ok';msg.textContent='✓ '+ok.length+'개 탭에서 '+all.length+'명을 모았습니다.';
+  }
+}
+document.getElementById('stImpFetchAll').onclick=async()=>{
+  const msg=document.getElementById('stImpMsg');msg.className='msg';
+  const url=document.getElementById('stImpUrl').value.trim();
+  if(!url){msg.className='msg err';msg.textContent='구글시트 링크를 입력하세요.';return;}
+  const btn=document.getElementById('stImpFetchAll');btn.disabled=true;msg.textContent='모든 탭을 읽는 중…';
+  try{
+    const r=await api('/sheet-all',{method:'POST',body:JSON.stringify({url})});
+    processStaffSheets(r.sheets,'');
+  }catch(e){msg.className='msg err';msg.textContent='✗ '+e.message;}
+  finally{btn.disabled=false;}
+};
+document.getElementById('stImpUpload').onclick=async()=>{
+  const msg=document.getElementById('stImpMsg');msg.className='msg';
+  const btn=document.getElementById('stImpUpload');btn.disabled=true;msg.textContent='파일을 읽는 중…';
+  try{
+    const sheets=await uploadSheetFile('stImpFile');
+    const nm=document.getElementById('stImpFile').files[0].name;
+    processStaffSheets(sheets,'📄 업로드 파일: <b>'+esc(nm)+'</b>');
   }catch(e){msg.className='msg err';msg.textContent='✗ '+e.message;}
   finally{btn.disabled=false;}
 };

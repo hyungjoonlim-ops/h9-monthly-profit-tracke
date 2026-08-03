@@ -581,6 +581,53 @@ app.post('/api/sheet-all', async (req, res) => {
   } catch (e) { res.status(500).json({ error: '시트 전체 가져오기 실패: ' + e.message }); }
 });
 
+// ══ 엑셀/CSV 파일 업로드 ═══════════════════════════════
+// 구글시트 접근이 막힌 환경을 위해 파일을 직접 올려 읽는다.
+// 응답 형태는 /api/sheet-all 과 동일해서 화면 로직을 그대로 쓴다.
+app.post('/api/upload-sheet',
+  express.raw({ type: () => true, limit: '20mb' }),
+  async (req, res) => {
+    try {
+      if (!Buffer.isBuffer(req.body) || !req.body.length) {
+        return res.status(400).json({ error: '파일 내용이 비어 있습니다.' });
+      }
+      const buf = req.body;
+      // 엑셀 바이너리 판별 (xlsx = ZIP 'PK', xls = OLE)
+      const isXlsx = buf[0] === 0x50 && buf[1] === 0x4b;
+      const isXls = buf[0] === 0xd0 && buf[1] === 0xcf;
+      if (!isXlsx && !isXls) {
+        // 텍스트 파일(CSV/TSV) — UTF-8 로 읽고, 깨지면 CP949(euc-kr) 로 다시 시도
+        let text = buf.toString('utf8').replace(/^\uFEFF/, '');
+        const broken = (text.match(/\uFFFD/g) || []).length;
+        if (broken > 0) {
+          try {
+            const alt = new TextDecoder('euc-kr').decode(buf).replace(/^\uFEFF/, '');
+            if ((alt.match(/\uFFFD/g) || []).length < broken) text = alt;
+          } catch (e) { /* euc-kr 미지원 환경이면 utf8 유지 */ }
+        }
+        const rows = text.includes('\t')
+          ? text.split(/\r?\n/).filter((l) => l.trim() !== '').map((l) => l.split('\t'))
+          : parseCsv(text);
+        if (!rows.length) return res.status(400).json({ error: '내용이 없는 파일입니다.' });
+        return res.json({ sheets: [{ name: 'CSV', rows: rows.map((r) => r.map((c) => String(c == null ? '' : c))) }] });
+      }
+      const XLSX = (await import('xlsx')).default || (await import('xlsx'));
+      const wb = XLSX.read(buf, { type: 'buffer', cellDates: false });
+      if (!wb.SheetNames.length) return res.status(400).json({ error: '시트를 찾을 수 없는 파일입니다.' });
+      res.json({
+        sheets: wb.SheetNames.map((name) => ({
+          name,
+          rows: XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: false, defval: '' })
+            .map((row) => row.map((c) => String(c == null ? '' : c))),
+        })),
+      });
+    } catch (e) {
+      res.status(400).json({
+        error: '파일을 읽을 수 없습니다 (' + e.message + '). .xlsx · .xls · .csv 파일인지 확인하세요.',
+      });
+    }
+  });
+
 // ══ 데이터 초기화 ══════════════════════════════════════
 app.post('/api/reset', async (req, res) => {
   const b = req.body || {};

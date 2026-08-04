@@ -206,7 +206,8 @@
       <div class="sp">
         <label style="display:flex;gap:6px;align-items:center;color:var(--ink2);font-size:12.5px">
           <input type="checkbox" id="dashMine" style="width:auto"> 내 프로젝트만</label>
-        <select id="dashFilter" style="width:160px">
+        <select id="dashPm" style="width:180px" title="담당 PM 으로 걸러 보기"></select>
+        <select id="dashFilter" style="width:150px">
           <option value="all">전체 상태</option>
           <option value="진행중">진행중</option>
           <option value="완료">완료</option>
@@ -227,7 +228,7 @@
         <tfoot><tr id="dashFoot"></tr></tfoot>
       </table>
     </div>
-    <div class="hint">행을 클릭하면 그 프로젝트의 수익률 입력 화면으로 이동합니다. 계약 수익률은 계약 시점 투입계획으로 산출한 기준값이고, 완료 수익률은 실제 투입·매출로 산출한 결과값입니다.
+    <div class="hint">목록은 <b>담당 PM 기준으로 묶여</b> 정렬되고(같은 PM 끼리 모임, 그 안에서는 프로젝트명 순), 위 <b>담당 PM</b> 셀렉트로 한 사람만 골라 볼 수 있습니다. 행을 클릭하면 그 프로젝트의 수익률 입력 화면으로 이동합니다. 계약 수익률은 계약 시점 투입계획으로 산출한 기준값이고, 완료 수익률은 실제 투입·매출로 산출한 결과값입니다.
       <b>상태가 '진행중'인 프로젝트의 변동은 아직 확정이 아니므로 <span class="prov">잠정</span> 으로 표시되고 합계·요약에서 제외됩니다.</b> 최종 변동을 반영하려면 상태를 '완료'로 바꿔 주세요.</div>
   </div>
 
@@ -552,7 +553,7 @@
 </div>
 
 <script>
-const APP_VERSION='v3.5 · 명부 10건 스크롤';
+const APP_VERSION='v3.6 · 담당 PM 필터';
 const GRADES=['초급','중급','고급','특급'];
 let projects=[],staff=[],rates={},allRows=[];
 let curId=null,cDraft=[],fDraft=[];
@@ -729,12 +730,35 @@ function aggregate(list){
   return {cAmt,cCost,fRev,fCost,cM,fM,bM,
     delta:(bM!=null&&fM!=null)?fM-bM:null,doneWith,ongoing};
 }
+// 담당 PM 셀렉트 — 프로젝트에 지정된 담당자만 목록에 넣는다 (선택값은 유지)
+function renderDashPm(){
+  const sel=document.getElementById('dashPm');
+  const keep=sel.value;
+  const names=[...new Set(projects.map(p=>String(p.pm||'').trim()).filter(Boolean))]
+    .sort((a,b)=>a.localeCompare(b,'ko'));
+  const none=projects.some(p=>!String(p.pm||'').trim());
+  sel.innerHTML='<option value="all">전체 담당 PM</option>'
+    +names.map(n=>'<option value="'+esc(n)+'">'+esc(n)+' ('+
+      projects.filter(p=>String(p.pm||'').trim()===n).length+')</option>').join('')
+    +(none?'<option value="__none">담당 미지정 ('+projects.filter(p=>!String(p.pm||'').trim()).length+')</option>':'');
+  sel.value=[...sel.options].some(o=>o.value===keep)?keep:'all';
+}
 function renderDash(){
   const f=document.getElementById('dashFilter').value;
   const mine=document.getElementById('dashMine').checked;
   const me=myName();
-  const list=projects.filter(p=>(f==='all'||p.status===f)
-    &&(!mine||!me||String(p.pm||'').trim()===me));
+  renderDashPm();
+  const pmf=document.getElementById('dashPm').value;
+  const pmOf=p=>String(p.pm||'').trim();
+  let list=projects.filter(p=>(f==='all'||p.status===f)
+    &&(!mine||!me||pmOf(p)===me)
+    &&(pmf==='all'||(pmf==='__none'?!pmOf(p):pmOf(p)===pmf)));
+  // 담당 PM 기준으로 묶어서 본다 — 같은 PM 끼리 모이고, 그 안에서는 프로젝트명 순
+  list=list.slice().sort((x,y)=>{
+    const a=pmOf(x),b=pmOf(y);
+    if(a!==b){if(!a)return 1;if(!b)return -1;return a.localeCompare(b,'ko');}
+    return String(x.name).localeCompare(String(y.name),'ko');
+  });
   const a=aggregate(projects);
   const nOn=projects.filter(p=>p.status==='진행중').length;
   const nDone=projects.filter(isDone).length;
@@ -762,8 +786,14 @@ function renderDash(){
 
   renderBars(list);
   const body=document.getElementById('dashBody');
-  document.getElementById('pjCount').textContent=list.length+'건';
-  if(!list.length){body.innerHTML='<tr><td colspan="12" class="empty">프로젝트가 없습니다. 프로젝트 수익률 탭에서 등록하거나 구글시트로 일괄 등록하세요.</td></tr>';
+  const filtered=list.length!==projects.length;
+  document.getElementById('pjCount').textContent=list.length+'건'
+    +(pmf==='all'?'':' · '+(pmf==='__none'?'담당 미지정':pmf))
+    +(filtered?' / 전체 '+projects.length+'건':'');
+  if(!list.length){
+    body.innerHTML='<tr><td colspan="12" class="empty">'+(projects.length
+      ?'조건에 맞는 프로젝트가 없습니다. 담당 PM·상태 필터를 바꿔 보세요.'
+      :'프로젝트가 없습니다. 프로젝트 수익률 탭에서 등록하거나 구글시트로 일괄 등록하세요.')+'</td></tr>';
     document.getElementById('dashFoot').innerHTML='';renderTypeDash();return;}
   body.innerHTML=list.map(p=>{
     const c=contractStats(p),fs=finalStats(p);
@@ -888,6 +918,7 @@ function renderTypeDash(){
 }
 document.getElementById('dashFilter').onchange=renderDash;
 document.getElementById('dashMine').onchange=renderDash;
+document.getElementById('dashPm').onchange=renderDash;
 document.getElementById('btnCsv').onclick=()=>{
   const rows=[['번호','프로젝트','담당PM','클라이언트','유형','상태','계약액','계약수익률(%)','완료매출','완료수익률(%)','변동(%p)','변동확정','사유']];
   projects.forEach(p=>{

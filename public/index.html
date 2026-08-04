@@ -851,7 +851,7 @@
 </div>
 
 <script>
-const APP_VERSION='v3.8 · 확정 수익률 · PM 추가';
+const APP_VERSION='v3.9 · 복사·숫자 입력 개선';
 const GRADES=['초급','중급','고급','특급'];
 let projects=[],staff=[],rates={},allRows=[];
 let curId=null,cDraft=[],fDraft=[];
@@ -871,6 +871,16 @@ function commify(el){
   el.value=v===''?'':(neg?'-':'')+Number(v).toLocaleString('ko-KR');
 }
 const MONEY_IDS=['cAmount','cOut','cEtc','fRev','fOut','fEtc'];
+// 숫자 칸이 0 일 때 클릭하면 0 을 비운다.
+// (0 이 남아 있으면 앞에 커서를 두고 입력할 때 5000000 → 50000000 처럼 0 이 하나 더 붙는다)
+// 비운 채로 벗어나면 다시 0 으로 돌려놓는다.
+const isNumBox=el=>el&&el.tagName==='INPUT'&&el.classList.contains('num');
+document.addEventListener('focusin',e=>{
+  if(isNumBox(e.target)&&pnum(e.target.value)===0)e.target.value='';
+});
+document.addEventListener('focusout',e=>{
+  if(isNumBox(e.target)&&e.target.value.trim()==='')e.target.value='0';
+});
 const pnum=s=>{const v=parseFloat(String(s).replace(/[^0-9.\-]/g,''));return isNaN(v)?0:v;};
 const esc=s=>String(s==null?'':s).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
 const cls=m=>m==null?'':m>=20?'good':m>=0?'warn':'bad';
@@ -1550,10 +1560,19 @@ document.getElementById('fAdd').onclick=()=>{
   const d=Object.keys(rates)[0]||'';
   fDraft.push({dept:d,grade:1,mm:1,rate:rateOf(d,1),staffId:null});renderPhase();renderVs();
 };
+// 계약 시점 내용을 확정 시점으로 그대로 가져온다 —
+// 금액(계약액→실제 매출, 외주비, 부대비)까지 복사한 뒤 달라진 부분만 고치면 된다.
 document.getElementById('fCopy').onclick=()=>{
   fDraft=cDraft.map(r=>({dept:r.dept,grade:r.grade,mm:r.mm,
     rate:r.rate||rateOf(r.dept,r.grade),staffId:null}));
-  renderPhase();renderVs();
+  [['cAmount','fRev'],['cOut','fOut'],['cEtc','fEtc']].forEach(([from,to])=>{
+    const dst=document.getElementById(to);
+    dst.value=document.getElementById(from).value;commify(dst);
+  });
+  renderPhase();renderVs();updateDirty();
+  const s=document.getElementById('fMsg');
+  s.className='status';s.textContent='계약 시점의 금액과 투입을 복사했습니다 — 달라진 부분만 고치세요.';
+  setTimeout(()=>{if(s.textContent.indexOf('복사했습니다')>=0)s.textContent='';},4000);
 };
 document.getElementById('btnNew').onclick=async()=>{
   const name=prompt('새 프로젝트명을 입력하세요');
@@ -2410,6 +2429,7 @@ async function refresh(){
 // ── 업데이트 히스토리 ─────────────────────────────────
 // 새 버전을 낼 때 APP_VERSION 을 올리고 이 목록 맨 위에 한 줄 추가한다.
 const CHANGELOG=[
+  ['v3.9','복사·숫자 입력 개선','<b>[← 계약 투입 복사]</b> 가 투입 행뿐 아니라 <b>계약액 → 실제 매출 · 외주비 · 부대비</b> 까지 함께 복사한다. 숫자 칸이 <b>0 일 때 클릭하면 0 이 지워져</b>, 앞에 커서를 두고 입력할 때 0 이 하나 더 붙던 문제를 없앴다(비운 채 벗어나면 0 으로 복구).'],
   ['v3.8','확정 수익률 · PM 추가','<b>완료 매출 → 확정 매출</b>, <b>완료 수익률 → 확정 수익률</b>, <b>완료 시점 → 확정 시점</b> 으로 명칭 변경(프로젝트 <b>상태</b>값 <code>완료</code> 는 그대로). 담당 PM 후보에 <b>인터렉션실 이은택 실장 · DT개발실 최용석 실장</b> 추가.'],
   ['v3.7','매뉴얼 · 버전 관리','<b>매뉴얼</b> 탭 신설 — 전체 흐름(7단계), 단계별 상세, 계산 규칙, 유의사항, 시트 형식, 자주 겪는 문제, 용어를 한 장으로 정리. <b>업데이트 히스토리</b> 표 추가.'],
   ['v3.6','담당 PM 필터','대시보드 프로젝트별 수익률에 <b>담당 PM 셀렉트</b> 추가(이름 옆 담당 건수, 담당 미지정 포함). 목록을 담당 PM 기준으로 묶어 정렬하고, 선택 시 막대그래프·합계도 함께 걸린다.'],

@@ -199,6 +199,20 @@
   .mn .btn-ref{display:inline-block;background:var(--accent);color:#04121f;border-radius:5px;
     padding:1px 7px;font-size:11px;font-weight:700}
   .mn .btn-ref.g{background:transparent;color:var(--ink2);border:1px solid var(--muted)}
+  /* 개발 스펙 요약 박스 */
+  .spec{border:1px solid var(--line);border-left:3px solid var(--good);border-radius:9px;
+    background:var(--panel2);padding:14px 16px;margin:0 0 18px}
+  .spec .sp-h{font-size:13.5px;font-weight:700;color:var(--ink);margin-bottom:11px;
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .spec .sp-g{display:grid;grid-template-columns:1fr;gap:10px 22px}
+  @media (min-width:820px){.spec .sp-g{grid-template-columns:1fr 1fr}}
+  @media (min-width:1400px){.spec .sp-g{grid-template-columns:1fr 1fr 1fr}}
+  .spec .sp-i{border-top:1px solid var(--line);padding-top:8px}
+  .spec .sp-i .k{font-size:10.5px;color:var(--accent);font-weight:700;letter-spacing:.02em}
+  .spec .sp-i .v{font-size:12.5px;color:var(--ink2);margin-top:2px;line-height:1.5}
+  .spec .sp-i .n2{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.5}
+  .spec .sp-f{border-top:1px solid var(--line);margin-top:12px;padding-top:9px;
+    font-size:11px;color:var(--muted);line-height:1.6}
 </style>
 
 <header>
@@ -475,6 +489,41 @@
       <div class="sp"><span class="tag">이 화면은 읽기 전용입니다 · 데이터가 바뀌지 않습니다</span></div>
     </div>
     <div class="mn">
+
+    <!-- 개발 스펙 요약 -->
+    <div class="spec">
+      <div class="sp-h">개발 스펙 요약 <span class="tag">H9 프로젝트 수익률 관리 시스템</span></div>
+      <div class="sp-g">
+        <div class="sp-i"><div class="k">개발 언어 · 런타임</div><div class="v">JavaScript (ES Modules) · <b>Node.js 22</b></div>
+          <div class="n2">빌드 도구 없음 — 소스를 그대로 실행합니다</div></div>
+        <div class="sp-i"><div class="k">백엔드</div><div class="v"><b>Express 4</b> + <code>pg</code> (REST API)</div>
+          <div class="n2">서버 파일 1개 (<code>server.js</code>)</div></div>
+        <div class="sp-i"><div class="k">프론트엔드</div><div class="v">정적 <b>HTML · CSS · Vanilla JS</b></div>
+          <div class="n2">단일 파일 (<code>public/index.html</code>) · 외부 프레임워크·CDN 미사용</div></div>
+        <div class="sp-i"><div class="k">데이터베이스</div><div class="v"><b>PostgreSQL</b> (Supabase 관리형)</div>
+          <div class="n2">Session pooler 접속(IPv4) · SSL 사용</div></div>
+        <div class="sp-i"><div class="k">테이블 (6개)</div>
+          <div class="v"><code>h9_projects</code> <code>h9_rows</code> <code>h9_logs</code></div>
+          <div class="n2"><code>h9_staff</code> <code>h9_rates</code> <code>h9_settings</code> — 접두사 <code>h9_</code>, 서버 시작 시 자동 생성</div></div>
+        <div class="sp-i"><div class="k">소스 관리</div><div class="v"><b>GitHub</b> — <code>hyungjoonlim-ops/h9-monthly-profit-tracke</code></div>
+          <div class="n2">기본 브랜치 <code>main</code> · push 하면 자동 배포</div></div>
+        <div class="sp-i"><div class="k">호스팅 · 배포</div><div class="v"><b>Render</b> Web Service (Blueprint)</div>
+          <div class="n2"><code>render.yaml</code> 자동 인식 · 싱가포르 리전 · 무료 플랜</div></div>
+        <div class="sp-i"><div class="k">로그인 · 보안</div><div class="v"><b>공용 비밀번호</b> 1개 + 입력자 이름 기록</div>
+          <div class="n2">scrypt 해시 저장 · HttpOnly 쿠키 세션(12시간) · 앱에서 비밀번호 변경 가능</div></div>
+        <div class="sp-i"><div class="k">외부 연동</div><div class="v"><b>구글시트</b> 읽기 · <b>엑셀/CSV</b> 업로드</div>
+          <div class="n2">보기 권한만으로 읽기 · <code>.xlsx</code> <code>.xls</code> <code>.csv</code>(UTF-8·CP949) 인식</div></div>
+        <div class="sp-i"><div class="k">동시 사용</div><div class="v"><b>여러 PM 동시 접속</b> 지원</div>
+          <div class="n2">낙관적 잠금으로 같은 프로젝트 덮어쓰기 차단 · 프로젝트번호 unique 제약</div></div>
+        <div class="sp-i"><div class="k">구축 이력</div><div class="v">최초 구축 <b>2026-07-25</b> · v2.0 전면 재구축</div>
+          <div class="n2">최근 업데이트 <b id="specDate">2026-08-04</b> · 현재 <b id="specVer"></b></div></div>
+        <div class="sp-i"><div class="k">규모</div><div class="v">약 <b>3,400줄</b> (서버 790 · 화면 2,500)</div>
+          <div class="n2">의존 패키지 5개 — express · pg · cookie-session · dotenv · xlsx</div></div>
+      </div>
+      <div class="sp-f">환경변수 <code>PGHOST</code> <code>PGPORT</code> <code>PGUSER</code> <code>PGPASSWORD</code>
+        <code>PGDATABASE</code> <code>APP_PASSWORD</code> (<code>SESSION_SECRET</code> 은 자동 생성) —
+        비밀값은 소스에 두지 않고 Render 대시보드에서 관리합니다.</div>
+    </div>
 
     <h3><span class="n">1</span>전체 흐름</h3>
     <p>처음 쓰신다면 아래 순서대로 한 번 따라 하시면 됩니다. <b>①②는 처음 한 번만</b>, ③~⑦은 프로젝트마다 반복합니다.</p>
@@ -851,7 +900,7 @@
 </div>
 
 <script>
-const APP_VERSION='v4.0 · 검수 반영(동시저장·집계)';
+const APP_VERSION='v4.1 · 개발 스펙 요약';
 const GRADES=['초급','중급','고급','특급'];
 let projects=[],staff=[],rates={},allRows=[];
 let curId=null,cDraft=[],fDraft=[];
@@ -2441,6 +2490,7 @@ async function refresh(){
 // ── 업데이트 히스토리 ─────────────────────────────────
 // 새 버전을 낼 때 APP_VERSION 을 올리고 이 목록 맨 위에 한 줄 추가한다.
 const CHANGELOG=[
+  ['v4.1','개발 스펙 요약','매뉴얼 상단에 <b>개발 스펙 요약 박스</b> 추가 — 개발 언어·런타임, 백엔드·프론트엔드, DB·테이블, GitHub, 호스팅, 로그인·보안, 외부 연동, 동시 사용, 구축 이력, 코드 규모, 환경변수.'],
   ['v4.0','검수 반영','전체 검증에서 발견한 결함 4건 수정 — ① <b>동시 저장 보호가 뚫리던 문제</b>(1초 관용 때문에 나중 저장이 앞 값을 덮어씀)를 원자적 조건부 UPDATE 로 바꾸고 누가 먼저 저장했는지 알려준다. ② 계약액이 0인 완료 프로젝트가 <b>변동 비교를 오염</b>시키던 문제 — 계약·확정이 둘 다 있는 건만 짝지어 비교. ③ 일괄 등록에서 <b>번호가 같아 다른 프로젝트 이름이 조용히 바뀌던</b> 것을 결과에 경고. ④ 직원 개별 삭제 확인창 문구를 실제 동작(완전 삭제)에 맞게 수정.'],
   ['v3.9','복사·숫자 입력 개선','<b>[← 계약 투입 복사]</b> 가 투입 행뿐 아니라 <b>계약액 → 실제 매출 · 외주비 · 부대비</b> 까지 함께 복사한다. 숫자 칸이 <b>0 일 때 클릭하면 0 이 지워져</b>, 앞에 커서를 두고 입력할 때 0 이 하나 더 붙던 문제를 없앴다(비운 채 벗어나면 0 으로 복구).'],
   ['v3.8','확정 수익률 · PM 추가','<b>완료 매출 → 확정 매출</b>, <b>완료 수익률 → 확정 수익률</b>, <b>완료 시점 → 확정 시점</b> 으로 명칭 변경(프로젝트 <b>상태</b>값 <code>완료</code> 는 그대로). 담당 PM 후보에 <b>인터렉션실 이은택 실장 · DT개발실 최용석 실장</b> 추가.'],
@@ -2471,6 +2521,7 @@ function renderChangelog(){
     '<td><b>'+v+'</b>'+(v===cur?' <span class="pill good" style="font-size:9.5px">현재</span>':'')+'</td>'+
     '<td>'+t+'</td><td>'+d+'</td></tr>').join('');
   document.getElementById('manVer').textContent=APP_VERSION;
+  const sv=document.getElementById('specVer');if(sv)sv.textContent=APP_VERSION;
 }
 (async function(){
   document.getElementById('appVer').textContent=APP_VERSION;

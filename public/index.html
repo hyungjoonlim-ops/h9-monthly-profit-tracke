@@ -138,12 +138,12 @@
   .phase h3{font-size:13.5px;margin:0 0 12px;font-weight:700;display:flex;gap:8px;align-items:center}
   .phase .tw table{min-width:620px}
   /* 두 시점 카드의 입력칸을 같은 4열 그리드로 맞춘다
-     (계약 시점은 4번째 칸이 비고, 완료 시점은 그 자리에 완료(정산) 월이 들어간다) */
+     (계약 시점은 4번째 칸이 비고, 확정 시점은 그 자리에 확정(정산) 월이 들어간다) */
   .phase .row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:2px}
   .phase .row .field{min-width:0}
   /* 라벨은 한 줄로 — 두 카드의 입력칸 높이가 어긋나지 않게 */
   .phase .row label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  /* 좁아져도 4열을 유지해 완료(정산) 월이 첫 줄에 남게 한다 (칸만 좁아진다).
+  /* 좁아져도 4열을 유지해 확정(정산) 월이 첫 줄에 남게 한다 (칸만 좁아진다).
      month 입력칸은 기본 최소 폭이 있어 따로 풀어 준다 */
   .phase .row input[type=month]{min-width:0;padding-left:6px;padding-right:4px}
   @media (max-width:1100px){.phase .row{gap:8px}}
@@ -203,7 +203,7 @@
 
 <header>
   <h1>H9 프로젝트 수익률 관리</h1>
-  <span class="sub">계약 시점 수익률 ↔ 완료 시점 수익률 · 변동 관리 <span class="muted" id="appVer"></span></span>
+  <span class="sub">계약 시점 수익률 ↔ 확정 시점 수익률 · 변동 관리 <span class="muted" id="appVer"></span></span>
   <span class="right"><span class="dot" id="dot"></span><span id="connText">연결 확인 중…</span>
     <span class="muted">입력자</span>
     <input id="myName" placeholder="이름 입력" style="width:96px;padding:4px 7px;font-size:12px">
@@ -223,7 +223,7 @@
 <!-- ═══════════ 대시보드 ═══════════ -->
 <section id="tab-dash">
   <div class="panel">
-    <h2>전체 요약 <span class="tag">완료 수익률·변동은 상태가 '완료'인 프로젝트만 집계 (진행중은 잠정치)</span></h2>
+    <h2>전체 요약 <span class="tag">확정 수익률·변동은 상태가 '완료'인 프로젝트만 집계 (진행중은 잠정치)</span></h2>
     <div class="cards" id="dashCards"></div>
   </div>
 
@@ -233,13 +233,13 @@
       <h2>프로젝트별 수익률 변동 <span class="tag" id="barCount"></span></h2>
       <div class="sp">
         <span class="lgd"><i class="sw c"></i>계약 시점</span>
-        <span class="lgd"><i class="sw f"></i>완료 시점</span>
+        <span class="lgd"><i class="sw f"></i>확정 시점</span>
         <button class="ghost sm" id="barLeft" title="왼쪽으로">←</button>
         <button class="ghost sm" id="barRight" title="오른쪽으로">→</button>
       </div>
     </div>
     <div class="barwrap" id="barWrap"><div class="mchart" id="barChart"></div></div>
-    <div class="hint" id="barHint">좌우로 스와이프하거나 끌어서 넘겨 보세요. 위 숫자는 <b>계약 시점 → 완료 시점</b> 수익률이고, 막대에 마우스를 올리면 변동(%p)이 나옵니다.</div>
+    <div class="hint" id="barHint">좌우로 스와이프하거나 끌어서 넘겨 보세요. 위 숫자는 <b>계약 시점 → 확정 시점</b> 수익률이고, 막대에 마우스를 올리면 변동(%p)이 나옵니다.</div>
   </div>
 
   <div class="panel">
@@ -263,25 +263,25 @@
         <thead><tr>
           <th>번호</th><th>프로젝트</th><th>담당 PM</th><th>클라이언트</th><th>유형</th><th>상태</th>
           <th class="right">계약액</th><th class="right">계약 수익률</th>
-          <th class="right">완료 매출</th><th class="right">완료 수익률</th>
+          <th class="right">확정 매출</th><th class="right">확정 수익률</th>
           <th class="right">변동</th><th>사유</th>
         </tr></thead>
         <tbody id="dashBody"></tbody>
         <tfoot><tr id="dashFoot"></tr></tfoot>
       </table>
     </div>
-    <div class="hint">목록은 <b>담당 PM 기준으로 묶여</b> 정렬되고(같은 PM 끼리 모임, 그 안에서는 프로젝트명 순), 위 <b>담당 PM</b> 셀렉트로 한 사람만 골라 볼 수 있습니다. 행을 클릭하면 그 프로젝트의 수익률 입력 화면으로 이동합니다. 계약 수익률은 계약 시점 투입계획으로 산출한 기준값이고, 완료 수익률은 실제 투입·매출로 산출한 결과값입니다.
+    <div class="hint">목록은 <b>담당 PM 기준으로 묶여</b> 정렬되고(같은 PM 끼리 모임, 그 안에서는 프로젝트명 순), 위 <b>담당 PM</b> 셀렉트로 한 사람만 골라 볼 수 있습니다. 행을 클릭하면 그 프로젝트의 수익률 입력 화면으로 이동합니다. 계약 수익률은 계약 시점 투입계획으로 산출한 기준값이고, 확정 수익률은 실제 투입·매출로 산출한 결과값입니다.
       <b>상태가 '진행중'인 프로젝트의 변동은 아직 확정이 아니므로 <span class="prov">잠정</span> 으로 표시되고 합계·요약에서 제외됩니다.</b> 최종 변동을 반영하려면 상태를 '완료'로 바꿔 주세요.</div>
   </div>
 
   <div class="panel">
-    <h2>유형별 수익률 <span class="tag">정산 형태 기준 · 완료 수익률과 변동은 완료 프로젝트만 집계</span></h2>
+    <h2>유형별 수익률 <span class="tag">정산 형태 기준 · 확정 수익률과 변동은 완료 프로젝트만 집계</span></h2>
     <div class="tw">
       <table>
         <thead><tr>
           <th>유형</th><th class="right">건수</th><th class="right">진행중 / 완료</th>
           <th class="right">계약액 합계</th>
-          <th class="right">계약 수익률</th><th class="right">완료 수익률</th><th class="right">변동</th>
+          <th class="right">계약 수익률</th><th class="right">확정 수익률</th><th class="right">변동</th>
         </tr></thead>
         <tbody id="typeBody"></tbody>
       </table>
@@ -349,14 +349,14 @@
       </div>
     </div>
 
-    <!-- 완료 시점 -->
+    <!-- 확정 시점 -->
     <div class="phase f">
-      <h3>② 완료 시점 (실적) <span class="pill flat">실제 결과</span></h3>
+      <h3>② 확정 시점 (실적) <span class="pill flat">실제 결과</span></h3>
       <div class="row">
         <div class="field"><label title="0으로 두면 계약액과 동일하게 봅니다">실제 매출 (0 = 계약액)</label><input id="fRev" class="num" inputmode="numeric" value="0"></div>
         <div class="field"><label>외주비</label><input id="fOut" class="num" inputmode="numeric" value="0"></div>
         <div class="field"><label>부대비</label><input id="fEtc" class="num" inputmode="numeric" value="0"></div>
-        <div class="field"><label>완료(정산) 월</label><input type="month" id="fClosed"></div>
+        <div class="field"><label>확정(정산) 월</label><input type="month" id="fClosed"></div>
       </div>
       <div class="tw" style="margin-top:12px">
         <table>
@@ -378,10 +378,10 @@
   </div>
 
   <div class="panel" style="margin-top:16px">
-    <h2>변동 분석 <span class="tag">완료 − 계약</span></h2>
+    <h2>변동 분석 <span class="tag">확정 − 계약</span></h2>
     <div class="tw">
       <table>
-        <thead><tr><th>항목</th><th class="right">계약 시점</th><th class="right">완료 시점</th><th class="right">차이</th><th>영향</th></tr></thead>
+        <thead><tr><th>항목</th><th class="right">계약 시점</th><th class="right">확정 시점</th><th class="right">차이</th><th>영향</th></tr></thead>
         <tbody id="varBody"></tbody>
       </table>
     </div>
@@ -491,7 +491,7 @@
       <div class="fs"><div class="fn">STEP 4</div><div class="ft">계약 시점 입력</div>
         <div class="fd">계약액·투입계획 → 기준 수익률 확정</div></div>
       <div class="fa">›</div>
-      <div class="fs"><div class="fn">STEP 5</div><div class="ft">완료 시점 입력</div>
+      <div class="fs"><div class="fn">STEP 5</div><div class="ft">확정 시점 입력</div>
         <div class="fd">실제 매출·실제 투입 입력</div></div>
       <div class="fa">›</div>
       <div class="fs"><div class="fn">STEP 6</div><div class="ft">변동 사유 기록</div>
@@ -515,19 +515,20 @@
             <td>단가가 <b>0</b>이면 인건비가 0으로 계산되어 수익률이 실제보다 높게 나옵니다. 등록 직후 <b>0인 칸이 없는지</b> 꼭 확인하세요.</td></tr>
           <tr><td><b>3</b></td><td>프로젝트 수익률</td>
             <td><span class="btn-ref">구글시트 일괄 등록</span> 으로 <b>프로젝트번호 · 프로젝트명 · 클라이언트 · 상태</b> 를 올리거나, <span class="btn-ref g">+ 새 프로젝트</span> 로 하나씩 만듭니다. 이어서 담당 PM · 유형 · 시작/종료월을 넣고 <span class="btn-ref">프로젝트 정보 저장</span>.</td>
-            <td>같은 시트를 여러 번 올려도 <b>중복 생성되지 않습니다</b>(번호 → 이름 순으로 기존 건을 찾아 갱신). <b>담당 PM</b>을 넣어 두면 대시보드에서 PM별로 걸러 볼 수 있습니다.</td></tr>
+            <td>같은 시트를 여러 번 올려도 <b>중복 생성되지 않습니다</b>(번호 → 이름 순으로 기존 건을 찾아 갱신). <b>담당 PM</b>을 넣어 두면 대시보드에서 PM별로 걸러 볼 수 있습니다.
+              담당 PM 후보에는 <b>PM실 인원</b>과 함께 <b>인터렉션실 이은택 실장 · DT개발실 최용석 실장</b>이 들어갑니다(직접 입력도 됩니다).</td></tr>
           <tr><td><b>4</b></td><td>프로젝트 수익률<br><span class="muted">① 계약 시점</span></td>
             <td><b>계약액(VAT 제외)</b> · 외주비 · 부대비를 넣고, <span class="btn-ref g">+ 투입 행 추가</span> 로 <b>소속 · 등급 · MM</b> 을 채웁니다. 소속·등급을 고르면 단가가 자동으로 들어옵니다.</td>
             <td>여기가 <b>기준값</b>입니다. 저장하면 그때의 단가가 <b>고정 보관</b>되어, 이후 단가표를 바꿔도 계약 기준 수익률은 흔들리지 않습니다. 실제 계약 단가가 다르면 단가 칸을 직접 고치세요.</td></tr>
-          <tr><td><b>5</b></td><td>프로젝트 수익률<br><span class="muted">② 완료 시점</span></td>
-            <td><b>실제 매출</b> · 실제 외주비 · 부대비 · 완료(정산) 월을 넣고, 실제 투입 인력을 채웁니다. <span class="btn-ref g">← 계약 투입 복사</span> 로 계약 내용을 가져온 뒤 <b>달라진 부분만</b> 고치면 빠릅니다.</td>
+          <tr><td><b>5</b></td><td>프로젝트 수익률<br><span class="muted">② 확정 시점</span></td>
+            <td><b>실제 매출</b> · 실제 외주비 · 부대비 · 확정(정산) 월을 넣고, 실제 투입 인력을 채웁니다. <span class="btn-ref g">← 계약 투입 복사</span> 로 계약 내용을 가져온 뒤 <b>달라진 부분만</b> 고치면 빠릅니다.</td>
             <td>실제 매출을 <b>0으로 두면 계약액과 같다고</b> 봅니다. 진행 중에도 그때까지의 투입을 넣어 두면 예상 수익률을 미리 볼 수 있습니다(대시보드에서는 <span class="prov">잠정</span> 으로 표시).</td></tr>
           <tr><td><b>6</b></td><td>프로젝트 수익률<br><span class="muted">변동 분석</span></td>
             <td>변동 분석표와 <b>인건비 변동 상세</b>(어느 소속·등급에서 MM이 늘거나 줄어 개선·악화됐는지 문장으로 설명)를 확인하고, <b>수익률 변동 사유</b>를 적고 <span class="btn-ref">수익률 저장 (이력 기록)</span>.</td>
             <td>이 버튼이 <b>투입 행과 이력까지 함께 저장</b>합니다. 위쪽 <span class="btn-ref">프로젝트 정보 저장</span> 은 이름·PM·상태 같은 <b>정보만</b> 저장합니다 — 둘을 구분해서 누르세요.</td></tr>
           <tr><td><b>7</b></td><td>프로젝트 수익률 → 대시보드</td>
             <td>정산이 끝나면 <b>상태</b>를 <code>완료</code> 로 바꾸고 저장합니다. 대시보드에서 요약·그래프·표로 확인합니다.</td>
-            <td><b>상태가 진행중이면 최종 집계에 들어가지 않습니다.</b> 완료로 바꿔야 완료 수익률과 변동에 반영됩니다.</td></tr>
+            <td><b>상태가 진행중이면 최종 집계에 들어가지 않습니다.</b> 완료로 바꿔야 확정 수익률과 변동에 반영됩니다.</td></tr>
         </tbody>
       </table>
     </div>
@@ -538,8 +539,8 @@
         <thead><tr><th style="width:170px">항목</th><th>산식</th></tr></thead>
         <tbody>
           <tr><td><b>계약 시점 수익률</b></td><td>( 계약액 − ( Σ 계약MM × <b>저장된 단가</b> + 계약 외주비 + 계약 부대비 ) ) ÷ 계약액 × 100</td></tr>
-          <tr><td><b>완료 시점 수익률</b></td><td>( 실제 매출 − ( Σ 실투입MM × 단가 + 실제 외주비 + 실제 부대비 ) ) ÷ 실제 매출 × 100</td></tr>
-          <tr><td><b>수익률 변동</b></td><td>완료 시점 수익률 − 계약 시점 수익률 &nbsp;(단위 <code>%p</code>)</td></tr>
+          <tr><td><b>확정 시점 수익률</b></td><td>( 실제 매출 − ( Σ 실투입MM × 단가 + 실제 외주비 + 실제 부대비 ) ) ÷ 실제 매출 × 100</td></tr>
+          <tr><td><b>수익률 변동</b></td><td>확정 시점 수익률 − 계약 시점 수익률 &nbsp;(단위 <code>%p</code>)</td></tr>
           <tr><td><b>인건비</b></td><td>Σ ( 투입 MM × 단가/MM ) &nbsp;— 단가는 소속 × 등급으로 단가표에서 찾습니다</td></tr>
           <tr><td><b>대시보드 합계</b></td><td>프로젝트별 평균이 아니라 <b>금액 가중 평균</b> — ( Σ 매출 − Σ 원가 ) ÷ Σ 매출</td></tr>
         </tbody>
@@ -547,9 +548,9 @@
     </div>
     <div class="box">
       <div class="bt">변동은 같은 프로젝트끼리만 비교합니다</div>
-      <p>대시보드의 <b>완료 수익률</b>과 <b>변동</b>은 상태가 <code>완료</code> 이고 실적이 입력된 프로젝트만 모아 계산하고,
+      <p>대시보드의 <b>확정 수익률</b>과 <b>변동</b>은 상태가 <code>완료</code> 이고 실적이 입력된 프로젝트만 모아 계산하고,
       그 변동은 <b>바로 그 프로젝트들의 계약 기준 수익률</b>과 비교합니다. 전체 평균과 섞지 않기 때문에
-      "계약 66.7% → 완료 57.1%, 변동 −9.5%p" 처럼 서로 짝이 맞는 숫자가 나옵니다.</p>
+      "계약 66.7% → 확정 57.1%, 변동 −9.5%p" 처럼 서로 짝이 맞는 숫자가 나옵니다.</p>
     </div>
 
     <h3><span class="n">4</span>반드시 알아야 할 유의사항</h3>
@@ -569,8 +570,8 @@
         </div>
         <div class="box"><div class="bt">③ 계약 시점 단가는 고정됩니다</div>
           <p>계약 시점 투입을 저장하면 <b>그 시점의 단가가 그대로 보관</b>됩니다. 나중에 단가표를 올려도
-          과거 계약 기준은 바뀌지 않습니다. 반대로 <b>완료 시점</b>은 현재 단가를 따르므로,
-          단가표를 수정하면 완료 수익률이 달라질 수 있습니다.</p>
+          과거 계약 기준은 바뀌지 않습니다. 반대로 <b>확정 시점</b>은 현재 단가를 따르므로,
+          단가표를 수정하면 확정 수익률이 달라질 수 있습니다.</p>
         </div>
         <div class="box good"><div class="bt">④ 저장 안 한 입력은 보호됩니다</div>
           <p>입력 중 변경이 있으면 저장바에 <b>● 저장 안 된 변경 있음</b>이 뜹니다. 이 상태에서는
@@ -659,9 +660,9 @@
           <tr><td>수익률이 실제보다 <b>너무 높게</b> 나온다</td>
             <td>투입 행의 <b>단가가 0</b>이거나 투입 행 자체가 비어 있습니다. 단가표에 그 소속이 있는지 확인하고
               <span class="btn-ref g">직원 소속 채우기</span> → <span class="btn-ref">단가표 저장</span>.</td></tr>
-          <tr><td>완료 수익률이 <b>-</b> 로만 보인다</td>
-            <td>완료 시점에 아무것도 입력되지 않은 상태입니다. 실제 매출이나 실제 투입 중 하나라도 넣으면 계산됩니다.</td></tr>
-          <tr><td>대시보드 <b>완료 수익률</b>에 내 프로젝트가 안 잡힌다</td>
+          <tr><td>확정 수익률이 <b>-</b> 로만 보인다</td>
+            <td>확정 시점에 아무것도 입력되지 않은 상태입니다. 실제 매출이나 실제 투입 중 하나라도 넣으면 계산됩니다.</td></tr>
+          <tr><td>대시보드 <b>확정 수익률</b>에 내 프로젝트가 안 잡힌다</td>
             <td>상태가 <code>진행중</code> 이면 집계에서 빠집니다. <code>완료</code> 로 바꿔 주세요.</td></tr>
           <tr><td>저장했더니 <b>"다른 사용자가 먼저 저장했습니다"</b></td>
             <td>같은 프로젝트를 다른 사람이 먼저 저장했습니다. 입력값을 복사해 두고
@@ -691,7 +692,8 @@
           <tr><td><b>단가/MM</b></td><td>1 MM 당 금액(원). 소속 × 등급으로 정해집니다.</td></tr>
           <tr><td><b>%p</b></td><td>퍼센트 포인트. 수익률 50% → 40% 는 <b>−10%p</b>.</td></tr>
           <tr><td><b>계약 시점 (기준)</b></td><td>계약할 때 계획한 수익률. 저장 시점 단가로 고정.</td></tr>
-          <tr><td><b>완료 시점 (실적)</b></td><td>실제 매출·실제 투입으로 계산한 결과 수익률.</td></tr>
+          <tr><td><b>확정 시점 (실적)</b></td><td>실제 매출·실제 투입으로 확정된 결과 수익률. 화면의 <b>확정 매출 · 확정 수익률</b>이 이 값입니다.</td></tr>
+          <tr><td><b>상태 <code>완료</code></b></td><td>프로젝트 진행 상태값(진행중 / 완료 / 보류). <b>확정</b>은 금액·수익률 이름이고, <b>완료</b>는 상태 이름입니다 — 서로 다릅니다.</td></tr>
           <tr><td><span class="prov">잠정</span></td><td>상태가 진행중이라 아직 확정이 아닌 변동값. 합계에서 제외됩니다.</td></tr>
           <tr><td><b>유형 (정산 형태)</b></td><td>월 정산, 30/30/40 등 대금 정산 방식. 대시보드에서 유형별로 묶어 봅니다.</td></tr>
         </tbody>
@@ -849,7 +851,7 @@
 </div>
 
 <script>
-const APP_VERSION='v3.7 · 매뉴얼 · 버전 관리';
+const APP_VERSION='v3.8 · 확정 수익률 · PM 추가';
 const GRADES=['초급','중급','고급','특급'];
 let projects=[],staff=[],rates={},allRows=[];
 let curId=null,cDraft=[],fDraft=[];
@@ -956,13 +958,17 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Enter'&&document.activeElement!==document.getElementById('delNo'))closeDelete(true);
 });
 
-// 담당 PM 후보 — 소속·팀·직책에 PM 이 들어간 직원만 (이미 지정된 담당 PM 은 항상 유지)
-const isPm=s=>['dept','team','title'].some(k=>/pm|피엠/i.test(String(s[k]||'')));
+// 담당 PM 후보 — 소속·팀·직책에 PM 이 들어간 직원 (이미 지정된 담당 PM 은 항상 유지)
+// PM실이 아니어도 프로젝트를 직접 맡는 분들은 아래에 이름을 추가한다.
+const EXTRA_PMS=['이은택','최용석'];   // 인터렉션실 실장 · DT개발실 실장
+const isPm=s=>EXTRA_PMS.some(n=>key(n)===key(s.name))
+  ||['dept','team','title'].some(k=>/pm|피엠/i.test(String(s[k]||'')));
 function pmCandidates(){
   const assigned=projects.map(p=>p.pm).filter(Boolean);
   let names=staff.filter(isPm).map(s=>s.name);
   if(names.length===0&&assigned.length===0)names=staff.map(s=>s.name); // PM 소속이 없으면 전체 표시
-  return [...new Set([...names,...assigned])].sort((a,b)=>a.localeCompare(b,'ko'));
+  // 명부에 아직 등록되지 않았어도 후보에는 항상 넣는다
+  return [...new Set([...names,...EXTRA_PMS,...assigned])].sort((a,b)=>a.localeCompare(b,'ko'));
 }
 function renderPmList(){
   document.getElementById('pmList').innerHTML=
@@ -991,7 +997,7 @@ function contractStats(p,draft){
   const margin=p.cAmount>0?(p.cAmount-cost)/p.cAmount*100:null;
   return {mm,labor,cost,revenue:p.cAmount,margin,rows};
 }
-// 완료 시점: 현재 단가 사용 (인력 등급이 바뀌면 따라 바뀜)
+// 확정 시점: 현재 단가 사용 (인력 등급이 바뀌면 따라 바뀜)
 function finalStats(p,draft){
   const rows=draft||rowsOf(p.id,'F');
   let mm=0,labor=0;
@@ -1005,7 +1011,7 @@ function finalStats(p,draft){
 const curProject=()=>projects.find(p=>p.id===curId)||null;
 
 // ── 대시보드 ──────────────────────────────────────────
-// 진행중 프로젝트는 아직 최종 실적이 아니므로 완료 수익률·변동 집계에서 제외한다.
+// 진행중 프로젝트는 아직 최종 실적이 아니므로 확정 수익률·변동 집계에서 제외한다.
 // (화면에는 '잠정' 으로만 보여주고 요약·합계 수치에는 넣지 않는다)
 const isDone=p=>p.status==='완료';
 const pctOf=(rev,cost)=>rev>0?(rev-cost)/rev*100:null;
@@ -1074,11 +1080,11 @@ function renderDash(){
       '<div class="foot">계약 원가 '+won(a.cCost)+'</div></div>'+
     '<div class="card"><div class="lbl">계약 기준 수익률</div><div class="val '+cls(a.cM)+'">'+(a.cM!=null?a.cM.toFixed(1)+'%':'-')+'</div>'+
       '<div class="foot">전 프로젝트 가중 평균</div></div>'+
-    '<div class="card hl"><div class="lbl">완료 수익률 <span class="tag">완료 '+a.doneWith+'건</span></div>'+
+    '<div class="card hl"><div class="lbl">확정 수익률 <span class="tag">완료 '+a.doneWith+'건</span></div>'+
       '<div class="val '+cls(a.fM)+'">'+(a.fM!=null?a.fM.toFixed(1)+'%':'-')+'</div>'+
       '<div class="foot">'+(a.delta!=null
         ?'같은 프로젝트 계약 기준 '+a.bM.toFixed(1)+'% 대비 '+deltaHtml(a.delta)
-        :'완료 프로젝트의 실적이 입력되면 표시됩니다')+'</div></div>';
+        :'완료 상태 프로젝트의 실적이 입력되면 표시됩니다')+'</div></div>';
 
   renderBars(list);
   const body=document.getElementById('dashBody');
@@ -1115,7 +1121,7 @@ function renderDash(){
   body.querySelectorAll('[data-go]').forEach(tr=>tr.onclick=()=>{
     curId=+tr.dataset.go;switchTab('proj');loadProject();
   });
-  // 합계 — 완료 수익률·변동은 목록 중 '완료' 프로젝트만으로 계산
+  // 합계 — 확정 수익률·변동은 목록 중 '완료' 프로젝트만으로 계산
   const la=aggregate(list);
   document.getElementById('dashFoot').innerHTML=
     '<td></td><td>합계 '+list.length+'건</td><td></td><td></td><td></td>'+
@@ -1126,7 +1132,7 @@ function renderDash(){
   renderTypeDash();
 }
 // ── 프로젝트별 수익률 변동 막대그래프 ────────────────────
-// 수익률이 입력된 프로젝트만 계약/완료 두 막대로 나란히 보여주고, 많으면 좌우로 넘겨 본다.
+// 수익률이 입력된 프로젝트만 계약/확정 두 막대로 나란히 보여주고, 많으면 좌우로 넘겨 본다.
 const PLOT_H=132;
 function renderBars(list){
   const wrap=document.getElementById('barWrap'),el=document.getElementById('barChart');
@@ -1159,7 +1165,7 @@ function renderBars(list){
   el.innerHTML=items.map(x=>{
     const dt=x.d==null?'변동 미산출':'변동 '+(x.d>=0?'+':'')+x.d.toFixed(1)+'%p'+(isDone(x.p)?'':' (진행중 잠정)');
     return '<div class="mg'+(isDone(x.p)?' done':'')+'" data-bar="'+x.p.id+'" title="'+
-      esc(x.p.name)+' — 계약 '+(x.c!=null?x.c.toFixed(1)+'%':'-')+' → 완료 '+
+      esc(x.p.name)+' — 계약 '+(x.c!=null?x.c.toFixed(1)+'%':'-')+' → 확정 '+
       (x.f!=null?x.f.toFixed(1)+'%':'미입력')+' · '+dt+'">'+
       '<div class="mval"><b class="vc">'+pct(x.c)+'</b> → <b class="vf">'+pct(x.f)+'</b></div>'+
       '<div class="mplot"><div class="mzero" style="top:'+zero.toFixed(1)+'px"></div>'+
@@ -1216,7 +1222,7 @@ document.getElementById('dashFilter').onchange=renderDash;
 document.getElementById('dashMine').onchange=renderDash;
 document.getElementById('dashPm').onchange=renderDash;
 document.getElementById('btnCsv').onclick=()=>{
-  const rows=[['번호','프로젝트','담당PM','클라이언트','유형','상태','계약액','계약수익률(%)','완료매출','완료수익률(%)','변동(%p)','변동확정','사유']];
+  const rows=[['번호','프로젝트','담당PM','클라이언트','유형','상태','계약액','계약수익률(%)','확정매출','확정수익률(%)','변동(%p)','변동확정','사유']];
   projects.forEach(p=>{
     const c=contractStats(p),fs=finalStats(p);
     const d=(c.margin!=null&&fs.margin!=null)?(fs.margin-c.margin).toFixed(2):'';
@@ -1359,7 +1365,7 @@ function renderPhase(){
     if(!await askDelete(rowDelOpt(cDraft[i],'계약 시점 투입')))return;
     cDraft.splice(i,1);renderPhase();renderVs();});
 
-  // 완료 시점 표
+  // 확정 시점 표
   const fb=document.getElementById('fBody');
   fb.innerHTML=fDraft.length?fDraft.map((r,i)=>{
     const rate=r.rate||rateOf(r.dept,r.grade);
@@ -1383,7 +1389,7 @@ function renderPhase(){
   });
   fb.querySelectorAll('[data-fdel]').forEach(x=>x.onclick=async e=>{
     const i=+e.target.dataset.fdel;
-    if(!await askDelete(rowDelOpt(fDraft[i],'완료 시점 투입')))return;
+    if(!await askDelete(rowDelOpt(fDraft[i],'확정 시점 투입')))return;
     fDraft.splice(i,1);renderPhase();renderVs();});
   updateDirty();   // 행 추가·삭제도 '저장 안 된 변경' 에 반영
 }
@@ -1456,7 +1462,7 @@ function renderLaborDetail(cRows,fRows){
     (l.diff>0?'⚠️':l.diff<0?'✅':'•')+' <b>'+esc(l.dept)+'</b> — '+l.text+
     ' → 인건비 <b style="color:'+(l.diff>0?'var(--bad)':'var(--good)')+'">'+
     (l.diff>0?'+':'')+won(l.diff)+'</b></div>').join('')
-    :'<div class="hint">계약 시점과 완료 시점의 투입이 동일합니다.</div>';
+    :'<div class="hint">계약 시점과 확정 시점의 투입이 동일합니다.</div>';
 
   // 소속×등급 상세 표
   const keys=[...new Set([...C.keys(),...F.keys()])].sort();
@@ -1481,8 +1487,8 @@ function renderLaborDetail(cRows,fRows){
   box.innerHTML='<h2 style="font-size:13.5px;margin:0 0 10px">인건비 변동 상세 <span class="tag">소속 · 등급별</span></h2>'+
     head+narrative+
     '<div class="tw" style="margin-top:12px"><table><thead><tr><th>소속</th><th>등급</th>'+
-    '<th class="right">계약 MM</th><th class="right">완료 MM</th><th class="right">MM 차이</th>'+
-    '<th class="right">계약 인건비</th><th class="right">완료 인건비</th><th class="right">인건비 차이</th>'+
+    '<th class="right">계약 MM</th><th class="right">확정 MM</th><th class="right">MM 차이</th>'+
+    '<th class="right">계약 인건비</th><th class="right">확정 인건비</th><th class="right">인건비 차이</th>'+
     '<th>구분</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
 function renderVs(){
@@ -1497,10 +1503,10 @@ function renderVs(){
   cards.innerHTML=
     '<div class="card"><div class="lbl">① 계약 시점 수익률</div><div class="val '+cls(c.margin)+'">'+(c.margin!=null?c.margin.toFixed(1)+'%':'-')+'</div>'+
       '<div class="foot">계약액 '+won(c.revenue)+' · 원가 '+won(c.cost)+'</div></div>'+
-    '<div class="card"><div class="lbl">② 완료 시점 수익률</div><div class="val '+cls(f.margin)+'">'+(f.margin!=null?f.margin.toFixed(1)+'%':'-')+'</div>'+
+    '<div class="card"><div class="lbl">② 확정 시점 수익률</div><div class="val '+cls(f.margin)+'">'+(f.margin!=null?f.margin.toFixed(1)+'%':'-')+'</div>'+
       '<div class="foot">매출 '+won(f.revenue)+' · 원가 '+won(f.cost)+'</div></div>'+
     '<div class="card hl"><div class="lbl">수익률 변동</div><div class="val '+(d==null?'':d>=0?'good':'bad')+'">'+(d!=null?(d>=0?'+':'')+d.toFixed(1)+'%p':'-')+'</div>'+
-      '<div class="foot">'+(d==null?'완료 시점 입력 필요':d>=0?'계약 기준보다 개선':'계약 기준보다 악화')+'</div></div>'+
+      '<div class="foot">'+(d==null?'확정 시점 입력 필요':d>=0?'계약 기준보다 개선':'계약 기준보다 악화')+'</div></div>'+
     '<div class="card"><div class="lbl">투입 MM</div><div class="val">'+f.mm.toFixed(2)+'</div>'+
       '<div class="foot">계약 '+c.mm.toFixed(2)+' MM · 차이 '+((f.mm-c.mm)>=0?'+':'')+(f.mm-c.mm).toFixed(2)+'</div></div>';
   const line=(label,a,b,invert)=>{
@@ -1576,7 +1582,7 @@ document.getElementById('btnDel').onclick=async()=>{
   const nC=rowsOf(p.id,'C').length,nF=rowsOf(p.id,'F').length;
   if(!await askDelete({
     what:'<b>'+esc(p.name)+'</b>'+(p.code?' <span class="muted">('+esc(p.code)+')</span>':'')+' 프로젝트',
-    note:'계약 투입 '+nC+'행 · 완료 투입 '+nF+'행과 변동 이력까지 함께 삭제됩니다. 되돌릴 수 없습니다.'}))return;
+    note:'계약 투입 '+nC+'행 · 확정 투입 '+nF+'행과 변동 이력까지 함께 삭제됩니다. 되돌릴 수 없습니다.'}))return;
   try{await api('/projects/'+p.id,{method:'DELETE'});curId=null;await refresh();loadProject();}
   catch(e){alert('삭제 실패: '+e.message);}
 };
@@ -1616,7 +1622,7 @@ document.getElementById('btnLogs').onclick=async()=>{
   try{
     const logs=await api('/projects/'+p.id+'/logs');
     box.innerHTML=logs.length?'<div class="tw"><table><thead><tr><th>기록 시각</th>'+
-      '<th class="right">계약 수익률</th><th class="right">완료 수익률</th><th class="right">변동</th><th>입력자</th><th>사유</th></tr></thead><tbody>'+
+      '<th class="right">계약 수익률</th><th class="right">확정 수익률</th><th class="right">변동</th><th>입력자</th><th>사유</th></tr></thead><tbody>'+
       logs.map(l=>{
         const d=(l.cMargin!=null&&l.fMargin!=null)?l.fMargin-l.cMargin:null;
         return '<tr><td class="muted">'+String(l.createdAt).replace('T',' ').slice(0,16)+'</td>'+
@@ -2404,6 +2410,7 @@ async function refresh(){
 // ── 업데이트 히스토리 ─────────────────────────────────
 // 새 버전을 낼 때 APP_VERSION 을 올리고 이 목록 맨 위에 한 줄 추가한다.
 const CHANGELOG=[
+  ['v3.8','확정 수익률 · PM 추가','<b>완료 매출 → 확정 매출</b>, <b>완료 수익률 → 확정 수익률</b>, <b>완료 시점 → 확정 시점</b> 으로 명칭 변경(프로젝트 <b>상태</b>값 <code>완료</code> 는 그대로). 담당 PM 후보에 <b>인터렉션실 이은택 실장 · DT개발실 최용석 실장</b> 추가.'],
   ['v3.7','매뉴얼 · 버전 관리','<b>매뉴얼</b> 탭 신설 — 전체 흐름(7단계), 단계별 상세, 계산 규칙, 유의사항, 시트 형식, 자주 겪는 문제, 용어를 한 장으로 정리. <b>업데이트 히스토리</b> 표 추가.'],
   ['v3.6','담당 PM 필터','대시보드 프로젝트별 수익률에 <b>담당 PM 셀렉트</b> 추가(이름 옆 담당 건수, 담당 미지정 포함). 목록을 담당 PM 기준으로 묶어 정렬하고, 선택 시 막대그래프·합계도 함께 걸린다.'],
   ['v3.5','명부 10건 스크롤','직원 명부를 <b>10명 높이로 제한</b>하고 명부 안에서 스크롤(머리글 고정). 단가표가 바로 아래로 올라와 한 화면에서 같이 본다.'],

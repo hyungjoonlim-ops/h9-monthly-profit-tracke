@@ -158,6 +158,47 @@
   .modal .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
   .savebar{display:flex;gap:10px;align-items:center;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
   .muted{color:var(--muted)}
+
+  /* ── 매뉴얼 (mn- 접두사) ────────────────────────────── */
+  .mn{font-size:13px;line-height:1.75;color:var(--ink2)}
+  .mn h3{font-size:14px;color:var(--ink);margin:22px 0 10px;font-weight:700;
+    display:flex;align-items:center;gap:8px}
+  .mn h3:first-child{margin-top:0}
+  .mn h3 .n{display:inline-flex;align-items:center;justify-content:center;
+    width:20px;height:20px;border-radius:50%;background:var(--accent);color:#04121f;
+    font-size:11.5px;font-weight:800;flex:0 0 20px}
+  .mn h4{font-size:12.5px;color:var(--ink);margin:14px 0 6px;font-weight:700}
+  .mn p{margin:0 0 8px}
+  .mn ul,.mn ol{margin:0 0 10px;padding-left:20px}
+  .mn li{margin:3px 0}
+  .mn b{color:var(--ink)}
+  .mn code{background:var(--panel2);border:1px solid var(--line);border-radius:4px;
+    padding:1px 5px;font-size:11.5px;font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--ink)}
+  .mn table{margin:6px 0 12px}
+  .mn th,.mn td{vertical-align:top;white-space:normal}
+  .mn th{white-space:nowrap}
+  /* 프로세스 흐름 */
+  .mn .flow{display:flex;gap:0;flex-wrap:wrap;align-items:stretch;margin:4px 0 14px}
+  .mn .fs{flex:1 1 140px;min-width:140px;background:var(--panel2);border:1px solid var(--line);
+    border-radius:9px;padding:10px 12px}
+  .mn .fs .fn{font-size:10.5px;color:var(--accent);font-weight:800;letter-spacing:.04em}
+  .mn .fs .ft{font-size:12.5px;color:var(--ink);font-weight:700;margin:2px 0 3px}
+  .mn .fs .fd{font-size:11px;color:var(--muted);line-height:1.5}
+  .mn .fa{flex:0 0 22px;display:flex;align-items:center;justify-content:center;
+    color:var(--muted);font-size:14px}
+  /* 안내 박스 */
+  .mn .box{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;
+    background:var(--panel2);padding:11px 13px;margin:8px 0 12px}
+  .mn .box.warn{border-left-color:var(--warn)}
+  .mn .box.bad{border-left-color:var(--bad)}
+  .mn .box.good{border-left-color:var(--good)}
+  .mn .box .bt{font-weight:700;color:var(--ink);margin-bottom:3px;font-size:12.5px}
+  .mn .box p:last-child,.mn .box ul:last-child{margin-bottom:0}
+  .mn .two-col{display:grid;grid-template-columns:1fr;gap:0 22px}
+  @media (min-width:1200px){.mn .two-col{grid-template-columns:1fr 1fr}}
+  .mn .btn-ref{display:inline-block;background:var(--accent);color:#04121f;border-radius:5px;
+    padding:1px 7px;font-size:11px;font-weight:700}
+  .mn .btn-ref.g{background:transparent;color:var(--ink2);border:1px solid var(--muted)}
 </style>
 
 <header>
@@ -175,6 +216,7 @@
   <div class="tab active" data-tab="dash">대시보드</div>
   <div class="tab" data-tab="proj">프로젝트 수익률</div>
   <div class="tab" data-tab="staff">직원 명부 · 단가</div>
+  <div class="tab" data-tab="man">매뉴얼</div>
 </nav>
 
 <main>
@@ -424,6 +466,260 @@
     </div>
   </div>
 </section>
+
+<!-- ═══════════ 매뉴얼 ═══════════ -->
+<section id="tab-man" class="hidden">
+  <div class="panel">
+    <div class="toolbar">
+      <h2>사용 매뉴얼 <span class="tag">관리·입력 절차와 유의사항</span></h2>
+      <div class="sp"><span class="tag">이 화면은 읽기 전용입니다 · 데이터가 바뀌지 않습니다</span></div>
+    </div>
+    <div class="mn">
+
+    <h3><span class="n">1</span>전체 흐름</h3>
+    <p>처음 쓰신다면 아래 순서대로 한 번 따라 하시면 됩니다. <b>①②는 처음 한 번만</b>, ③~⑦은 프로젝트마다 반복합니다.</p>
+    <div class="flow">
+      <div class="fs"><div class="fn">STEP 1</div><div class="ft">직원 명부 등록</div>
+        <div class="fd">직원 명부·단가 탭 → 엑셀/구글시트로 일괄 등록</div></div>
+      <div class="fa">›</div>
+      <div class="fs"><div class="fn">STEP 2</div><div class="ft">단가표 확인</div>
+        <div class="fd">소속별·등급별 단가 확인 → [단가표 저장]</div></div>
+      <div class="fa">›</div>
+      <div class="fs"><div class="fn">STEP 3</div><div class="ft">프로젝트 등록</div>
+        <div class="fd">일괄 등록 또는 [+ 새 프로젝트]</div></div>
+      <div class="fa">›</div>
+      <div class="fs"><div class="fn">STEP 4</div><div class="ft">계약 시점 입력</div>
+        <div class="fd">계약액·투입계획 → 기준 수익률 확정</div></div>
+      <div class="fa">›</div>
+      <div class="fs"><div class="fn">STEP 5</div><div class="ft">완료 시점 입력</div>
+        <div class="fd">실제 매출·실제 투입 입력</div></div>
+      <div class="fa">›</div>
+      <div class="fs"><div class="fn">STEP 6</div><div class="ft">변동 사유 기록</div>
+        <div class="fd">차이 원인을 적고 [수익률 저장]</div></div>
+      <div class="fa">›</div>
+      <div class="fs"><div class="fn">STEP 7</div><div class="ft">상태 = 완료</div>
+        <div class="fd">대시보드 최종 집계에 반영</div></div>
+    </div>
+
+    <h3><span class="n">2</span>단계별 상세</h3>
+    <div class="tw">
+      <table>
+        <thead><tr><th style="width:52px">단계</th><th style="width:150px">어디서</th>
+          <th style="width:340px">무엇을</th><th>유의사항</th></tr></thead>
+        <tbody>
+          <tr><td><b>1</b></td><td>직원 명부 · 단가</td>
+            <td><span class="btn-ref">구글시트 일괄 등록</span> 으로 <b>부서(실) · 부서(팀) · 이름 · 기술등급(SDS) · 등급분류기준(경력)</b> 을 올립니다. 몇 명만 추가할 때는 아래 입력칸 + <span class="btn-ref g">직원 추가</span>.</td>
+            <td>구글시트 권한이 막히면 <b>엑셀 파일 업로드</b>가 가장 확실합니다. 기본이 <b>명부 전체 대체</b>라, 시트에 없는 직원은 명부에서 빠집니다(확인창에서 대상 이름을 먼저 보여줍니다). 부서(팀)에 <code>-</code> 를 넣으면 그 실의 <b>실장</b>이 됩니다.</td></tr>
+          <tr><td><b>2</b></td><td>직원 명부 · 단가</td>
+            <td>소속별·등급별 단가를 확인하고 <span class="btn-ref">단가표 저장</span>. 명부에는 있는데 단가표에 없는 소속이 있으면 <span class="btn-ref g">직원 소속 채우기</span> 를 누릅니다.</td>
+            <td>단가가 <b>0</b>이면 인건비가 0으로 계산되어 수익률이 실제보다 높게 나옵니다. 등록 직후 <b>0인 칸이 없는지</b> 꼭 확인하세요.</td></tr>
+          <tr><td><b>3</b></td><td>프로젝트 수익률</td>
+            <td><span class="btn-ref">구글시트 일괄 등록</span> 으로 <b>프로젝트번호 · 프로젝트명 · 클라이언트 · 상태</b> 를 올리거나, <span class="btn-ref g">+ 새 프로젝트</span> 로 하나씩 만듭니다. 이어서 담당 PM · 유형 · 시작/종료월을 넣고 <span class="btn-ref">프로젝트 정보 저장</span>.</td>
+            <td>같은 시트를 여러 번 올려도 <b>중복 생성되지 않습니다</b>(번호 → 이름 순으로 기존 건을 찾아 갱신). <b>담당 PM</b>을 넣어 두면 대시보드에서 PM별로 걸러 볼 수 있습니다.</td></tr>
+          <tr><td><b>4</b></td><td>프로젝트 수익률<br><span class="muted">① 계약 시점</span></td>
+            <td><b>계약액(VAT 제외)</b> · 외주비 · 부대비를 넣고, <span class="btn-ref g">+ 투입 행 추가</span> 로 <b>소속 · 등급 · MM</b> 을 채웁니다. 소속·등급을 고르면 단가가 자동으로 들어옵니다.</td>
+            <td>여기가 <b>기준값</b>입니다. 저장하면 그때의 단가가 <b>고정 보관</b>되어, 이후 단가표를 바꿔도 계약 기준 수익률은 흔들리지 않습니다. 실제 계약 단가가 다르면 단가 칸을 직접 고치세요.</td></tr>
+          <tr><td><b>5</b></td><td>프로젝트 수익률<br><span class="muted">② 완료 시점</span></td>
+            <td><b>실제 매출</b> · 실제 외주비 · 부대비 · 완료(정산) 월을 넣고, 실제 투입 인력을 채웁니다. <span class="btn-ref g">← 계약 투입 복사</span> 로 계약 내용을 가져온 뒤 <b>달라진 부분만</b> 고치면 빠릅니다.</td>
+            <td>실제 매출을 <b>0으로 두면 계약액과 같다고</b> 봅니다. 진행 중에도 그때까지의 투입을 넣어 두면 예상 수익률을 미리 볼 수 있습니다(대시보드에서는 <span class="prov">잠정</span> 으로 표시).</td></tr>
+          <tr><td><b>6</b></td><td>프로젝트 수익률<br><span class="muted">변동 분석</span></td>
+            <td>변동 분석표와 <b>인건비 변동 상세</b>(어느 소속·등급에서 MM이 늘거나 줄어 개선·악화됐는지 문장으로 설명)를 확인하고, <b>수익률 변동 사유</b>를 적고 <span class="btn-ref">수익률 저장 (이력 기록)</span>.</td>
+            <td>이 버튼이 <b>투입 행과 이력까지 함께 저장</b>합니다. 위쪽 <span class="btn-ref">프로젝트 정보 저장</span> 은 이름·PM·상태 같은 <b>정보만</b> 저장합니다 — 둘을 구분해서 누르세요.</td></tr>
+          <tr><td><b>7</b></td><td>프로젝트 수익률 → 대시보드</td>
+            <td>정산이 끝나면 <b>상태</b>를 <code>완료</code> 로 바꾸고 저장합니다. 대시보드에서 요약·그래프·표로 확인합니다.</td>
+            <td><b>상태가 진행중이면 최종 집계에 들어가지 않습니다.</b> 완료로 바꿔야 완료 수익률과 변동에 반영됩니다.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3><span class="n">3</span>계산 규칙</h3>
+    <div class="tw">
+      <table>
+        <thead><tr><th style="width:170px">항목</th><th>산식</th></tr></thead>
+        <tbody>
+          <tr><td><b>계약 시점 수익률</b></td><td>( 계약액 − ( Σ 계약MM × <b>저장된 단가</b> + 계약 외주비 + 계약 부대비 ) ) ÷ 계약액 × 100</td></tr>
+          <tr><td><b>완료 시점 수익률</b></td><td>( 실제 매출 − ( Σ 실투입MM × 단가 + 실제 외주비 + 실제 부대비 ) ) ÷ 실제 매출 × 100</td></tr>
+          <tr><td><b>수익률 변동</b></td><td>완료 시점 수익률 − 계약 시점 수익률 &nbsp;(단위 <code>%p</code>)</td></tr>
+          <tr><td><b>인건비</b></td><td>Σ ( 투입 MM × 단가/MM ) &nbsp;— 단가는 소속 × 등급으로 단가표에서 찾습니다</td></tr>
+          <tr><td><b>대시보드 합계</b></td><td>프로젝트별 평균이 아니라 <b>금액 가중 평균</b> — ( Σ 매출 − Σ 원가 ) ÷ Σ 매출</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="box">
+      <div class="bt">변동은 같은 프로젝트끼리만 비교합니다</div>
+      <p>대시보드의 <b>완료 수익률</b>과 <b>변동</b>은 상태가 <code>완료</code> 이고 실적이 입력된 프로젝트만 모아 계산하고,
+      그 변동은 <b>바로 그 프로젝트들의 계약 기준 수익률</b>과 비교합니다. 전체 평균과 섞지 않기 때문에
+      "계약 66.7% → 완료 57.1%, 변동 −9.5%p" 처럼 서로 짝이 맞는 숫자가 나옵니다.</p>
+    </div>
+
+    <h3><span class="n">4</span>반드시 알아야 할 유의사항</h3>
+    <div class="two-col">
+      <div>
+        <div class="box warn"><div class="bt">① 저장 버튼이 두 개입니다</div>
+          <ul>
+            <li><span class="btn-ref">프로젝트 정보 저장</span> — 번호·이름·클라이언트·담당 PM·유형·상태·시작/종료월</li>
+            <li><span class="btn-ref">수익률 저장 (이력 기록)</span> — 금액·투입 행·변동 사유 + 이력 남김</li>
+          </ul>
+          <p>투입 인력을 고쳤으면 <b>아래쪽</b> [수익률 저장]을 눌러야 반영됩니다.</p>
+        </div>
+        <div class="box warn"><div class="bt">② 진행중은 아직 확정이 아닙니다</div>
+          <p>상태가 <code>진행중</code> 인 프로젝트의 변동은 대시보드에서 <span class="prov">잠정</span> 으로 흐리게 표시되고
+          <b>합계·요약에서 제외</b>됩니다. 정산이 끝나면 상태를 <code>완료</code> 로 바꿔 주세요.
+          CSV 에도 <code>변동확정</code> 열로 <code>확정</code> / <code>잠정(진행중)</code> 이 함께 나갑니다.</p>
+        </div>
+        <div class="box"><div class="bt">③ 계약 시점 단가는 고정됩니다</div>
+          <p>계약 시점 투입을 저장하면 <b>그 시점의 단가가 그대로 보관</b>됩니다. 나중에 단가표를 올려도
+          과거 계약 기준은 바뀌지 않습니다. 반대로 <b>완료 시점</b>은 현재 단가를 따르므로,
+          단가표를 수정하면 완료 수익률이 달라질 수 있습니다.</p>
+        </div>
+        <div class="box good"><div class="bt">④ 저장 안 한 입력은 보호됩니다</div>
+          <p>입력 중 변경이 있으면 저장바에 <b>● 저장 안 된 변경 있음</b>이 뜹니다. 이 상태에서는
+          자동 새로고침이 화면 값을 덮어쓰지 않고, <span class="btn-ref g">새로고침</span>·프로젝트 이동·창 닫기 시
+          먼저 확인을 받습니다. 그래도 <b>작업이 끝나면 바로 저장</b>하는 것이 안전합니다.</p>
+        </div>
+      </div>
+      <div>
+        <div class="box bad"><div class="bt">⑤ 삭제와 초기화는 되돌릴 수 없습니다</div>
+          <p>모든 삭제는 <b>[정말 삭제하시겠습니까?]</b> 확인창을 거치고, 무엇이 지워지는지(투입 행 수 등)를 보여줍니다.
+          프로젝트를 지우면 <b>투입·변동 이력까지</b> 함께 사라집니다.
+          <b>데이터 초기화</b>는 프로젝트 전체를 지우므로, 확인 문구 <code>초기화</code> 를 직접 입력해야 실행됩니다.</p>
+        </div>
+        <div class="box warn"><div class="bt">⑥ 여러 PM이 동시에 쓸 때</div>
+          <ul>
+            <li>헤더 <b>입력자</b> 칸에 이름을 넣어 주세요 — 최종 수정자와 이력 작성자로 남습니다(브라우저에 저장).</li>
+            <li>같은 프로젝트를 두 사람이 열어 두고 저장하면 <b>나중에 저장하는 쪽이 차단</b>됩니다(먼저 저장한 값 보존).</li>
+            <li>서로 <b>다른</b> 프로젝트는 동시에 저장해도 문제 없습니다.</li>
+          </ul>
+        </div>
+        <div class="box"><div class="bt">⑦ 단가 0 · 소속 미매칭 확인</div>
+          <p>투입 행의 <b>단가/MM 이 0</b>이면 그 인력의 인건비가 0으로 잡혀 수익률이 실제보다 좋게 나옵니다.
+          단가표에 그 소속이 없거나 이름이 달라 못 찾은 경우이니, 단가표에 소속을 추가하거나
+          <span class="btn-ref g">직원 소속 채우기</span> 를 눌러 채워 주세요.</p>
+        </div>
+        <div class="box"><div class="bt">⑧ 화면이 예전 그대로면</div>
+          <p>브라우저 캐시일 수 있습니다. <b>Ctrl+Shift+R</b>(Mac은 <b>Cmd+Shift+R</b>)로 새로고침하고,
+          왼쪽 위 제목 옆 <b>버전 표기</b>가 최신인지 확인하세요.</p>
+        </div>
+      </div>
+    </div>
+
+    <h3><span class="n">5</span>일괄 등록 — 시트 형식</h3>
+    <p>세 가지 방법을 지원합니다. <b>엑셀 파일 업로드</b>(권한 설정 불필요, 가장 확실) · <b>구글시트 링크</b>(현재 탭 / 모든 탭) · <b>붙여넣기</b>.
+    열 <b>순서는 상관없고</b>, 제목 행이 위에 몇 줄 있어도 머리글을 찾아냅니다.</p>
+    <div class="tw">
+      <table>
+        <thead><tr><th style="width:110px">대상</th><th style="width:380px">인식하는 머리글</th><th>비고</th></tr></thead>
+        <tbody>
+          <tr><td><b>프로젝트</b></td>
+            <td><code>프로젝트명</code>(필수) · <code>프로젝트번호</code> · <code>클라이언트</code> · <code>상태</code> ·
+              <code>담당 PM</code> · <code>유형</code> · <code>시작</code> · <code>종료</code> · <code>금액</code> ·
+              <code>파트</code> · <code>등급</code> · <code>MM</code> · 월별 열(<code>25'10월</code> <code>1월</code> <code>2026-01</code>)</td>
+            <td>파트·등급·MM 이 있으면 <b>계약 시점 투입계획</b>으로 함께 들어옵니다. 월별 열이 있으면 그 합을 MM으로 씁니다.
+              <code>MM 당 단가</code> 처럼 단가가 든 열은 MM 으로 쓰지 않습니다.</td></tr>
+          <tr><td><b>직원 명부</b></td>
+            <td><code>번호</code>(무시) · <code>부서(실)</code> · <code>부서(팀)</code> · <code>이름</code> ·
+              <code>기술등급(SDS)</code> · <code>등급분류기준(경력)</code></td>
+            <td>부서(팀)이 <code>-</code> 면 <b>실장</b>. [모든 탭 일괄]은 이름에 <b>현황</b>이 들어간 탭이 있으면 그 탭만 가져옵니다.</td></tr>
+          <tr><td><b>단가표</b></td>
+            <td><b>가로형</b> — 첫 열 소속 + <code>초급</code> <code>중급</code> <code>고급</code> <code>특급</code><br>
+              <b>세로형</b> — <code>소속</code> · <code>등급</code> · <code>단가</code></td>
+            <td>금액의 쉼표·"원"·공백은 자동으로 지웁니다. 기본은 <b>겹치는 소속만 갱신</b>, 체크하면 전체 대체.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h4>구글시트 권한 설정</h4>
+    <p><b>[공유] → 일반 액세스 → "링크가 있는 모든 사용자"</b>, 역할은 <b>뷰어(보기)</b> 로 두면 됩니다.
+    편집 권한은 필요 없습니다. 안 읽히면 화면에 원인별 해결 방법이 안내되는데, 가장 흔한 원인은
+    <b>파일이 구글시트가 아니라 업로드된 <code>.xlsx</code></b> 인 경우입니다 — 이때는
+    구글시트로 변환하거나 그냥 <b>엑셀 파일 업로드</b>를 쓰세요.</p>
+
+    <h3><span class="n">6</span>소속 이름 자동 해석</h3>
+    <p>시트의 파트·소속 표기가 단가표와 달라도 자동으로 맞춰 줍니다.</p>
+    <div class="tw">
+      <table>
+        <thead><tr><th style="width:300px">시트 표기</th><th style="width:150px">적용 단가</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td><code>GUI</code> <code>PUB</code> <code>UI</code> <code>퍼블리싱</code></td><td><b>Visual</b></td><td rowspan="3">이름이 달라도 같은 소속으로 봅니다.</td></tr>
+          <tr><td><code>DEV</code> <code>BE</code> <code>FE</code> <code>QA</code> <code>개발</code></td><td><b>서비스개발</b></td></tr>
+          <tr><td><code>기획</code></td><td><b>UX</b></td></tr>
+          <tr><td><code>CTO</code> <code>CTO직속</code> <code>CEO직속</code> <code>대표이사 직속</code> …</td><td><b>PM</b></td>
+            <td><b>CTO · CEO(대표) 직속은 모두 PM 단가 기준</b>을 따릅니다. 표기가 어떻게 달라도 적용됩니다.</td></tr>
+          <tr><td>그 밖의 이름</td><td>이름 유사도로 매칭</td>
+            <td>못 찾으면 미리보기에 경고로 표시되고 단가가 0으로 남습니다. 단가표에 소속을 추가해 주세요.
+              <b>단가표에 같은 이름의 행이 있으면 그 행이 항상 우선</b>입니다.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3><span class="n">7</span>자주 겪는 문제</h3>
+    <div class="tw">
+      <table>
+        <thead><tr><th style="width:300px">증상</th><th>원인과 해결</th></tr></thead>
+        <tbody>
+          <tr><td>수익률이 실제보다 <b>너무 높게</b> 나온다</td>
+            <td>투입 행의 <b>단가가 0</b>이거나 투입 행 자체가 비어 있습니다. 단가표에 그 소속이 있는지 확인하고
+              <span class="btn-ref g">직원 소속 채우기</span> → <span class="btn-ref">단가표 저장</span>.</td></tr>
+          <tr><td>완료 수익률이 <b>-</b> 로만 보인다</td>
+            <td>완료 시점에 아무것도 입력되지 않은 상태입니다. 실제 매출이나 실제 투입 중 하나라도 넣으면 계산됩니다.</td></tr>
+          <tr><td>대시보드 <b>완료 수익률</b>에 내 프로젝트가 안 잡힌다</td>
+            <td>상태가 <code>진행중</code> 이면 집계에서 빠집니다. <code>완료</code> 로 바꿔 주세요.</td></tr>
+          <tr><td>저장했더니 <b>"다른 사용자가 먼저 저장했습니다"</b></td>
+            <td>같은 프로젝트를 다른 사람이 먼저 저장했습니다. 입력값을 복사해 두고
+              <span class="btn-ref g">새로고침</span> 한 뒤 다시 입력하세요.</td></tr>
+          <tr><td>입력한 값이 <b>예전 값으로 돌아갔다</b></td>
+            <td>저장하지 않은 상태에서 다른 창을 다녀오면 예전에는 덮어써졌습니다. 지금은 보호되지만,
+              저장바에 <b>● 저장 안 된 변경 있음</b>이 보이면 <b>저장을 먼저</b> 해 주세요.</td></tr>
+          <tr><td>일괄 등록했더니 <b>같은 프로젝트가 두 건</b></td>
+            <td>지금은 번호·이름으로 기존 건을 찾아 갱신하므로 생기지 않습니다. 이전에 생긴 중복은
+              프로젝트 수익률 탭에서 <span class="btn-ref g">삭제</span> 로 정리하세요.</td></tr>
+          <tr><td>시트를 <b>못 읽는다</b></td>
+            <td>① 파일이 구글시트가 아니라 <code>.xlsx</code> ② 링크 공유가 제한됨 ③ 주소를 잘못 붙여넣음.
+              가장 확실한 방법은 <b>엑셀 파일 업로드</b>입니다.</td></tr>
+          <tr><td>직원이 <b>명부에서 사라졌다</b></td>
+            <td>일괄 등록의 <b>명부 전체 대체</b>로 시트에 없는 직원이 빠진 것입니다.
+              투입 이력이 있는 직원은 삭제되지 않고 <b>재직 해제</b>로 남습니다(재직 칸을 다시 체크).</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3><span class="n">8</span>용어</h3>
+    <div class="tw">
+      <table>
+        <thead><tr><th style="width:150px">용어</th><th>뜻</th></tr></thead>
+        <tbody>
+          <tr><td><b>MM</b></td><td>Man-Month. 한 사람이 한 달 일하는 양. 0.5 = 반 달.</td></tr>
+          <tr><td><b>단가/MM</b></td><td>1 MM 당 금액(원). 소속 × 등급으로 정해집니다.</td></tr>
+          <tr><td><b>%p</b></td><td>퍼센트 포인트. 수익률 50% → 40% 는 <b>−10%p</b>.</td></tr>
+          <tr><td><b>계약 시점 (기준)</b></td><td>계약할 때 계획한 수익률. 저장 시점 단가로 고정.</td></tr>
+          <tr><td><b>완료 시점 (실적)</b></td><td>실제 매출·실제 투입으로 계산한 결과 수익률.</td></tr>
+          <tr><td><span class="prov">잠정</span></td><td>상태가 진행중이라 아직 확정이 아닌 변동값. 합계에서 제외됩니다.</td></tr>
+          <tr><td><b>유형 (정산 형태)</b></td><td>월 정산, 30/30/40 등 대금 정산 방식. 대시보드에서 유형별로 묶어 봅니다.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    </div>
+  </div>
+
+  <!-- 업데이트 히스토리 -->
+  <div class="panel">
+    <div class="toolbar">
+      <h2>업데이트 히스토리 <span class="tag">버전 관리</span></h2>
+      <div class="sp"><span class="tag">현재 버전 </span><span class="pill good" id="manVer"></span></div>
+    </div>
+    <div class="mn">
+    <p>화면 왼쪽 위 제목 옆에 <b>현재 버전</b>이 표시됩니다. 새 기능이 안 보이면
+      <b>Ctrl+Shift+R</b>(Mac은 <b>Cmd+Shift+R</b>)로 새로고침한 뒤 버전을 확인해 주세요.</p>
+    <div class="tw">
+      <table>
+        <thead><tr><th style="width:76px">버전</th><th style="width:170px">주제</th><th>변경 내용</th></tr></thead>
+        <tbody id="verBody"></tbody>
+      </table>
+    </div>
+    <div class="hint">기록은 최신 버전이 위입니다. 버전 번호는 기능이 추가·변경될 때마다 올라갑니다.</div>
+    </div>
+  </div>
+</section>
 </main>
 
 <!-- 모달: 프로젝트 일괄 등록 -->
@@ -553,7 +849,7 @@
 </div>
 
 <script>
-const APP_VERSION='v3.6 · 담당 PM 필터';
+const APP_VERSION='v3.7 · 매뉴얼 · 버전 관리';
 const GRADES=['초급','중급','고급','특급'];
 let projects=[],staff=[],rates={},allRows=[];
 let curId=null,cDraft=[],fDraft=[];
@@ -2029,7 +2325,7 @@ document.getElementById('btnReset').onclick=async()=>{
 // ── 탭 · 공통 ─────────────────────────────────────────
 function switchTab(name){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
-  ['dash','proj','staff'].forEach(n=>document.getElementById('tab-'+n).classList.toggle('hidden',n!==name));
+  ['dash','proj','staff','man'].forEach(n=>document.getElementById('tab-'+n).classList.toggle('hidden',n!==name));
   // 숨은 상태에서는 행 높이를 잴 수 없으므로 화면에 보일 때 다시 계산한다
   if(name==='staff')fitRows('stWrap',10,'stScrollTip');
 }
@@ -2105,8 +2401,40 @@ async function refresh(){
   renderDash();renderStaff();renderRates();renderPjSelect();renderPmList();renderClientList();
   if(!document.getElementById('tab-proj').classList.contains('hidden')){renderPhase();renderVs();}
 }
+// ── 업데이트 히스토리 ─────────────────────────────────
+// 새 버전을 낼 때 APP_VERSION 을 올리고 이 목록 맨 위에 한 줄 추가한다.
+const CHANGELOG=[
+  ['v3.7','매뉴얼 · 버전 관리','<b>매뉴얼</b> 탭 신설 — 전체 흐름(7단계), 단계별 상세, 계산 규칙, 유의사항, 시트 형식, 자주 겪는 문제, 용어를 한 장으로 정리. <b>업데이트 히스토리</b> 표 추가.'],
+  ['v3.6','담당 PM 필터','대시보드 프로젝트별 수익률에 <b>담당 PM 셀렉트</b> 추가(이름 옆 담당 건수, 담당 미지정 포함). 목록을 담당 PM 기준으로 묶어 정렬하고, 선택 시 막대그래프·합계도 함께 걸린다.'],
+  ['v3.5','명부 10건 스크롤','직원 명부를 <b>10명 높이로 제한</b>하고 명부 안에서 스크롤(머리글 고정). 단가표가 바로 아래로 올라와 한 화면에서 같이 본다.'],
+  ['v3.4','그래프 폭 고정','수익률 변동 그래프의 <b>막대 폭·영역 폭 고정</b>(막대 14px), 프로젝트 간격 확보. 그래프 위에는 수익률 숫자만 표시. 옛 CSS 충돌로 막대가 벌어지던 문제 수정.'],
+  ['v3.3','수익률 변동 그래프','대시보드에 <b>프로젝트별 수익률 변동 막대그래프</b> 추가 — 계약/완료 두 막대, 0 기준선 위·아래로 적자 표현, 좌우 스와이프·드래그·버튼, 막대 클릭 시 해당 프로젝트로 이동.'],
+  ['v3.2','입력 보호','저장하지 않은 입력이 <b>자동 새로고침에 덮어써지던 문제 수정</b>. ● 저장 안 된 변경 있음 표시, 새로고침·프로젝트 이동·창 닫기 시 확인. 금액 입력 중 투입 표가 다시 그려지며 값이 엉키던 문제도 수정.'],
+  ['v3.1','삭제 확인창','모든 삭제에 <b>[정말 삭제하시겠습니까?]</b> 확인창 적용(무엇이 지워지는지 표시). 단가표에 CTO직속·CEO직속을 PM 단가로 반영, <b>[직원 소속 채우기]</b> 버튼 추가. 완료(정산) 월 줄바꿈 수정.'],
+  ['v3.0','진행중/완료 구분 집계','<b>진행중 프로젝트를 완료 수익률·변동 집계에서 제외</b>(잠정 표시). 진행중/완료 건수 카드 추가. 일괄 등록 <b>중복 방지</b>. 담당 PM·클라이언트 목록 정리, 완료(정산) 월 그리드 정렬.'],
+  ['v2.9','CTO·CEO직속 PM 단가','<b>CTO · CEO(대표) 직속</b> 소속을 모두 PM 단가 기준으로 계산.'],
+  ['v2.8','단가표 일괄 등록','단가표도 <b>엑셀 업로드 · 구글시트 · 붙여넣기</b>로 일괄 등록(가로형·세로형 인식).'],
+  ['v2.7','엑셀 업로드','<b>엑셀/CSV 파일 업로드</b>로 일괄 등록 — 구글시트 권한 설정 없이 가능. CP949·BOM 자동 인식.'],
+  ['v2.6','시트 읽기 경로 다중화','구글시트를 <b>보기 권한만으로</b> 읽도록 경로를 여러 개로 시도하고, 실패 원인을 화면에 안내.'],
+  ['v2.5','인건비 변동 서술','<b>인건비 변동 상세</b> — 어느 소속·등급에서 MM이 늘거나 줄어 개선·악화됐는지 문장으로 설명. 직원 추가 폼에 부서(팀)·경력 추가.'],
+  ['v2.4','명부 6열 · 구조 통일','직원 명부 <b>현황시트 6열</b> 인식(부서(팀) <code>-</code> 는 실장). 완료 시점 표를 계약 시점과 동일 구조로 통일.'],
+  ['v2.3','입력 편의 개선','금액 <b>천단위 쉼표</b>, 완료 시점 표 열 분리, 처음 화면에서 프로젝트 기본 미선택.'],
+  ['v2.2','동시 편집 보호','<b>여러 PM 동시 사용</b> — 담당 PM·입력자 기록, 같은 프로젝트 동시 저장 차단, 프로젝트번호 중복 차단.'],
+  ['v2.1','프로젝트번호 인식','일괄 등록에서 <b>프로젝트번호 / 프로젝트명 / 클라이언트 / 상태</b> 4열 머리글 인식.'],
+  ['v2.0','전면 재구축','<b>계약 시점(기준) · 완료 시점(실적)</b> 두 수익률을 각각 입력하고 변동을 관리하는 구조로 재구축. 테이블 접두사 <code>h9_</code> 로 분리.'],
+];
+function renderChangelog(){
+  const b=document.getElementById('verBody');if(!b)return;
+  const cur=String(APP_VERSION).split(' ')[0];
+  b.innerHTML=CHANGELOG.map(([v,t,d])=>
+    '<tr'+(v===cur?' style="background:var(--panel2)"':'')+'>'+
+    '<td><b>'+v+'</b>'+(v===cur?' <span class="pill good" style="font-size:9.5px">현재</span>':'')+'</td>'+
+    '<td>'+t+'</td><td>'+d+'</td></tr>').join('');
+  document.getElementById('manVer').textContent=APP_VERSION;
+}
 (async function(){
   document.getElementById('appVer').textContent=APP_VERSION;
+  renderChangelog();
   initMyName();
   try{
     const me=await fetch('/api/me').then(r=>r.json()).catch(()=>({}));

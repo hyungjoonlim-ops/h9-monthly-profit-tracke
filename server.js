@@ -306,29 +306,34 @@ app.put('/api/projects/:id', async (req, res) => {
   const p = req.body || {};
   if (!txt(p.name)) return res.status(400).json({ error: '프로젝트명은 필수입니다.' });
   try {
-    // 동시 편집 보호 — 내가 화면에 띄운 이후 다른 사람이 저장했으면 덮어쓰지 않는다
-    if (p.baseUpdatedAt) {
-      const cur = await pool.query('SELECT updated_at FROM h9_projects WHERE id=$1', [req.params.id]);
-      if (!cur.rows[0]) return res.status(404).json({ error: '프로젝트를 찾을 수 없습니다.' });
-      const db = new Date(cur.rows[0].updated_at).getTime();
-      const mine = new Date(p.baseUpdatedAt).getTime();
-      if (Number.isFinite(db) && Number.isFinite(mine) && db - mine > 1000) {
-        return res.status(409).json({
-          error: '다른 사용자가 먼저 저장했습니다. 화면을 새로고침한 뒤 다시 입력해 주세요.',
-          conflict: true,
-        });
-      }
-    }
+    // 동시 편집 보호 — 내가 화면에 띄운 이후 다른 사람이 저장했으면 덮어쓰지 않는다.
+    // 조건을 UPDATE 안에 넣어 원자적으로 판정한다 (조회 후 갱신 사이에 끼어드는 것을 막는다).
+    // updated_at 은 클라이언트로 나갈 때 밀리초까지만 남으므로 밀리초 단위로 잘라 비교한다.
+    const base = p.baseUpdatedAt && Number.isFinite(new Date(p.baseUpdatedAt).getTime())
+      ? new Date(p.baseUpdatedAt).toISOString() : null;
     const { rows } = await pool.query(
       `UPDATE h9_projects SET code=$1, name=$2, client=$3, pm=$4,
               updated_by=COALESCE($5,updated_by), proj_type=$6, status=$7,
               start_ym=$8, end_ym=$9, c_amount=$10, c_cost_out=$11, c_cost_etc=$12,
               f_revenue=$13, f_cost_out=$14, f_cost_etc=$15, f_closed_at=$16,
               reason=$17, memo=$18, updated_at=now()
-       WHERE id=$19 RETURNING *`,
-      [...projParams(p), req.params.id]
+       WHERE id=$19
+         AND ($20::timestamptz IS NULL
+              OR date_trunc('milliseconds', updated_at) <= $20::timestamptz)
+       RETURNING *`,
+      [...projParams(p), req.params.id, base]
     );
-    if (!rows[0]) return res.status(404).json({ error: '프로젝트를 찾을 수 없습니다.' });
+    if (!rows[0]) {
+      // 갱신되지 않았다 — 프로젝트가 없는 것인지, 다른 사람이 먼저 저장한 것인지 구분해서 알린다
+      const cur = await pool.query('SELECT updated_by, updated_at FROM h9_projects WHERE id=$1', [req.params.id]);
+      if (!cur.rows[0]) return res.status(404).json({ error: '프로젝트를 찾을 수 없습니다.' });
+      const who = cur.rows[0].updated_by ? ' (' + cur.rows[0].updated_by + ')' : '';
+      return res.status(409).json({
+        error: '다른 사용자가 먼저 저장했습니다' + who + '. 화면을 새로고침한 뒤 다시 입력해 주세요.',
+        conflict: true,
+        updatedAt: new Date(cur.rows[0].updated_at).toISOString(),
+      });
+    }
     res.json(mapProject(rows[0]));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -444,6 +449,7 @@ app.post('/api/projects/import', async (req, res) => {
   try {
     await client.query('BEGIN');
     let created = 0, updated = 0, rowCount = 0;
+    const renamed = [];   // 번호로 찾았는데 이름이 달라 바뀐 건 (시트 번호 오기입을 알아채도록)
     for (const p of list) {
       const name = txt(p.name);
       if (!name) continue;
@@ -451,17 +457,23 @@ app.post('/api/projects/import', async (req, res) => {
       // 기존 프로젝트 찾기 — ① 프로젝트번호 ② 이름(공백·대소문자 무시)
       // 번호로 못 찾아도 같은 이름이 이미 있으면 그것을 갱신하므로 중복 생성되지 않는다
       let found = code
-        ? await client.query('SELECT id FROM h9_projects WHERE code=$1', [code])
+        ? await client.query('SELECT id, name FROM h9_projects WHERE code=$1', [code])
         : { rows: [] };
+      const byCode = !!found.rows[0];
       if (!found.rows[0]) {
         found = await client.query(
-          `SELECT id FROM h9_projects
+          `SELECT id, name FROM h9_projects
             WHERE lower(btrim(regexp_replace(name, '\\s+', ' ', 'g'))) = $1
             ORDER BY id LIMIT 1`, [key(name)]);
       }
       let pid;
       if (found.rows[0]) {
         pid = Number(found.rows[0].id);
+        // 번호로 찾았는데 이름이 다르면 기존 이름을 덮어쓴다 — 시트에 번호를 잘못 적었을 때
+        // 다른 프로젝트가 조용히 바뀌지 않도록 결과에 알려 준다
+        if (byCode && key(found.rows[0].name) !== key(name)) {
+          renamed.push({ code, from: found.rows[0].name, to: name });
+        }
         // 계약 정보만 갱신 — 완료 시점 입력값은 건드리지 않는다
         await client.query(
           `UPDATE h9_projects SET
@@ -501,7 +513,7 @@ app.post('/api/projects/import', async (req, res) => {
       }
     }
     await client.query('COMMIT');
-    res.json({ ok: true, created, updated, rowCount, merged });
+    res.json({ ok: true, created, updated, rowCount, merged, renamed });
   } catch (e) {
     await client.query('ROLLBACK');
     res.status(500).json({ error: e.message });

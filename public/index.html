@@ -851,7 +851,7 @@
 </div>
 
 <script>
-const APP_VERSION='v3.9 · 복사·숫자 입력 개선';
+const APP_VERSION='v4.0 · 검수 반영(동시저장·집계)';
 const GRADES=['초급','중급','고급','특급'];
 let projects=[],staff=[],rates={},allRows=[];
 let curId=null,cDraft=[],fDraft=[];
@@ -1026,21 +1026,26 @@ const curProject=()=>projects.find(p=>p.id===curId)||null;
 const isDone=p=>p.status==='완료';
 const pctOf=(rev,cost)=>rev>0?(rev-cost)/rev*100:null;
 function aggregate(list){
-  let cAmt=0,cCost=0,fRev=0,fCost=0,bAmt=0,bCost=0,doneWith=0,ongoing=0;
+  let cAmt=0,cCost=0,fRev=0,fCost=0,doneWith=0,ongoing=0;
+  // 변동 비교용 — 계약 기준과 확정 실적이 '둘 다' 산출되는 프로젝트만 짝지어 모은다.
+  // (한쪽만 넣으면 서로 다른 집합끼리 비교해 변동이 실제와 달라진다)
+  let bAmt=0,bCost=0,dRev=0,dCost=0,pairs=0;
   list.forEach(p=>{
     const c=contractStats(p),fs=finalStats(p);
     if(p.cAmount>0){cAmt+=p.cAmount;cCost+=c.cost;}
     if(isDone(p)){
       if(fs.has&&fs.revenue>0){
         fRev+=fs.revenue;fCost+=fs.cost;doneWith++;
-        // 변동은 같은(완료된) 프로젝트의 계약 기준과 비교해야 의미가 있다
-        if(p.cAmount>0){bAmt+=p.cAmount;bCost+=c.cost;}
+        if(p.cAmount>0&&c.margin!=null){
+          bAmt+=p.cAmount;bCost+=c.cost;dRev+=fs.revenue;dCost+=fs.cost;pairs++;
+        }
       }
     }else if(p.status==='진행중')ongoing++;
   });
-  const cM=pctOf(cAmt,cCost),fM=pctOf(fRev,fCost),bM=pctOf(bAmt,bCost);
-  return {cAmt,cCost,fRev,fCost,cM,fM,bM,
-    delta:(bM!=null&&fM!=null)?fM-bM:null,doneWith,ongoing};
+  const cM=pctOf(cAmt,cCost),fM=pctOf(fRev,fCost);
+  const bM=pctOf(bAmt,bCost),dM=pctOf(dRev,dCost);
+  return {cAmt,cCost,fRev,fCost,cM,fM,bM,dM,pairs,
+    delta:(bM!=null&&dM!=null)?dM-bM:null,doneWith,ongoing};
 }
 // 담당 PM 셀렉트 — 프로젝트에 지정된 담당자만 목록에 넣는다 (선택값은 유지)
 function renderDashPm(){
@@ -1093,7 +1098,7 @@ function renderDash(){
     '<div class="card hl"><div class="lbl">확정 수익률 <span class="tag">완료 '+a.doneWith+'건</span></div>'+
       '<div class="val '+cls(a.fM)+'">'+(a.fM!=null?a.fM.toFixed(1)+'%':'-')+'</div>'+
       '<div class="foot">'+(a.delta!=null
-        ?'같은 프로젝트 계약 기준 '+a.bM.toFixed(1)+'% 대비 '+deltaHtml(a.delta)
+        ?'같은 '+a.pairs+'건의 계약 기준 '+a.bM.toFixed(1)+'% 대비 '+deltaHtml(a.delta)
         :'완료 상태 프로젝트의 실적이 입력되면 표시됩니다')+'</div></div>';
 
   renderBars(list);
@@ -1706,7 +1711,7 @@ function renderStaff(){
     const id=+e.target.dataset.sdel;const s=staff.find(y=>y.id===id);
     if(!await askDelete({
       what:'<b>'+esc(s?s.name:id)+'</b>'+(s?' <span class="muted">'+esc([s.dept,s.team,s.title].filter(Boolean).join(' · ')||'-')+' · '+GRADES[s.grade]+'</span>':'')+' 직원',
-      note:'명부에서 삭제됩니다. 투입 이력이 있는 직원은 재직 해제로 남습니다.'}))return;
+      note:'명부에서 완전히 삭제됩니다(되돌릴 수 없음). 이력을 남기려면 삭제하지 말고 재직 칸을 해제하세요.'}))return;
     try{await api('/staff/'+id,{method:'DELETE'});await refresh();}
     catch(err){alert('삭제 실패: '+err.message);}
   });
@@ -2064,6 +2069,13 @@ document.getElementById('impSubmit').onclick=async()=>{
     msg.className='msg ok';
     msg.textContent='✓ 신규 '+r.created+'건 · 기존 갱신 '+r.updated+'건 · 계약 투입 '+r.rowCount+'행'
       +(r.merged?' (중복 '+r.merged+'건은 기존 프로젝트에 합침)':'')+'이 등록되었습니다.';
+    // 번호가 같아 기존 프로젝트의 이름이 바뀐 건 — 시트 번호 오기입일 수 있으므로 반드시 알린다
+    if(r.renamed&&r.renamed.length){
+      msg.className='msg';
+      msg.innerHTML=esc(msg.textContent)+'<br><b style="color:var(--warn)">⚠ 프로젝트번호가 같아 이름이 바뀐 건 '
+        +r.renamed.length+'건 — 시트의 번호가 맞는지 확인하세요.</b><br>'
+        +r.renamed.map(x=>'<span class="muted">['+esc(x.code)+'] '+esc(x.from)+' → '+esc(x.to)+'</span>').join('<br>');
+    }
     await refresh();
     setTimeout(()=>impModal.classList.remove('show'),1500);
   }catch(e){msg.className='msg err';msg.textContent='✗ '+e.message;btn.disabled=false;}
@@ -2429,6 +2441,7 @@ async function refresh(){
 // ── 업데이트 히스토리 ─────────────────────────────────
 // 새 버전을 낼 때 APP_VERSION 을 올리고 이 목록 맨 위에 한 줄 추가한다.
 const CHANGELOG=[
+  ['v4.0','검수 반영','전체 검증에서 발견한 결함 4건 수정 — ① <b>동시 저장 보호가 뚫리던 문제</b>(1초 관용 때문에 나중 저장이 앞 값을 덮어씀)를 원자적 조건부 UPDATE 로 바꾸고 누가 먼저 저장했는지 알려준다. ② 계약액이 0인 완료 프로젝트가 <b>변동 비교를 오염</b>시키던 문제 — 계약·확정이 둘 다 있는 건만 짝지어 비교. ③ 일괄 등록에서 <b>번호가 같아 다른 프로젝트 이름이 조용히 바뀌던</b> 것을 결과에 경고. ④ 직원 개별 삭제 확인창 문구를 실제 동작(완전 삭제)에 맞게 수정.'],
   ['v3.9','복사·숫자 입력 개선','<b>[← 계약 투입 복사]</b> 가 투입 행뿐 아니라 <b>계약액 → 실제 매출 · 외주비 · 부대비</b> 까지 함께 복사한다. 숫자 칸이 <b>0 일 때 클릭하면 0 이 지워져</b>, 앞에 커서를 두고 입력할 때 0 이 하나 더 붙던 문제를 없앴다(비운 채 벗어나면 0 으로 복구).'],
   ['v3.8','확정 수익률 · PM 추가','<b>완료 매출 → 확정 매출</b>, <b>완료 수익률 → 확정 수익률</b>, <b>완료 시점 → 확정 시점</b> 으로 명칭 변경(프로젝트 <b>상태</b>값 <code>완료</code> 는 그대로). 담당 PM 후보에 <b>인터렉션실 이은택 실장 · DT개발실 최용석 실장</b> 추가.'],
   ['v3.7','매뉴얼 · 버전 관리','<b>매뉴얼</b> 탭 신설 — 전체 흐름(7단계), 단계별 상세, 계산 규칙, 유의사항, 시트 형식, 자주 겪는 문제, 용어를 한 장으로 정리. <b>업데이트 히스토리</b> 표 추가.'],

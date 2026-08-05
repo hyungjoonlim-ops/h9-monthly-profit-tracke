@@ -22,6 +22,14 @@
   .tab{padding:10px 18px;cursor:pointer;font-size:13.5px;color:var(--ink2);border-bottom:2px solid transparent}
   .tab:hover{color:var(--ink)}
   .tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+  /* 문의처 줄 — 탭 바로 아래, 모든 화면에 공통 */
+  .contact{display:flex;flex-wrap:wrap;align-items:center;gap:6px;
+    padding:7px 24px;background:var(--panel2);border-bottom:1px solid var(--line);
+    font-size:11.5px;color:var(--muted)}
+  .contact b{color:var(--ink2);font-weight:650}
+  .contact a{color:var(--accent);text-decoration:none}
+  .contact a:hover{text-decoration:underline}
+  .contact .sep{opacity:.5}
   main{padding:20px 24px 60px;max-width:1840px}
   section.hidden{display:none}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:16px}
@@ -232,6 +240,15 @@
   <div class="tab" data-tab="staff">직원 명부 · 단가</div>
   <div class="tab" data-tab="man">매뉴얼</div>
 </nav>
+
+<!-- 문의처 — 모든 화면 상단에 공통으로 보인다 -->
+<div class="contact">
+  <b>개발 및 관리자 문의</b>
+  <span class="sep">·</span>PMO 그룹 <b>임형준</b>
+  <a href="mailto:hyungjoon.lim@hnine.com">hyungjoon.lim@hnine.com</a>
+  <span class="sep">/</span>
+  <a href="tel:01044008136">010-4400-8136</a>
+</div>
 
 <main>
 <!-- ═══════════ 대시보드 ═══════════ -->
@@ -519,6 +536,10 @@
           <div class="n2">최근 업데이트 <b id="specDate">2026-08-04</b> · 현재 <b id="specVer"></b></div></div>
         <div class="sp-i"><div class="k">규모</div><div class="v">약 <b>3,400줄</b> (서버 790 · 화면 2,500)</div>
           <div class="n2">의존 패키지 5개 — express · pg · cookie-session · dotenv · xlsx</div></div>
+        <div class="sp-i"><div class="k">개발 및 관리자 문의</div>
+          <div class="v">PMO 그룹 <b>임형준</b></div>
+          <div class="n2"><a href="mailto:hyungjoon.lim@hnine.com" style="color:var(--accent)">hyungjoon.lim@hnine.com</a>
+            · <a href="tel:01044008136" style="color:var(--accent)">010-4400-8136</a></div></div>
       </div>
       <div class="sp-f">환경변수 <code>PGHOST</code> <code>PGPORT</code> <code>PGUSER</code> <code>PGPASSWORD</code>
         <code>PGDATABASE</code> <code>APP_PASSWORD</code> (<code>SESSION_SECRET</code> 은 자동 생성) —
@@ -749,6 +770,15 @@
       </table>
     </div>
 
+    <h3><span class="n">9</span>문의</h3>
+    <div class="box good">
+      <div class="bt">개발 및 관리자 문의 — PMO 그룹 임형준</div>
+      <p><a href="mailto:hyungjoon.lim@hnine.com" style="color:var(--accent)">hyungjoon.lim@hnine.com</a>
+        &nbsp;·&nbsp; <a href="tel:01044008136" style="color:var(--accent)">010-4400-8136</a></p>
+      <p class="muted" style="margin-bottom:0">오류·개선 요청은 <b>어느 화면에서 무엇을 하다가</b> 생겼는지와
+        화면 왼쪽 위의 <b>버전 표기</b>를 함께 알려주시면 빠르게 확인할 수 있습니다.</p>
+    </div>
+
     </div>
   </div>
 
@@ -900,7 +930,7 @@
 </div>
 
 <script>
-const APP_VERSION='v4.1 · 개발 스펙 요약';
+const APP_VERSION='v4.2 · 문의처 표시';
 const GRADES=['초급','중급','고급','특급'];
 let projects=[],staff=[],rates={},allRows=[];
 let curId=null,cDraft=[],fDraft=[];
@@ -2490,6 +2520,7 @@ async function refresh(){
 // ── 업데이트 히스토리 ─────────────────────────────────
 // 새 버전을 낼 때 APP_VERSION 을 올리고 이 목록 맨 위에 한 줄 추가한다.
 const CHANGELOG=[
+  ['v4.2','문의처 표시','<b>개발 및 관리자 문의</b>(PMO 그룹 임형준 · hyungjoon.lim@hnine.com · 010-4400-8136)를 탭 바로 아래 줄에 넣어 모든 화면에서 보이게 하고, 매뉴얼 스펙 요약과 문의 항목에도 추가.'],
   ['v4.1','개발 스펙 요약','매뉴얼 상단에 <b>개발 스펙 요약 박스</b> 추가 — 개발 언어·런타임, 백엔드·프론트엔드, DB·테이블, GitHub, 호스팅, 로그인·보안, 외부 연동, 동시 사용, 구축 이력, 코드 규모, 환경변수.'],
   ['v4.0','검수 반영','전체 검증에서 발견한 결함 4건 수정 — ① <b>동시 저장 보호가 뚫리던 문제</b>(1초 관용 때문에 나중 저장이 앞 값을 덮어씀)를 원자적 조건부 UPDATE 로 바꾸고 누가 먼저 저장했는지 알려준다. ② 계약액이 0인 완료 프로젝트가 <b>변동 비교를 오염</b>시키던 문제 — 계약·확정이 둘 다 있는 건만 짝지어 비교. ③ 일괄 등록에서 <b>번호가 같아 다른 프로젝트 이름이 조용히 바뀌던</b> 것을 결과에 경고. ④ 직원 개별 삭제 확인창 문구를 실제 동작(완전 삭제)에 맞게 수정.'],
   ['v3.9','복사·숫자 입력 개선','<b>[← 계약 투입 복사]</b> 가 투입 행뿐 아니라 <b>계약액 → 실제 매출 · 외주비 · 부대비</b> 까지 함께 복사한다. 숫자 칸이 <b>0 일 때 클릭하면 0 이 지워져</b>, 앞에 커서를 두고 입력할 때 0 이 하나 더 붙던 문제를 없앴다(비운 채 벗어나면 0 으로 복구).'],

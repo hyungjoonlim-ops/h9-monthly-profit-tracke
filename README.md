@@ -185,6 +185,12 @@ npm start          # http://localhost:3000
 | POST | `/api/reset` | 데이터 초기화 (`confirm:"초기화"`, 직원·단가 보존 선택) |
 | POST | `/api/drop-legacy` | 구버전 `mt_` 테이블 삭제 (`confirm:"구버전삭제"`) |
 
+## 문의
+
+개발 및 관리자 문의 — PMO 그룹 **임형준** (hyungjoon.lim@hnine.com / 010-4400-8136)
+
+앱의 **모든 화면 상단**(탭 바로 아래)과 **로그인 화면**, **매뉴얼**(스펙 요약 · 문의 섹션)에 표시됩니다.
+
 ## 참고
 
 - 이 환경은 IPv6 미지원 → Supabase **직접 연결** 대신 **Session pooler** 사용.

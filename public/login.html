@@ -19,6 +19,11 @@
   button:hover{background:var(--accent2);color:#fff}
   button:disabled{opacity:.6;cursor:not-allowed}
   .err{color:var(--bad);font-size:12px;margin-top:12px;min-height:16px;text-align:center}
+  .contact{margin-top:18px;padding-top:14px;border-top:1px solid var(--line);
+    font-size:11px;color:var(--muted);text-align:center;line-height:1.7}
+  .contact b{color:var(--ink,#e8eef6)}
+  .contact a{color:var(--accent);text-decoration:none}
+  .contact a:hover{text-decoration:underline}
 </style>
 </head>
 <body>
@@ -29,6 +34,8 @@
   <input id="pw" type="password" autocomplete="current-password" autofocus>
   <button type="submit" id="btn">로그인</button>
   <div class="err" id="err"></div>
+  <div class="contact">개발 및 관리자 문의 · PMO 그룹 <b>임형준</b><br>
+    <a href="mailto:hyungjoon.lim@hnine.com">hyungjoon.lim@hnine.com</a> / 010-4400-8136</div>
 </form>
 <script>
 const form=document.getElementById('loginForm'),btn=document.getElementById('btn'),err=document.getElementById('err');

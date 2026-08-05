@@ -309,7 +309,10 @@
   </div>
 
   <div class="panel">
-    <h2>유형별 수익률 <span class="tag">정산 형태 기준 · 확정 수익률과 변동은 완료 프로젝트만 집계</span></h2>
+    <div class="toolbar">
+      <h2>유형별 수익률 <span class="tag">정산 형태 기준 · 확정 수익률과 변동은 완료 프로젝트만 집계</span></h2>
+      <div class="sp"><button class="ghost sm" id="btnTypeFix" style="display:none">표기 통일</button></div>
+    </div>
     <div class="tw">
       <table>
         <thead><tr>
@@ -339,7 +342,7 @@
       <div class="field grow"><label>프로젝트명 *</label><input id="fName" placeholder="예: 이즐 충전소 운영"></div>
       <div class="field"><label>클라이언트</label><input id="fClient" list="clientList" placeholder="고객사"></div>
       <div class="field"><label>담당 PM</label><input id="fPm" list="pmList" placeholder="담당자"></div>
-      <div class="field"><label>유형 (정산 형태)</label><input id="fType" placeholder="예: 월 정산"></div>
+      <div class="field"><label>유형 (정산 형태)</label><input id="fType" list="typeList" placeholder="예: 월 정산"></div>
       <div class="field"><label>상태</label><select id="fStatus"><option>진행중</option><option>완료</option><option>보류</option></select></div>
       <div class="field"><label>시작월</label><input type="month" id="fStart"></div>
       <div class="field"><label>종료월</label><input type="month" id="fEnd"></div>
@@ -353,6 +356,7 @@
     </div>
     <datalist id="pmList"></datalist>
     <datalist id="clientList"></datalist>
+    <datalist id="typeList"></datalist>
   </div>
 
   <div class="cards" id="vsCards"></div>
@@ -746,6 +750,11 @@
           <tr><td>수익률이 실제보다 <b>너무 높게</b> 나온다</td>
             <td>투입 행의 <b>단가가 0</b>이거나 투입 행 자체가 비어 있습니다. 단가표에 그 소속이 있는지 확인하고
               <span class="btn-ref g">직원 소속 채우기</span> → <span class="btn-ref">단가표 저장</span>.</td></tr>
+          <tr><td>같은 유형인데 <b>월정산 / 월 정산</b> 처럼 두 줄로 나뉜다</td>
+            <td>유형은 자유 입력이라 표기가 갈릴 수 있습니다. 유형별 수익률은 <b>공백·대소문자를 무시해
+              한 묶음으로 집계</b>하고 많이 쓰인 표기를 대표로 보여 줍니다(갈린 표기는 옆에 함께 표시).
+              저장된 값까지 맞추려면 유형별 수익률 옆 <span class="btn-ref g">표기 통일</span> 을 누르세요.
+              앞으로는 유형 칸을 누르면 <b>이미 쓰인 유형 목록</b>이 뜨니 골라서 넣으면 됩니다.</td></tr>
           <tr><td>합계의 <b>계약액</b>과 <b>확정 매출</b> 금액 차이가 너무 크다</td>
             <td>두 열의 <b>집계 대상이 다릅니다</b> — 계약액은 <b>전체</b>(진행중·보류 포함), 확정 매출은
               <b>완료 + 실적 입력된 건만</b>. 차액은 대부분 <b>아직 진행중인 계약</b>입니다.
@@ -951,7 +960,7 @@
 </div>
 
 <script>
-const APP_VERSION='v4.8 · 두 시점 표 정렬';
+const APP_VERSION='v4.9 · 유형 표기 통합';
 const GRADES=['초급','중급','고급','특급'];
 let projects=[],staff=[],rates={},allRows=[];
 let curId=null,cDraft=[],fDraft=[];
@@ -1351,28 +1360,85 @@ function renderBars(list){
   document.getElementById('barLeft').onclick=()=>wrap.scrollBy({left:-page(),behavior:'smooth'});
   document.getElementById('barRight').onclick=()=>wrap.scrollBy({left:page(),behavior:'smooth'});
 })();
-function renderTypeDash(){
+// 유형(정산 형태)은 자유 입력이라 '월정산' 과 '월 정산' 처럼 표기가 갈린다.
+// 집계는 공백·대소문자를 무시한 키로 묶고, 이름은 가장 많이 쓰인 표기를 대표로 쓴다.
+// 유형 비교는 공백을 '모두 제거' 한다 — key() 는 공백을 하나로 줄이기만 하므로
+// '월정산' 과 '월 정산' 이 다른 값으로 남는다.
+const typeNorm=t=>String(t==null?'':t).replace(/\s+/g,'').toLowerCase();
+function typeKey(p){ return typeNorm(p.projType)||'(유형 미지정)'; }
+function typeGroups(list){
   const map=new Map();
-  projects.forEach(p=>{
-    const k=(p.projType||'').trim()||'(유형 미지정)';
-    if(!map.has(k))map.set(k,[]);
-    map.get(k).push(p);
+  list.forEach(p=>{
+    const k=typeKey(p);
+    if(!map.has(k))map.set(k,{list:[],names:new Map()});
+    const g=map.get(k);g.list.push(p);
+    const nm=(p.projType||'').trim();
+    if(nm)g.names.set(nm,(g.names.get(nm)||0)+1);
   });
+  // 대표 표기 = 많이 쓰인 것, 같으면 짧은 것
+  map.forEach(g=>{
+    const arr=[...g.names.entries()].sort((a,b)=>b[1]-a[1]||a[0].length-b[0].length);
+    g.label=arr.length?arr[0][0]:'(유형 미지정)';
+    g.variants=arr.map(([n])=>n);
+  });
+  return map;
+}
+function renderTypeDash(){
+  const map=typeGroups(projects);
   const body=document.getElementById('typeBody');
   if(!map.size){body.innerHTML='<tr><td colspan="7" class="empty">데이터가 없습니다.</td></tr>';return;}
-  body.innerHTML=[...map.entries()]
-    .map(([k,ps])=>[k,ps,aggregate(ps)])
-    .sort((a,b)=>b[2].cAmt-a[2].cAmt).map(([k,ps,o])=>{
-    const nDone=ps.filter(isDone).length;
-    return '<tr><td style="font-weight:650">'+esc(k)+'</td>'+
-      '<td class="right">'+ps.length+'</td>'+
+  body.innerHTML=[...map.values()]
+    .map(g=>[g,aggregate(g.list)])
+    .sort((a,b)=>b[1].cAmt-a[1].cAmt).map(([g,o])=>{
+    const nDone=g.list.filter(isDone).length;
+    // 같은 유형인데 표기가 다른 것이 섞여 있으면 함께 알려 준다
+    const mixed=g.variants.length>1
+      ? ' <span class="tag" title="표기가 다른 것을 하나로 묶어 집계했습니다">('+esc(g.variants.join(' · '))+')</span>' : '';
+    return '<tr><td style="font-weight:650">'+esc(g.label)+mixed+'</td>'+
+      '<td class="right">'+g.list.length+'</td>'+
       '<td class="right muted">'+o.ongoing+' / '+nDone+'</td>'+
       '<td class="right">'+won(o.cAmt)+'</td>'+
       '<td class="right">'+(o.cM!=null?'<span class="pill '+cls(o.cM)+'">'+o.cM.toFixed(1)+'%</span>':'-')+'</td>'+
       '<td class="right">'+(o.fM!=null?'<span class="pill '+cls(o.fM)+'">'+o.fM.toFixed(1)+'%</span>':'-')+'</td>'+
       '<td class="right">'+(o.delta!=null?deltaHtml(o.delta):'–')+'</td></tr>';
   }).join('');
+  renderTypeList();
+  // 표기가 갈린 유형이 있으면 정리 버튼을 보여 준다
+  const mixedCnt=[...map.values()].filter(g=>g.variants.length>1).length;
+  const btn=document.getElementById('btnTypeFix');
+  if(btn){btn.style.display=mixedCnt?'':'none';btn.textContent='표기 통일 ('+mixedCnt+'종)';}
 }
+// 유형 입력칸 후보 — 이미 쓰인 표기를 대표 이름으로 제시해 새 변형이 생기지 않게 한다
+function renderTypeList(){
+  const el=document.getElementById('typeList');if(!el)return;
+  const names=[...typeGroups(projects).values()].map(g=>g.label)
+    .filter(n=>n&&n!=='(유형 미지정)').sort((a,b)=>a.localeCompare(b,'ko'));
+  el.innerHTML=names.map(n=>'<option value="'+esc(n)+'">').join('');
+}
+// [표기 통일] — 같은 유형인데 표기가 갈린 프로젝트를 대표 표기로 맞춘다
+document.getElementById('btnTypeFix').onclick=async()=>{
+  const groups=[...typeGroups(projects).values()].filter(g=>g.variants.length>1);
+  if(!groups.length)return;
+  const todo=[];
+  groups.forEach(g=>g.list.forEach(p=>{
+    if((p.projType||'').trim()!==g.label)todo.push({p,to:g.label});
+  }));
+  if(!todo.length)return;
+  const preview=groups.map(g=>'<b>'+esc(g.label)+'</b> ← '+
+    esc(g.variants.filter(v=>v!==g.label).join(', '))).join('<br>');
+  if(!await askDelete({title:'유형 표기를 통일할까요?',
+    what:preview+'<br><span class="muted">프로젝트 '+todo.length+'건의 유형 표기가 바뀝니다.</span>',
+    note:'수익률·금액은 바뀌지 않고 유형 이름만 대표 표기로 맞춥니다.',ok:'통일'}))return;
+  const btn=document.getElementById('btnTypeFix');btn.disabled=true;
+  try{
+    for(const {p,to} of todo){
+      await api('/projects/'+p.id,{method:'PUT',
+        body:JSON.stringify({...p,projType:to,by:myName(),baseUpdatedAt:p.updatedAt})});
+    }
+    await refresh();
+  }catch(e){alert('표기 통일 실패: '+e.message);}
+  finally{btn.disabled=false;}
+};
 document.getElementById('dashFilter').onchange=renderDash;
 document.getElementById('dashMine').onchange=renderDash;
 document.getElementById('dashPm').onchange=renderDash;
@@ -2598,12 +2664,13 @@ document.getElementById('pwForm').onsubmit=async e=>{
 async function refresh(){
   [projects,staff,rates,allRows]=await Promise.all([
     api('/projects'),api('/staff'),api('/rates'),api('/rows')]);
-  renderDash();renderStaff();renderRates();renderPjSelect();renderPmList();renderClientList();
+  renderDash();renderStaff();renderRates();renderPjSelect();renderPmList();renderClientList();renderTypeList();
   if(!document.getElementById('tab-proj').classList.contains('hidden')){renderPhase();renderVs();}
 }
 // ── 업데이트 히스토리 ─────────────────────────────────
 // 새 버전을 낼 때 APP_VERSION 을 올리고 이 목록 맨 위에 한 줄 추가한다.
 const CHANGELOG=[
+  ['v4.9','유형 표기 통합','유형(정산 형태)이 자유 입력이라 <b>월정산 / 월 정산</b> 처럼 갈리던 것을 정리 — 유형별 수익률은 <b>공백·대소문자를 무시해 한 묶음</b>으로 집계하고 가장 많이 쓰인 표기를 대표로 보여 준다(갈린 표기는 옆에 함께 표시). 유형 입력칸에 <b>이미 쓰인 유형 목록</b>을 제시해 새 변형이 생기지 않게 하고, <b>[표기 통일]</b> 버튼으로 기존 데이터의 표기를 대표 이름으로 맞출 수 있다.'],
   ['v4.8','두 시점 표 정렬','계약 시점과 확정 시점의 <b>투입 표가 20px 어긋나 있던 문제</b> 수정 — 실제 매출 아래 안내 문구가 확정 시점 카드만 높여 놓았다. 두 카드의 입력칸에 같은 공간을 예약해 <b>표 머리글·행·합계가 모두 같은 높이</b>에서 시작한다.'],
   ['v4.7','확정매출 합계 카드','대시보드 요약에 <b>확정 매출 합계</b> 카드를 계약액 합계 옆에 추가하고, 두 카드에 <b>전체 N건 / 완료 M건</b> 기준을 붙여 금액 차이가 바로 보이게 했다. 주소를 항상 <code>#dash</code> 로 시작하게 맞춰 [뒤로]가 대시보드로 정확히 돌아온다.'],
   ['v4.6','뒤로가기 수정','브라우저 <b>[뒤로]</b>를 누르면 로그인 화면이 나오고 버튼이 <b>확인 중…</b> 으로 멈춰 있던 문제 수정 — 로그인 후 이동을 <code>replace</code> 로 바꿔 로그인 화면을 기록에 남기지 않고, 돌아왔을 때 버튼 상태를 되돌리며 이미 로그인돼 있으면 앱으로 되돌려 보낸다. 아울러 <b>탭 이동을 주소(#해시)에 기록</b>해 [뒤로]가 <b>이전 탭</b>으로 가고, 새로고침해도 보던 탭이 유지된다.'],

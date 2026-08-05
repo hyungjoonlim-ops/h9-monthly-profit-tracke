@@ -68,8 +68,8 @@
   .prov{opacity:.55;font-size:11px;white-space:nowrap}
   /* 합계 행에서 그 열이 무엇을 더한 값인지 */
   tfoot .basis{font-size:10px;font-weight:400;color:var(--muted);margin-top:1px}
-  .revhint{font-size:10.5px;color:var(--muted);margin-top:3px;height:13px;line-height:13px;
-    white-space:nowrap;overflow:hidden}
+  .revhint{position:absolute;left:0;right:0;bottom:0;height:14px;line-height:14px;
+    font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   /* 저장 안 된 변경 표시 */
   .status.dirty{color:var(--warn);font-weight:600}
 
@@ -153,11 +153,14 @@
   /* 두 시점 카드의 입력칸을 같은 4열 그리드로 맞춘다
      (계약 시점은 4번째 칸이 비고, 확정 시점은 그 자리에 확정(정산) 월이 들어간다) */
   .phase .row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:2px}
-  .phase .row .field{min-width:0}
+  /* 두 카드의 표가 같은 높이에서 시작하도록, 입력칸 아래에 안내 문구 자리를
+     양쪽 모두 같은 크기로 예약한다 (문구는 그 자리에 절대배치) */
+  .phase .row .field{min-width:0;position:relative;padding-bottom:16px}
   /* 라벨은 한 줄로 — 두 카드의 입력칸 높이가 어긋나지 않게 */
   .phase .row label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   /* 좁아져도 4열을 유지해 확정(정산) 월이 첫 줄에 남게 한다 (칸만 좁아진다).
-     month 입력칸은 기본 최소 폭이 있어 따로 풀어 준다 */
+     month 입력칸은 기본 최소 폭·높이가 달라(31 vs 33px) 표 위치를 어긋나게 하므로 맞춰 준다 */
+  .phase .row input,.phase .row select{height:31px}
   .phase .row input[type=month]{min-width:0;padding-left:6px;padding-right:4px}
   @media (max-width:1100px){.phase .row{gap:8px}}
   @media (max-width:600px){.phase .row{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -948,7 +951,7 @@
 </div>
 
 <script>
-const APP_VERSION='v4.7 · 확정매출 합계 카드';
+const APP_VERSION='v4.8 · 두 시점 표 정렬';
 const GRADES=['초급','중급','고급','특급'];
 let projects=[],staff=[],rates={},allRows=[];
 let curId=null,cDraft=[],fDraft=[];
@@ -2601,6 +2604,7 @@ async function refresh(){
 // ── 업데이트 히스토리 ─────────────────────────────────
 // 새 버전을 낼 때 APP_VERSION 을 올리고 이 목록 맨 위에 한 줄 추가한다.
 const CHANGELOG=[
+  ['v4.8','두 시점 표 정렬','계약 시점과 확정 시점의 <b>투입 표가 20px 어긋나 있던 문제</b> 수정 — 실제 매출 아래 안내 문구가 확정 시점 카드만 높여 놓았다. 두 카드의 입력칸에 같은 공간을 예약해 <b>표 머리글·행·합계가 모두 같은 높이</b>에서 시작한다.'],
   ['v4.7','확정매출 합계 카드','대시보드 요약에 <b>확정 매출 합계</b> 카드를 계약액 합계 옆에 추가하고, 두 카드에 <b>전체 N건 / 완료 M건</b> 기준을 붙여 금액 차이가 바로 보이게 했다. 주소를 항상 <code>#dash</code> 로 시작하게 맞춰 [뒤로]가 대시보드로 정확히 돌아온다.'],
   ['v4.6','뒤로가기 수정','브라우저 <b>[뒤로]</b>를 누르면 로그인 화면이 나오고 버튼이 <b>확인 중…</b> 으로 멈춰 있던 문제 수정 — 로그인 후 이동을 <code>replace</code> 로 바꿔 로그인 화면을 기록에 남기지 않고, 돌아왔을 때 버튼 상태를 되돌리며 이미 로그인돼 있으면 앱으로 되돌려 보낸다. 아울러 <b>탭 이동을 주소(#해시)에 기록</b>해 [뒤로]가 <b>이전 탭</b>으로 가고, 새로고침해도 보던 탭이 유지된다.'],
   ['v4.5','매출 고정 반영','<b>계약금액은 계약 시점과 확정 시점이 같다</b>는 실무 기준을 화면에 반영 — 변동 분석의 매출 행에 <b>계약금액 변동 없음</b> 표시, 실제 매출을 0으로 두면 <b>적용되는 계약액을 칸 아래에 표시</b>, 매뉴얼에 원칙과 예외(감액 정산)를 정리. 수익률 변동은 투입 등급·MM 에서 나온다는 점을 명시.'],

@@ -66,6 +66,10 @@
   .card .lbl .tag{margin-left:4px}
   /* 진행중 프로젝트의 잠정 변동 — 확정값과 구분해 흐리게 */
   .prov{opacity:.55;font-size:11px;white-space:nowrap}
+  /* 합계 행에서 그 열이 무엇을 더한 값인지 */
+  tfoot .basis{font-size:10px;font-weight:400;color:var(--muted);margin-top:1px}
+  .revhint{font-size:10.5px;color:var(--muted);margin-top:3px;height:13px;line-height:13px;
+    white-space:nowrap;overflow:hidden}
   /* 저장 안 된 변경 표시 */
   .status.dirty{color:var(--warn);font-weight:600}
 
@@ -296,6 +300,7 @@
         <tfoot><tr id="dashFoot"></tr></tfoot>
       </table>
     </div>
+    <div class="hint" id="footNote" style="margin-bottom:6px"></div>
     <div class="hint">목록은 <b>담당 PM 기준으로 묶여</b> 정렬되고(같은 PM 끼리 모임, 그 안에서는 프로젝트명 순), 위 <b>담당 PM</b> 셀렉트로 한 사람만 골라 볼 수 있습니다. 행을 클릭하면 그 프로젝트의 수익률 입력 화면으로 이동합니다. 계약 수익률은 계약 시점 투입계획으로 산출한 기준값이고, 확정 수익률은 실제 투입·매출로 산출한 결과값입니다.
       <b>상태가 '진행중'인 프로젝트의 변동은 아직 확정이 아니므로 <span class="prov">잠정</span> 으로 표시되고 합계·요약에서 제외됩니다.</b> 최종 변동을 반영하려면 상태를 '완료'로 바꿔 주세요.</div>
   </div>
@@ -379,7 +384,7 @@
     <div class="phase f">
       <h3>② 확정 시점 (실적) <span class="pill flat">실제 결과</span></h3>
       <div class="row">
-        <div class="field"><label title="0으로 두면 계약액과 동일하게 봅니다">실제 매출 (0 = 계약액)</label><input id="fRev" class="num" inputmode="numeric" value="0"></div>
+        <div class="field"><label title="계약금액은 보통 변하지 않습니다. 0으로 두면 계약액을 그대로 씁니다.">실제 매출 <span class="muted">(0 = 계약액)</span></label><input id="fRev" class="num" inputmode="numeric" value="0"><div class="revhint" id="revHint"></div></div>
         <div class="field"><label>외주비</label><input id="fOut" class="num" inputmode="numeric" value="0"></div>
         <div class="field"><label>부대비</label><input id="fEtc" class="num" inputmode="numeric" value="0"></div>
         <div class="field"><label>확정(정산) 월</label><input type="month" id="fClosed"></div>
@@ -611,6 +616,19 @@
         </tbody>
       </table>
     </div>
+    <div class="box warn">
+      <div class="bt">계약금액은 시작과 끝이 같습니다 — 수익률 변동은 원가에서 나옵니다</div>
+      <p>고객사에서 받는 <b>계약금액은 계약 시점과 확정 시점이 동일</b>합니다. 등급이 올라가거나 MM이 늘어도
+      고객사에서 더 받는 것이 아니므로, <b>매출은 그대로 두고 원가(인건비·외주비·부대비)만 달라집니다.</b>
+      따라서 수익률 변동은 사실상 <b>투입 인력의 등급·MM 변동</b>에서 나옵니다 —
+      그래서 <b>인건비 변동 상세</b>에 어느 소속·등급에서 얼마가 늘었는지 문장으로 적어 둡니다.</p>
+      <ul>
+        <li><b>실제 매출은 0으로 비워 두면</b> 계약액을 그대로 씁니다 (칸 아래에 적용 금액이 표시됩니다).
+          매번 같은 금액을 다시 입력할 필요가 없습니다.</li>
+        <li>변동 분석표의 매출 행에는 <b>계약금액 변동 없음</b>으로 표시됩니다.</li>
+        <li><b>감액 정산·과업 축소처럼 실제로 받는 금액이 달라진 경우에만</b> 실제 매출을 다르게 넣으세요.</li>
+      </ul>
+    </div>
     <div class="box">
       <div class="bt">변동은 같은 프로젝트끼리만 비교합니다</div>
       <p>대시보드의 <b>확정 수익률</b>과 <b>변동</b>은 상태가 <code>완료</code> 이고 실적이 입력된 프로젝트만 모아 계산하고,
@@ -725,6 +743,11 @@
           <tr><td>수익률이 실제보다 <b>너무 높게</b> 나온다</td>
             <td>투입 행의 <b>단가가 0</b>이거나 투입 행 자체가 비어 있습니다. 단가표에 그 소속이 있는지 확인하고
               <span class="btn-ref g">직원 소속 채우기</span> → <span class="btn-ref">단가표 저장</span>.</td></tr>
+          <tr><td>합계의 <b>계약액</b>과 <b>확정 매출</b> 금액 차이가 너무 크다</td>
+            <td>두 열의 <b>집계 대상이 다릅니다</b> — 계약액은 <b>전체</b>(진행중·보류 포함), 확정 매출은
+              <b>완료 + 실적 입력된 건만</b>. 차액은 대부분 <b>아직 진행중인 계약</b>입니다.
+              표 아래 설명에 차액이 어디서 나오는지(진행중·보류·실적 미입력 건수) 표시되며,
+              같은 기준으로 보려면 상태 필터를 <code>완료</code> 로 바꾸세요.</td></tr>
           <tr><td>확정 수익률이 <b>-</b> 로만 보인다</td>
             <td>확정 시점에 아무것도 입력되지 않은 상태입니다. 실제 매출이나 실제 투입 중 하나라도 넣으면 계산됩니다.</td></tr>
           <tr><td>대시보드 <b>확정 수익률</b>에 내 프로젝트가 안 잡힌다</td>
@@ -925,7 +948,7 @@
 </div>
 
 <script>
-const APP_VERSION='v4.3 · 문의처 헤더 이동';
+const APP_VERSION='v4.5 · 매출 고정 반영';
 const GRADES=['초급','중급','고급','특급'];
 let projects=[],staff=[],rates={},allRows=[];
 let curId=null,cDraft=[],fDraft=[];
@@ -1093,6 +1116,14 @@ function finalStats(p,draft){
   return {mm,labor,cost,revenue,margin,has,rows};
 }
 const curProject=()=>projects.find(p=>p.id===curId)||null;
+// 실제 매출을 0(=계약액과 동일)으로 둔 경우, 실제로 적용되는 금액을 칸 옆에 흐리게 보여준다.
+// 계약금액은 보통 변하지 않으므로 이 상태가 정상이며, 매출이 0이라고 오해하지 않게 한다.
+function syncRevHint(){
+  const el=document.getElementById('revHint');if(!el)return;
+  const rev=pnum(document.getElementById('fRev').value);
+  const amt=pnum(document.getElementById('cAmount').value);
+  el.innerHTML=(rev===0&&amt>0)?'계약액 <b>'+won(amt)+'</b> 적용':'';
+}
 
 // ── 대시보드 ──────────────────────────────────────────
 // 진행중 프로젝트는 아직 최종 실적이 아니므로 확정 수익률·변동 집계에서 제외한다.
@@ -1185,7 +1216,8 @@ function renderDash(){
     body.innerHTML='<tr><td colspan="12" class="empty">'+(projects.length
       ?'조건에 맞는 프로젝트가 없습니다. 담당 PM·상태 필터를 바꿔 보세요.'
       :'프로젝트가 없습니다. 프로젝트 수익률 탭에서 등록하거나 구글시트로 일괄 등록하세요.')+'</td></tr>';
-    document.getElementById('dashFoot').innerHTML='';renderTypeDash();return;}
+    document.getElementById('dashFoot').innerHTML='';
+    document.getElementById('footNote').innerHTML='';renderTypeDash();return;}
   body.innerHTML=list.map(p=>{
     const c=contractStats(p),fs=finalStats(p);
     const d=(c.margin!=null&&fs.margin!=null)?fs.margin-c.margin:null;
@@ -1210,14 +1242,38 @@ function renderDash(){
   body.querySelectorAll('[data-go]').forEach(tr=>tr.onclick=()=>{
     curId=+tr.dataset.go;switchTab('proj');loadProject();
   });
-  // 합계 — 확정 수익률·변동은 목록 중 '완료' 프로젝트만으로 계산
+  // 합계 — 왼쪽(계약)은 목록 전체, 오른쪽(확정)은 '완료 + 실적 입력' 건만 집계한다.
+  // 기준이 다르므로 각 열에 무엇을 더한 값인지 붙여 준다 (두 금액 차이의 원인이 바로 보이게).
   const la=aggregate(list);
+  const nContract=list.filter(p=>p.cAmount>0).length;
+  const basis=t=>'<div class="basis">'+t+'</div>';
   document.getElementById('dashFoot').innerHTML=
-    '<td></td><td>합계 '+list.length+'건</td><td></td><td></td><td></td>'+
-    '<td class="muted">완료 '+la.doneWith+'건 기준</td>'+
-    '<td class="right">'+won(la.cAmt)+'</td><td class="right">'+(la.cM!=null?la.cM.toFixed(1)+'%':'-')+'</td>'+
-    '<td class="right">'+won(la.fRev)+'</td><td class="right">'+(la.fM!=null?la.fM.toFixed(1)+'%':'-')+'</td>'+
-    '<td class="right">'+(la.delta!=null?deltaHtml(la.delta):'–')+'</td><td></td>';
+    '<td></td><td>합계 '+list.length+'건</td><td></td><td></td><td></td><td></td>'+
+    '<td class="right">'+won(la.cAmt)+basis('전체 '+nContract+'건')+'</td>'+
+    '<td class="right">'+(la.cM!=null?la.cM.toFixed(1)+'%':'-')+basis('전체 기준')+'</td>'+
+    '<td class="right">'+won(la.fRev)+basis('완료 '+la.doneWith+'건')+'</td>'+
+    '<td class="right">'+(la.fM!=null?la.fM.toFixed(1)+'%':'-')+basis('완료 기준')+'</td>'+
+    '<td class="right">'+(la.delta!=null?deltaHtml(la.delta):'–')
+      +basis(la.pairs?'짝 '+la.pairs+'건':'–')+'</td><td></td>';
+  // 두 기준의 차이를 문장으로도 알려 준다
+  const gap=la.cAmt-la.fRev;
+  const nOngoing=list.filter(p=>p.status==='진행중').length;
+  const nHoldL=list.filter(p=>p.status==='보류').length;
+  const nNoActual=list.filter(p=>isDone(p)&&!(finalStats(p).has&&finalStats(p).revenue>0)).length;
+  const gapEl=document.getElementById('footNote');
+  if(!(la.cAmt>0&&Math.abs(gap)>0)){gapEl.innerHTML='';}
+  else{
+    const why=[];
+    if(nOngoing)why.push('진행중 '+nOngoing+'건');
+    if(nHoldL)why.push('보류 '+nHoldL+'건');
+    if(nNoActual)why.push('완료지만 실적 미입력 '+nNoActual+'건');
+    gapEl.innerHTML='<b>계약액 '+won(la.cAmt)+'</b>은 계약액이 있는 <b>전체 '+nContract+'건</b>을, '
+      +'<b>확정 매출 '+won(la.fRev)+'</b>은 실적이 입력된 <b>완료 '+la.doneWith+'건</b>만 더한 값입니다 — '
+      +'기준이 다르므로 두 금액을 직접 비교하지 마세요. 차액 <b>'+won(gap)+'</b>'
+      +(why.length?'은 아직 확정 실적이 없는 '+why.join(' · ')+' 때문입니다.'
+                  :'은 계약액과 실제 매출의 차이입니다.')
+      +((nOngoing||nHoldL)?' 확정된 건만 보려면 상태 필터를 <b>완료</b>로 바꿔 주세요.':'');
+  }
   renderTypeDash();
 }
 // ── 프로젝트별 수익률 변동 막대그래프 ────────────────────
@@ -1367,6 +1423,7 @@ function loadProject(){
   document.getElementById('cOut').value=won(p.cCostOut);
   document.getElementById('cEtc').value=won(p.cCostEtc);
   document.getElementById('fRev').value=won(p.fRevenue);
+  syncRevHint();
   document.getElementById('fOut').value=won(p.fCostOut);
   document.getElementById('fEtc').value=won(p.fCostEtc);
   document.getElementById('fClosed').value=p.fClosedAt||'';
@@ -1607,8 +1664,12 @@ function renderVs(){
       '<td class="right" style="color:'+(diff===0?'inherit':bad?'var(--bad)':'var(--good)')+'">'+(diff>0?'+':'')+won(diff)+'</td>'+
       '<td>'+impact+'</td></tr>';
   };
+  const sameRev=Math.abs(f.revenue-c.revenue)<1;
   vb.innerHTML=
-    line('매출',c.revenue,f.revenue,false)+
+    (sameRev
+      ? '<tr><td>매출</td><td class="right">'+won(c.revenue)+'</td><td class="right">'+won(f.revenue)+'</td>'
+        +'<td class="right">0</td><td><span class="muted">계약금액 변동 없음</span></td></tr>'
+      : line('매출',c.revenue,f.revenue,false))+
     line('인건비',c.labor,f.labor,true)+
     line('외주비',p.cCostOut,p.fCostOut,true)+
     line('부대비',p.cCostEtc,p.fCostEtc,true)+
@@ -1625,8 +1686,8 @@ function renderVs(){
   const money=MONEY_IDS.includes(id);
   // 요약만 다시 그린다. 투입 표를 글자마다 다시 그리면 표 안의 입력칸이
   // 새로 만들어져 포커스가 풀리고 입력 중인 값이 엉키는 문제가 생긴다.
-  el.oninput=()=>{if(money)commify(el);renderVs();};
-  el.onchange=()=>{if(money)commify(el);renderVs();};
+  el.oninput=()=>{if(money)commify(el);renderVs();syncRevHint();};
+  el.onchange=()=>{if(money)commify(el);renderVs();syncRevHint();};
 });
 // 프로젝트 화면의 어떤 입력이든 바뀌면 '저장 안 된 변경' 표시를 갱신한다
 ['input','change'].forEach(ev=>
@@ -1648,7 +1709,7 @@ document.getElementById('fCopy').onclick=()=>{
     const dst=document.getElementById(to);
     dst.value=document.getElementById(from).value;commify(dst);
   });
-  renderPhase();renderVs();updateDirty();
+  renderPhase();renderVs();updateDirty();syncRevHint();
   const s=document.getElementById('fMsg');
   s.className='status';s.textContent='계약 시점의 금액과 투입을 복사했습니다 — 달라진 부분만 고치세요.';
   setTimeout(()=>{if(s.textContent.indexOf('복사했습니다')>=0)s.textContent='';},4000);
@@ -2515,6 +2576,8 @@ async function refresh(){
 // ── 업데이트 히스토리 ─────────────────────────────────
 // 새 버전을 낼 때 APP_VERSION 을 올리고 이 목록 맨 위에 한 줄 추가한다.
 const CHANGELOG=[
+  ['v4.5','매출 고정 반영','<b>계약금액은 계약 시점과 확정 시점이 같다</b>는 실무 기준을 화면에 반영 — 변동 분석의 매출 행에 <b>계약금액 변동 없음</b> 표시, 실제 매출을 0으로 두면 <b>적용되는 계약액을 칸 아래에 표시</b>, 매뉴얼에 원칙과 예외(감액 정산)를 정리. 수익률 변동은 투입 등급·MM 에서 나온다는 점을 명시.'],
+  ['v4.4','합계 기준 표시','합계 행의 <b>계약액은 전체(진행중 포함)</b>, <b>확정 매출은 완료 건만</b> 더한 값인데 기준이 한 곳에만 적혀 오해를 부르던 것을 고쳤다. 각 열 아래에 <b>전체 N건 / 완료 M건 / 짝 K건</b> 을 표기하고, 표 아래에 두 금액의 <b>차액이 어디서 나오는지</b>(진행중·보류·실적 미입력 건수) 문장으로 설명한다.'],
   ['v4.3','문의처 헤더 이동','<b>개발 수정 및 오류 문의</b>(PMO 그룹 임형준 · hyungjoon.lim@hnine.com · 010-4400-8136)를 화면 <b>맨 위 헤더 오른쪽</b>으로 옮겨 모든 화면에서 같은 자리에 보이게 했다. 로그인 화면·매뉴얼(스펙 요약·문의 섹션)에도 같은 문구로 표시.'],
   ['v4.1','개발 스펙 요약','매뉴얼 상단에 <b>개발 스펙 요약 박스</b> 추가 — 개발 언어·런타임, 백엔드·프론트엔드, DB·테이블, GitHub, 호스팅, 로그인·보안, 외부 연동, 동시 사용, 구축 이력, 코드 규모, 환경변수.'],
   ['v4.0','검수 반영','전체 검증에서 발견한 결함 4건 수정 — ① <b>동시 저장 보호가 뚫리던 문제</b>(1초 관용 때문에 나중 저장이 앞 값을 덮어씀)를 원자적 조건부 UPDATE 로 바꾸고 누가 먼저 저장했는지 알려준다. ② 계약액이 0인 완료 프로젝트가 <b>변동 비교를 오염</b>시키던 문제 — 계약·확정이 둘 다 있는 건만 짝지어 비교. ③ 일괄 등록에서 <b>번호가 같아 다른 프로젝트 이름이 조용히 바뀌던</b> 것을 결과에 경고. ④ 직원 개별 삭제 확인창 문구를 실제 동작(완전 삭제)에 맞게 수정.'],

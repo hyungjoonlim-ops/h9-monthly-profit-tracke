@@ -948,7 +948,7 @@
 </div>
 
 <script>
-const APP_VERSION='v4.5 · 매출 고정 반영';
+const APP_VERSION='v4.7 · 확정매출 합계 카드';
 const GRADES=['초급','중급','고급','특급'];
 let projects=[],staff=[],rates={},allRows=[];
 let curId=null,cDraft=[],fDraft=[];
@@ -1185,6 +1185,7 @@ function renderDash(){
   const nOn=projects.filter(p=>p.status==='진행중').length;
   const nDone=projects.filter(isDone).length;
   const nHold=projects.filter(p=>p.status==='보류').length;
+  const nWithAmt=projects.filter(p=>p.cAmount>0).length;
   const onAmt=projects.filter(p=>p.status==='진행중').reduce((s,p)=>s+p.cAmount,0);
   const onM=(()=>{const o=projects.filter(p=>p.status==='진행중');
     let r=0,c=0;o.forEach(p=>{if(p.cAmount>0){r+=p.cAmount;c+=contractStats(p).cost;}});
@@ -1196,8 +1197,14 @@ function renderDash(){
       '<div class="foot">계약액 '+won(onAmt)+(onM!=null?' · 계약 기준 '+onM.toFixed(1)+'%':'')+'</div></div>'+
     '<div class="card"><div class="lbl">완료</div><div class="val">'+nDone+'<span class="unit">건</span></div>'+
       '<div class="foot">'+(nDone?'실적 입력 '+a.doneWith+'건 / '+nDone+'건':'완료된 프로젝트 없음')+'</div></div>'+
-    '<div class="card"><div class="lbl">계약액 합계</div><div class="val">'+won(a.cAmt)+'</div>'+
+    '<div class="card"><div class="lbl">계약액 합계 <span class="tag">전체 '+nWithAmt+'건</span></div>'+
+      '<div class="val">'+won(a.cAmt)+'</div>'+
       '<div class="foot">계약 원가 '+won(a.cCost)+'</div></div>'+
+    '<div class="card"><div class="lbl">확정 매출 합계 <span class="tag">완료 '+a.doneWith+'건</span></div>'+
+      '<div class="val">'+won(a.fRev)+'</div>'+
+      '<div class="foot">'+(a.doneWith
+        ?'확정 원가 '+won(a.fCost)
+        :'완료 프로젝트의 실적이 입력되면 표시됩니다')+'</div></div>'+
     '<div class="card"><div class="lbl">계약 기준 수익률</div><div class="val '+cls(a.cM)+'">'+(a.cM!=null?a.cM.toFixed(1)+'%':'-')+'</div>'+
       '<div class="foot">전 프로젝트 가중 평균</div></div>'+
     '<div class="card hl"><div class="lbl">확정 수익률 <span class="tag">완료 '+a.doneWith+'건</span></div>'+
@@ -1240,7 +1247,7 @@ function renderDash(){
       '<td class="muted">'+esc(p.reason||'')+'</td></tr>';
   }).join('');
   body.querySelectorAll('[data-go]').forEach(tr=>tr.onclick=()=>{
-    curId=+tr.dataset.go;switchTab('proj');loadProject();
+    curId=+tr.dataset.go;goTab('proj');loadProject();
   });
   // 합계 — 왼쪽(계약)은 목록 전체, 오른쪽(확정)은 '완료 + 실적 입력' 건만 집계한다.
   // 기준이 다르므로 각 열에 무엇을 더한 값인지 붙여 준다 (두 금액 차이의 원인이 바로 보이게).
@@ -1318,7 +1325,7 @@ function renderBars(list){
       '<div class="mname">'+esc(x.p.name)+'</div></div>';
   }).join('');
   el.querySelectorAll('[data-bar]').forEach(g=>g.onclick=()=>{
-    curId=+g.dataset.bar;switchTab('proj');loadProject();});
+    curId=+g.dataset.bar;goTab('proj');loadProject();});
   // 좌우 버튼은 넘길 내용이 있을 때만
   const more=wrap.scrollWidth>wrap.clientWidth+4;
   ['barLeft','barRight'].forEach(id=>document.getElementById(id).style.display=more?'':'none');
@@ -1431,6 +1438,7 @@ function loadProject(){
   cDraft=rowsOf(p.id,'C').map(r=>({...r}));
   fDraft=rowsOf(p.id,'F').map(r=>({...r}));
   renderPhase();renderVs();
+  loadedId=curId;
   markClean();   // 불러온 직후가 '저장된 상태'
 }
 // 화면 입력값을 프로젝트 객체에 반영한 사본
@@ -1460,7 +1468,7 @@ function formProject(){
 // ── 저장 안 한 입력 보호 ───────────────────────────────
 // 프로젝트를 불러온 직후 상태를 기억해 두고, 지금 화면과 달라졌으면 '수정 중' 으로 본다.
 // 수정 중이면 자동 새로고침이 값을 덮어쓰지 않는다 (덮어써서 입력이 사라지던 문제).
-let cleanSnap=null;
+let cleanSnap=null,loadedId=null;   // loadedId — 지금 화면에 그려져 있는 프로젝트
 const FORM_IDS=['fCode','fName','fClient','fPm','fType','fStatus','fStart','fEnd',
   'cAmount','cOut','cEtc','fRev','fOut','fEtc','fClosed','fReason'];
 function snapshot(){
@@ -1719,7 +1727,7 @@ document.getElementById('btnNew').onclick=async()=>{
   if(!name||!name.trim())return;
   try{
     const p=await api('/projects',{method:'POST',body:JSON.stringify({name:name.trim()})});
-    curId=p.id;await refresh();switchTab('proj');loadProject();
+    curId=p.id;await refresh();goTab('proj');loadProject();
   }catch(e){alert('생성 실패: '+e.message);}
 };
 document.getElementById('btnSaveInfo').onclick=async()=>{
@@ -2495,20 +2503,37 @@ document.getElementById('btnReset').onclick=async()=>{
 };
 
 // ── 탭 · 공통 ─────────────────────────────────────────
+const TABS=['dash','proj','staff','man'];
 function switchTab(name){
+  if(!TABS.includes(name))name='dash';
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
-  ['dash','proj','staff','man'].forEach(n=>document.getElementById('tab-'+n).classList.toggle('hidden',n!==name));
+  TABS.forEach(n=>document.getElementById('tab-'+n).classList.toggle('hidden',n!==name));
   // 숨은 상태에서는 행 높이를 잴 수 없으므로 화면에 보일 때 다시 계산한다
   if(name==='staff')fitRows('stWrap',10,'stScrollTip');
 }
+// 탭을 주소(#해시)에 기록한다 — 브라우저 [뒤로]가 이전 탭으로 돌아가고,
+// 로그인 화면으로 되돌아가지 않는다. 새로고침해도 보던 탭이 유지된다.
+const tabFromHash=()=>{
+  const h=String(location.hash||'').replace(/^#/,'');
+  return TABS.includes(h)?h:'dash';
+};
+function goTab(name){
+  if(!TABS.includes(name))name='dash';
+  if(tabFromHash()===name){applyTab(name);return;}
+  location.hash='#'+name;          // hashchange 에서 화면을 바꾼다
+}
+function applyTab(name){
+  switchTab(name);
+  // 프로젝트 탭으로 돌아올 때, 같은 프로젝트를 편집 중이면 다시 불러오지 않는다
+  // (불러오면 저장하지 않은 입력이 DB 값으로 덮어써진다)
+  if(name==='proj'&&!(loadedId===curId&&isDirty()))loadProject();
+}
+window.addEventListener('hashchange',()=>applyTab(tabFromHash()));
 // 창 크기가 바뀌면 (줄바꿈으로 행 높이가 달라질 수 있어) 다시 계산
 window.addEventListener('resize',()=>{
   if(!document.getElementById('tab-staff').classList.contains('hidden'))fitRows('stWrap',10,'stScrollTip');
 });
-document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
-  switchTab(t.dataset.tab);
-  if(t.dataset.tab==='proj')loadProject();
-});
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>goTab(t.dataset.tab));
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape')document.querySelectorAll('.modal-bg.show').forEach(m=>m.classList.remove('show'));
 });
@@ -2576,6 +2601,8 @@ async function refresh(){
 // ── 업데이트 히스토리 ─────────────────────────────────
 // 새 버전을 낼 때 APP_VERSION 을 올리고 이 목록 맨 위에 한 줄 추가한다.
 const CHANGELOG=[
+  ['v4.7','확정매출 합계 카드','대시보드 요약에 <b>확정 매출 합계</b> 카드를 계약액 합계 옆에 추가하고, 두 카드에 <b>전체 N건 / 완료 M건</b> 기준을 붙여 금액 차이가 바로 보이게 했다. 주소를 항상 <code>#dash</code> 로 시작하게 맞춰 [뒤로]가 대시보드로 정확히 돌아온다.'],
+  ['v4.6','뒤로가기 수정','브라우저 <b>[뒤로]</b>를 누르면 로그인 화면이 나오고 버튼이 <b>확인 중…</b> 으로 멈춰 있던 문제 수정 — 로그인 후 이동을 <code>replace</code> 로 바꿔 로그인 화면을 기록에 남기지 않고, 돌아왔을 때 버튼 상태를 되돌리며 이미 로그인돼 있으면 앱으로 되돌려 보낸다. 아울러 <b>탭 이동을 주소(#해시)에 기록</b>해 [뒤로]가 <b>이전 탭</b>으로 가고, 새로고침해도 보던 탭이 유지된다.'],
   ['v4.5','매출 고정 반영','<b>계약금액은 계약 시점과 확정 시점이 같다</b>는 실무 기준을 화면에 반영 — 변동 분석의 매출 행에 <b>계약금액 변동 없음</b> 표시, 실제 매출을 0으로 두면 <b>적용되는 계약액을 칸 아래에 표시</b>, 매뉴얼에 원칙과 예외(감액 정산)를 정리. 수익률 변동은 투입 등급·MM 에서 나온다는 점을 명시.'],
   ['v4.4','합계 기준 표시','합계 행의 <b>계약액은 전체(진행중 포함)</b>, <b>확정 매출은 완료 건만</b> 더한 값인데 기준이 한 곳에만 적혀 오해를 부르던 것을 고쳤다. 각 열 아래에 <b>전체 N건 / 완료 M건 / 짝 K건</b> 을 표기하고, 표 아래에 두 금액의 <b>차액이 어디서 나오는지</b>(진행중·보류·실적 미입력 건수) 문장으로 설명한다.'],
   ['v4.3','문의처 헤더 이동','<b>개발 수정 및 오류 문의</b>(PMO 그룹 임형준 · hyungjoon.lim@hnine.com · 010-4400-8136)를 화면 <b>맨 위 헤더 오른쪽</b>으로 옮겨 모든 화면에서 같은 자리에 보이게 했다. 로그인 화면·매뉴얼(스펙 요약·문의 섹션)에도 같은 문구로 표시.'],
@@ -2614,6 +2641,11 @@ function renderChangelog(){
 }
 (async function(){
   document.getElementById('appVer').textContent=APP_VERSION;
+  // 주소에 탭이 없으면 #dash 로 맞춰 둔다 (기록을 늘리지 않는 replaceState).
+  // 이렇게 해야 다른 탭으로 갔을 때 [뒤로]가 대시보드로 정확히 돌아온다.
+  if(!TABS.includes(String(location.hash||'').replace(/^#/,'')))
+    history.replaceState(null,'','#dash');
+  switchTab(tabFromHash());     // 주소에 #proj 등이 있으면 그 탭으로 시작
   renderChangelog();
   initMyName();
   try{
@@ -2623,6 +2655,7 @@ function renderChangelog(){
   }catch(e){}
   try{
     await refresh();
+    if(tabFromHash()==='proj')loadProject();   // 주소가 #proj 면 프로젝트 화면까지 채운다
     setConn(true,'DB 연결됨');
   }catch(e){
     setConn(false,'DB 연결 실패');

@@ -39,15 +39,28 @@
 </form>
 <script>
 const form=document.getElementById('loginForm'),btn=document.getElementById('btn'),err=document.getElementById('err');
+const reset=()=>{btn.disabled=false;btn.textContent='로그인';};
+// 뒤로가기로 이 화면에 돌아왔을 때 '확인 중…' 상태가 그대로 남지 않게 한다.
+// (브라우저 캐시로 복원되면 스크립트가 다시 실행되지 않으므로 pageshow 에서 되돌린다)
+window.addEventListener('pageshow',async(e)=>{
+  reset();
+  // 이미 로그인된 상태로 돌아왔다면 앱으로 되돌려 보낸다
+  try{
+    const me=await fetch('/api/me',{cache:'no-store'}).then(r=>r.json());
+    if(me&&me.authed){location.replace('/');return;}
+  }catch(e2){}
+  document.getElementById('pw').value='';
+});
 form.onsubmit=async(e)=>{
   e.preventDefault();err.textContent='';btn.disabled=true;btn.textContent='확인 중…';
   try{
     const r=await fetch('/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:document.getElementById('pw').value})});
-    if(r.ok){location.href='/';return;}
+    // replace 로 이동해야 뒤로가기 했을 때 로그인 화면으로 되돌아오지 않는다
+    if(r.ok){location.replace('/');return;}
     const d=await r.json().catch(()=>({}));
     err.textContent=d.error||'로그인에 실패했습니다.';
   }catch(e2){err.textContent='서버에 연결할 수 없습니다.';}
-  btn.disabled=false;btn.textContent='로그인';
+  reset();
 };
 </script>
 </body>

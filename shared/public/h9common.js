@@ -81,11 +81,9 @@
   // 상단 앱 전환 목록. 주소(환경변수)가 설정된 앱만 표시됩니다.
   //   monthly → 월 수익률 관리 (h9-monthly-profit)
   //   pmo     → PMO 프로젝트 관리
-  //   profit  → 수익률 계산 (PROFIT_APP_URL 을 비워 두면 숨겨집니다)
   const APPS = [
     { key: 'monthly', label: '월 수익률 관리', env: 'MONTHLY_APP_URL' },
     { key: 'pmo', label: 'PMO 프로젝트 관리', env: 'PMO_APP_URL' },
-    { key: 'profit', label: '수익률 계산', env: 'PROFIT_APP_URL' },
   ];
 
   let ME = null;
@@ -255,12 +253,16 @@ kim@${esc(ME.emailDomain)}, lee@${esc(ME.emailDomain)}"
 
     const bar = document.createElement('div');
     bar.className = 'h9bar';
+    const CURRENT_LABEL = { monthly: '월 수익률 관리', pmo: 'PMO 프로젝트 관리', profit: '수익률 계산' };
     const links = APPS.map((a) => {
       const url = (ME.apps && ME.apps[a.key]) || '';
       if (a.key === ME.app) return `<span class="h9app on">${a.label}</span>`;
       if (!url) return '';   // 주소가 없는 앱은 표시하지 않음
       return `<a class="h9app" href="${esc(url)}">${a.label}</a>`;
-    }).filter(Boolean).join('');
+    }).filter(Boolean).join('') +
+    // 목록에 없는 앱을 보고 있는 경우(예: 수익률 계산)에도 현재 위치는 표시합니다.
+    (APPS.some((a) => a.key === ME.app) ? ''
+      : `<span class="h9app on">${esc(CURRENT_LABEL[ME.app] || ME.app || '')}</span>`);
 
     const u = ME.user || {};
     bar.innerHTML = `

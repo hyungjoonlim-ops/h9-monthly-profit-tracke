@@ -8,7 +8,7 @@ import {
   sessionMiddleware, loadUser, requireAuth, authRoutes, accountRoutes,
   ensureUsersTable, ensureBootstrapAdmin, SHARED_PUBLIC,
 } from './shared/auth.js';
-import { oidcRoutes } from './shared/oidc.js';
+import { oidcRoutes, autoSsoGate } from './shared/oidc.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -27,6 +27,7 @@ app.use(authRoutes('monthly'));
 app.use(oidcRoutes());                                   // 회사 계정 SSO
 app.use('/shared', express.static(SHARED_PUBLIC));
 
+app.use(autoSsoGate());                                  // 미로그인 → 바로 회사 계정 인증
 app.use(requireAuth);                                    // 인증 게이트
 app.use(accountRoutes());                                // 본인 비밀번호 변경 + 계정 관리
 

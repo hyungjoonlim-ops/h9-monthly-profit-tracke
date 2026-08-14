@@ -37,6 +37,9 @@ export const OIDC = {
   autoProvision: process.env.OIDC_AUTO_PROVISION === '1',
   // 허용할 회사 도메인 (Google 의 hd 클레임 / 이메일 도메인 검사)
   hostedDomain: (process.env.OIDC_HD || EMAIL_DOMAIN || '').toLowerCase(),
+  // 로그인 화면을 거치지 않고 곧바로 회사 계정 인증으로 보냅니다 (기본 켜짐).
+  // AUTO_SSO=0 으로 끄면 예전처럼 로그인 화면이 먼저 나옵니다.
+  auto: process.env.AUTO_SSO !== '0',
 };
 
 // 디스커버리 결과 캐시
@@ -73,12 +76,38 @@ function redirectUri(req) {
 const backToLogin = (res, msg) =>
   res.redirect('/login.html?err=' + encodeURIComponent(msg));
 
+// 미로그인 상태로 화면을 열면 곧바로 회사 계정 인증으로 보냅니다.
+//   · 브라우저에 회사 계정이 로그인돼 있으면 → 화면 없이 그대로 통과
+//   · 로그인돼 있지 않으면 → 구글 로그인 화면
+// requireAuth 앞에 마운트하세요. 통과시키면 requireAuth 가 로그인 화면으로 보냅니다.
+export function autoSsoGate() {
+  return (req, res, next) => {
+    if (!OIDC.enabled || !OIDC.auto || req.user) return next();
+    if (req.method !== 'GET') return next();
+
+    // 인증 경로·API·정적 자원·로그인 화면은 건드리지 않습니다.
+    if (req.path.startsWith('/api') || req.path.startsWith('/auth') ||
+        req.path.startsWith('/shared') || req.path === '/login.html') return next();
+    // 브라우저 화면 요청만 (이미지·스크립트 등은 제외)
+    if (!String(req.headers.accept || '').includes('text/html')) return next();
+    // 비밀번호 로그인을 쓰고 싶을 때의 탈출구: /?pw=1
+    if (req.query.pw === '1') return next();
+
+    // 무한 리다이렉트 방지 — 방금 시도했는데도 미로그인이면 로그인 화면을 보여 줍니다.
+    const tried = req.session && req.session.ssoTriedAt;
+    if (tried && Date.now() - tried < 60000) return next();
+    if (req.session) req.session.ssoTriedAt = Date.now();
+
+    return res.redirect('/auth/login?next=' + encodeURIComponent(req.originalUrl || '/'));
+  };
+}
+
 export function oidcRoutes() {
   const r = express.Router();
 
   // SSO 설정 상태 (로그인 화면이 버튼을 보여줄지 판단)
   r.get('/api/auth/config', (req, res) =>
-    res.json({ enabled: OIDC.enabled, label: OIDC.label, provider: OIDC.provider })
+    res.json({ enabled: OIDC.enabled, label: OIDC.label, provider: OIDC.provider, auto: OIDC.auto })
   );
 
   if (!OIDC.enabled) return r;
@@ -206,6 +235,7 @@ export function oidcRoutes() {
 
       req.session.uid = Number(user.id);
       req.session.email = user.email;
+      req.session.ssoTriedAt = null;
       await pool.query('UPDATE users SET last_login_at = now() WHERE id = $1', [user.id]);
 
       const next = saved.next && saved.next.startsWith('/') ? saved.next : '/';

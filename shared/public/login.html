@@ -48,6 +48,7 @@
     <a class="sso-alt" id="ssoAlt">다른 계정으로 로그인 / 계정 선택</a>
     <div class="or">또는 비밀번호로 로그인</div>
   </div>
+  <a class="sso-alt" id="pwToggle" style="display:none">비밀번호로 로그인 (관리자용)</a>
 
   <div id="pwBox">
     <label for="email">회사 이메일</label>
@@ -82,7 +83,19 @@ fetch('/api/auth/config').then(r=>r.json()).then(c=>{
     const go=(sel)=>{location.href='/auth/login?next='+encodeURIComponent(nextUrl)+(sel?'&select=1':'');};
     document.getElementById('ssoBtn').onclick=()=>go(false);
     document.getElementById('ssoAlt').onclick=()=>go(true);
-    pwBox.style.display='block';   // 비밀번호 로그인도 계속 가능 (SSO 장애 대비)
+    document.getElementById('pwToggle').onclick=()=>{
+      document.getElementById('pwBox').style.display='block';
+      document.getElementById('pwToggle').style.display='none';
+      document.getElementById('email').focus();
+    };
+    // 자동 SSO 가 켜져 있으면 보통 이 화면을 볼 일이 없습니다.
+    // (오류로 되돌아온 경우이거나 /?pw=1 로 들어온 경우)
+    if(c.auto&&!qErr&&!new URLSearchParams(location.search).has('pw')){
+      pwBox.style.display='none';
+      document.getElementById('pwToggle').style.display='block';
+    }else{
+      pwBox.style.display='block';
+    }
   }else{
     pwBox.style.display='block';
     document.getElementById('email').focus();

@@ -12,8 +12,24 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: SESSION_SECRET   # Render가 자동 생성
-        generateValue: true
+      # ⚠️ PMO 프로젝트 관리(h9-pmo)와 반드시 '같은 값' 이어야 계정/세션이 통합됩니다.
+      - key: SESSION_SECRET
+        sync: false
+      - key: MONTHLY_APP_URL
+        value: https://h9-monthly-profit.onrender.com
+      - key: PMO_APP_URL
+        value: https://h9-pmo.onrender.com
+      - key: ALLOWED_EMAIL_DOMAIN
+        value: hnine.com
+      - key: ADMIN_EMAIL       # 최초 관리자 계정
+        sync: false
+      # 회사 계정(Google) SSO — 설정하면 로그인 화면에 버튼이 생깁니다
+      - key: OIDC_PROVIDER
+        value: google
+      - key: OIDC_CLIENT_ID
+        sync: false
+      - key: OIDC_CLIENT_SECRET
+        sync: false
       - key: PGHOST
         sync: false
       - key: PGPORT
@@ -24,5 +40,6 @@ services:
         sync: false
       - key: PGDATABASE
         sync: false
-      - key: APP_PASSWORD      # 앱 접근 비밀번호
+      # (구버전 호환) 기존 단일 비밀번호. 최초 관리자 비밀번호 승계에만 쓰입니다.
+      - key: APP_PASSWORD
         sync: false

@@ -92,7 +92,17 @@
     const bg = document.createElement('div');
     bg.className = 'h9modal-bg show';
     bg.innerHTML = `<div class="h9modal ${cls || ''}">${html}</div>`;
-    bg.onclick = (e) => { if (e.target === bg) bg.remove(); };
+    // 작성 도중 배경을 잘못 눌러 입력이 사라지지 않도록, 내용을 입력한 뒤에는
+    // 배경 클릭 시 한 번 확인합니다.
+    let dirty = false;
+    const touch = (e) => { if (e.target && e.target.closest('input,select,textarea')) dirty = true; };
+    bg.addEventListener('input', touch);
+    bg.addEventListener('change', touch);
+    bg.onclick = (e) => {
+      if (e.target !== bg) return;
+      if (dirty && !confirm('작성 중인 내용이 있습니다.\n저장하지 않고 닫을까요?')) return;
+      bg.remove();
+    };
     document.body.appendChild(bg);
     return bg;
   }
@@ -258,7 +268,9 @@ kim@${esc(ME.emailDomain)}, lee@${esc(ME.emailDomain)}"
       const url = (ME.apps && ME.apps[a.key]) || '';
       if (a.key === ME.app) return `<span class="h9app on">${a.label}</span>`;
       if (!url) return '';   // 주소가 없는 앱은 표시하지 않음
-      return `<a class="h9app" href="${esc(url)}">${a.label}</a>`;
+      // 다른 앱은 주소(호스트)가 달라 로그인 쿠키가 넘어가지 않습니다.
+      // /auth/handoff 를 거치면 일회용 토큰으로 로그인이 그대로 이어집니다.
+      return `<a class="h9app" href="/auth/handoff?app=${esc(a.key)}">${a.label}</a>`;
     }).filter(Boolean).join('') +
     // 목록에 없는 앱을 보고 있는 경우(예: 수익률 계산)에도 현재 위치는 표시합니다.
     (APPS.some((a) => a.key === ME.app) ? ''

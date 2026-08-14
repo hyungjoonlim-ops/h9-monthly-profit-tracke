@@ -115,6 +115,16 @@ export async function ensureUsersTable() {
       updated_at    timestamptz not null default now()
     );
     create index if not exists idx_users_email on users(lower(email));
+
+    -- 앱 간 이동용 일회용 토큰 (월 수익률 관리 ↔ PMO).
+    -- 서로 다른 주소(호스트)라 쿠키가 공유되지 않으므로, 이동할 때
+    -- 60초짜리 일회용 토큰을 공용 DB 에 남겨 반대편에서 세션을 만들어 줍니다.
+    create table if not exists sso_tokens (
+      token_hash text primary key,
+      user_id    bigint not null references users(id) on delete cascade,
+      expires_at timestamptz not null,
+      used_at    timestamptz
+    );
   `);
 }
 
@@ -273,6 +283,59 @@ export function authRoutes(appKey) {
   r.post('/logout', (req, res) => {
     req.session = null;
     res.json({ ok: true });
+  });
+
+  // ── 앱 간 이동 (월 수익률 관리 ↔ PMO) ──────────────────
+  // 두 앱은 주소(호스트)가 달라 로그인 쿠키가 공유되지 않습니다.
+  // 상단바에서 다른 앱을 누르면 여기로 와서 일회용 토큰(60초)을 만들어
+  // 상대 앱의 /auth/accept 로 넘기고, 상대 앱이 토큰을 확인해 세션을 만듭니다.
+  const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
+
+  r.get('/auth/handoff', async (req, res) => {
+    const key = String(req.query.app || '');
+    const target = APP_URLS[key];
+    if (!target) return res.redirect('/');
+    if (!req.user) return res.redirect('/login.html');
+    try {
+      const token = crypto.randomBytes(32).toString('hex');
+      await pool.query('DELETE FROM sso_tokens WHERE expires_at < now()');
+      await pool.query(
+        `INSERT INTO sso_tokens (token_hash, user_id, expires_at)
+         VALUES ($1, $2, now() + interval '60 seconds')`,
+        [sha256(token), req.user.id]
+      );
+      const base = target.replace(/\/+$/, '');
+      res.redirect(`${base}/auth/accept?token=${token}`);
+    } catch (e) {
+      // 토큰을 못 만들어도 이동은 되게 — 상대 앱에서 로그인하면 됩니다.
+      res.redirect(target);
+    }
+  });
+
+  r.get('/auth/accept', async (req, res) => {
+    const token = String(req.query.token || '');
+    if (req.user) return res.redirect('/');            // 이미 로그인돼 있으면 그대로
+    if (!token) return res.redirect('/login.html');
+    try {
+      const { rows } = await pool.query(
+        `UPDATE sso_tokens SET used_at = now()
+          WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now()
+          RETURNING user_id`,
+        [sha256(token)]
+      );
+      const uid = rows[0] && Number(rows[0].user_id);
+      if (!uid) return res.redirect('/login.html');
+      const { rows: us } = await pool.query(
+        "SELECT * FROM users WHERE id = $1 AND status = 'active'", [uid]
+      );
+      if (!us[0]) return res.redirect('/login.html');
+      req.session.uid = uid;
+      req.session.email = us[0].email;
+      await pool.query('UPDATE users SET last_login_at = now() WHERE id = $1', [uid]);
+      res.redirect('/');
+    } catch (e) {
+      res.redirect('/login.html');
+    }
   });
 
   return r;

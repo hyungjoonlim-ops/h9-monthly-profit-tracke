@@ -53,7 +53,9 @@
   .h9modal th{color:#93a8c0;font-size:11px;font-weight:700}
   .h9modal .h9msg{font-size:12px;min-height:17px;margin-top:10px}
   .h9modal .h9msg.err{color:#ef6b6b}.h9modal .h9msg.ok{color:#37c98b}
-  .h9pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
+  .h9pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap}
+  .h9tblwrap{overflow-x:auto;margin-top:6px}
+  .h9modal td,.h9modal th{white-space:nowrap}
   .h9pill.on{background:rgba(55,201,139,.16);color:#37c98b}
   .h9pill.off{background:rgba(239,107,107,.16);color:#ef6b6b}
   .h9pill.adm{background:rgba(62,166,255,.16);color:#3ea6ff}
@@ -131,30 +133,42 @@
   // ── 통합 계정 관리 (관리자) ──────────────────────────────
   function openAccounts() {
     const bg = modal(`
-      <h3>통합 계정 관리</h3>
-      <div class="h9sub">수익률 관리 · PMO 프로젝트 관리에 공통 적용됩니다. 회사 메일(@${esc(ME.emailDomain)}) 계정만 등록할 수 있습니다.</div>
+      <h3>통합 계정 관리 — 로그인 허용 목록</h3>
+      <div class="h9sub">여기 등록된 회사 메일(@${esc(ME.emailDomain)})만 로그인할 수 있습니다.
+        등록되지 않은 계정은 구글 인증을 통과해도 차단됩니다. 두 사이트에 공통 적용됩니다.</div>
       <form id="h9uf">
+        <div class="h9f"><label>회사 이메일 — 여러 개는 줄바꿈이나 쉼표로 구분</label>
+          <textarea id="h9ue" rows="3" placeholder="hong@${esc(ME.emailDomain)}
+kim@${esc(ME.emailDomain)}, lee@${esc(ME.emailDomain)}"
+            style="width:100%;background:#2a3a4d;border:1px solid #38506a;color:#eef3f9;padding:8px 10px;
+                   border-radius:7px;font:inherit;font-size:13px;resize:vertical"></textarea></div>
         <div class="h9row">
-          <div class="h9f"><label>회사 이메일</label><input id="h9ue" type="email" placeholder="name@${esc(ME.emailDomain)}"></div>
-          <div class="h9f"><label>이름</label><input id="h9un" placeholder="홍길동"></div>
+          <div class="h9f"><label>이름 (한 명만 등록할 때)</label><input id="h9un" placeholder="홍길동"></div>
           <div class="h9f"><label>소속</label><input id="h9ud" placeholder="PMO그룹"></div>
           <div class="h9f"><label>권한</label><select id="h9ur">
             <option value="member">일반</option><option value="admin">관리자</option></select></div>
+          <div class="h9f"><label>로그인 방식</label><select id="h9um2">
+            <option value="sso">회사 계정(Google) 전용</option>
+            <option value="pw">임시 비밀번호도 발급</option></select></div>
         </div>
         <div class="h9btns"><button type="submit">＋ 계정 등록</button></div>
       </form>
       <div class="h9msg" id="h9um"></div>
       <div id="h9temp"></div>
-      <table><thead><tr><th>이메일</th><th>이름</th><th>소속</th><th>권한</th><th>상태</th><th>최근 로그인</th><th></th></tr></thead>
-      <tbody id="h9ub"><tr><td colspan="7" style="color:#93a8c0;padding:18px">불러오는 중…</td></tr></tbody></table>
+      <div class="h9tblwrap"><table><thead><tr><th>이메일</th><th>이름</th><th>소속</th><th>권한</th><th>로그인</th><th>상태</th><th>최근 로그인</th><th></th></tr></thead>
+      <tbody id="h9ub"><tr><td colspan="8" style="color:#93a8c0;padding:18px">불러오는 중…</td></tr></tbody></table></div>
       <div class="h9btns"><button class="ghost" id="h9uclose">닫기</button></div>`);
 
     const msg = bg.querySelector('#h9um'), body = bg.querySelector('#h9ub'), temp = bg.querySelector('#h9temp');
     bg.querySelector('#h9uclose').onclick = () => bg.remove();
 
-    const showTemp = (email, pw) => {
-      temp.innerHTML = `<div class="h9tempbox">🔑 <b>${esc(email)}</b> 임시 비밀번호: <code>${esc(pw)}</code>
-        <div style="color:#93a8c0;margin-top:4px">이 창을 닫으면 다시 볼 수 없습니다. 본인에게 전달 후 최초 로그인 시 변경하도록 안내하세요.</div></div>`;
+    // 임시 비밀번호 표시 — [{user,tempPassword}] 또는 (email, pw)
+    const showTemp = (a, b) => {
+      const items = Array.isArray(a) ? a.map((c) => [c.user.email, c.tempPassword]) : [[a, b]];
+      temp.innerHTML = `<div class="h9tempbox">` +
+        items.map(([em, pw]) => `🔑 <b>${esc(em)}</b> 임시 비밀번호: <code>${esc(pw)}</code>`).join('<br>') +
+        `<div style="color:#93a8c0;margin-top:6px">이 창을 닫으면 다시 볼 수 없습니다.
+          본인에게 전달 후 최초 로그인 시 변경하도록 안내하세요.</div></div>`;
     };
 
     async function load() {
@@ -166,6 +180,7 @@
             <td>${esc(u.name || '-')}</td>
             <td>${esc(u.dept || '-')}</td>
             <td>${u.role === 'admin' ? '<span class="h9pill adm">관리자</span>' : '일반'}</td>
+            <td>${u.ssoOnly ? '<span class="h9pill adm">회사 계정</span>' : '비밀번호'}</td>
             <td>${u.status === 'active' ? '<span class="h9pill on">사용</span>' : '<span class="h9pill off">제한</span>'}</td>
             <td style="color:#93a8c0;font-size:12px">${u.lastLoginAt ? esc(String(u.lastLoginAt).slice(0, 10)) : '-'}</td>
             <td style="white-space:nowrap;text-align:right">
@@ -175,7 +190,7 @@
               <button class="danger sm" data-act="del">삭제</button>
             </td>
           </tr>`).join('') ||
-          '<tr><td colspan="7" style="color:#93a8c0;padding:18px">등록된 계정이 없습니다.</td></tr>';
+          '<tr><td colspan="8" style="color:#93a8c0;padding:18px">등록된 계정이 없습니다.</td></tr>';
 
         body.querySelectorAll('button[data-act]').forEach((btn) => {
           btn.onclick = async () => {
@@ -202,7 +217,7 @@
           };
         });
       } catch (err) {
-        body.innerHTML = `<tr><td colspan="7" style="color:#ef6b6b;padding:18px">${esc(err.message)}</td></tr>`;
+        body.innerHTML = `<tr><td colspan="8" style="color:#ef6b6b;padding:18px">${esc(err.message)}</td></tr>`;
       }
     }
 
@@ -211,14 +226,20 @@
       msg.className = 'h9msg'; msg.textContent = '등록 중…';
       try {
         const res = await api('/api/users', { method: 'POST', body: JSON.stringify({
-          email: bg.querySelector('#h9ue').value,
+          emails: bg.querySelector('#h9ue').value,
           name: bg.querySelector('#h9un').value,
           dept: bg.querySelector('#h9ud').value,
           role: bg.querySelector('#h9ur').value,
+          withPassword: bg.querySelector('#h9um2').value === 'pw',
         }) });
-        msg.className = 'h9msg ok'; msg.textContent = '✓ 등록되었습니다.';
-        showTemp(res.user.email, res.tempPassword);
-        ['#h9ue', '#h9un', '#h9ud'].forEach((s) => { bg.querySelector(s).value = ''; });
+        const okN = res.created.length, ngN = (res.failed || []).length;
+        msg.className = 'h9msg ' + (ngN ? 'err' : 'ok');
+        msg.textContent = `✓ ${okN}건 등록` + (ngN
+          ? ` · 실패 ${ngN}건 — ` + res.failed.map((f) => `${f.email}(${f.error})`).join(', ')
+          : '');
+        const pws = res.created.filter((c) => c.tempPassword);
+        if (pws.length) showTemp(pws);
+        ['#h9ue', '#h9un', '#h9ud'].forEach((sel) => { bg.querySelector(sel).value = ''; });
         await load();
       } catch (err) { msg.className = 'h9msg err'; msg.textContent = '✗ ' + err.message; }
     };

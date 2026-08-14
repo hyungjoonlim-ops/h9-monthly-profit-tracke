@@ -63,6 +63,8 @@ export function publicUser(u) {
     role: u.role, status: u.status, mustChangePw: u.must_change_pw,
     lastLoginAt: u.last_login_at, createdAt: u.created_at,
     isAdmin: u.role === 'admin',
+    // 비밀번호가 없는 계정 = 회사 계정(Google) 로그인 전용
+    ssoOnly: u.sso_only != null ? !!u.sso_only : !u.password_hash,
   };
 }
 
@@ -248,7 +250,12 @@ export function authRoutes(appKey) {
     const { email, password } = req.body || {};
     try {
       const u = await findByEmail(email);
-      if (!u || !u.password_hash || !verifyHash(String(password || ''), u.password_hash)) {
+      if (u && !u.password_hash) {
+        return res.status(401).json({
+          error: '이 계정은 회사 계정(Google) 로그인 전용입니다. "회사 계정으로 로그인" 을 이용하세요.',
+        });
+      }
+      if (!u || !verifyHash(String(password || ''), u.password_hash)) {
         return res.status(401).json({ error: '이메일 또는 비밀번호가 올바르지 않습니다.' });
       }
       if (u.status !== 'active') {
@@ -300,7 +307,8 @@ export function accountRoutes() {
   r.get('/api/users', requireAuth, requireAdmin, async (req, res) => {
     try {
       const { rows } = await pool.query(
-        `SELECT ${USER_COLS} FROM users ORDER BY role DESC, lower(email)`
+        `SELECT ${USER_COLS}, (password_hash IS NULL) AS sso_only
+         FROM users ORDER BY role DESC, lower(email)`
       );
       res.json(rows.map(publicUser));
     } catch (e) {
@@ -308,25 +316,47 @@ export function accountRoutes() {
     }
   });
 
-  // 계정 등록 — 임시 비밀번호를 발급해 반환합니다.
+  // 계정 등록 — 허용할 회사 메일을 등록합니다. 여기 등록된 계정만 로그인할 수 있습니다.
+  //   · 여러 개를 줄바꿈/쉼표로 한 번에 등록할 수 있습니다.
+  //   · 기본은 'SSO 전용' — 비밀번호를 만들지 않고 회사 계정(Google)으로만 로그인합니다.
+  //     withPassword: true 로 주면 임시 비밀번호를 함께 발급합니다.
   r.post('/api/users', requireAuth, requireAdmin, async (req, res) => {
-    const { email, name, dept, role, password } = req.body || {};
-    if (!isAllowedEmail(email)) {
-      return res.status(400).json({ error: `회사 메일(@${EMAIL_DOMAIN}) 계정만 등록할 수 있습니다.` });
+    const b = req.body || {};
+    const raw = b.emails != null ? b.emails : b.email;
+    const list = (Array.isArray(raw) ? raw : String(raw || '').split(/[\s,;]+/))
+      .map((e) => normEmail(e)).filter(Boolean);
+    if (list.length === 0) return res.status(400).json({ error: '이메일을 입력하세요.' });
+
+    const withPassword = b.withPassword === true || !!b.password;
+    const role = b.role === 'admin' ? 'admin' : 'member';
+    const created = [], failed = [];
+
+    for (const email of list) {
+      if (!isAllowedEmail(email)) {
+        failed.push({ email, error: `회사 메일(@${EMAIL_DOMAIN}) 만 등록할 수 있습니다.` });
+        continue;
+      }
+      const pw = withPassword
+        ? (b.password && String(b.password).length >= 8 && list.length === 1
+            ? String(b.password) : randomPassword())
+        : null;
+      try {
+        const { rows } = await pool.query(
+          `INSERT INTO users (email, name, dept, role, status, password_hash, must_change_pw, created_by)
+           VALUES ($1,$2,$3,$4,'active',$5,$6,$7) RETURNING ${USER_COLS}`,
+          [email, (list.length === 1 ? b.name : null) || null, b.dept || null, role,
+           pw ? hashPassword(pw) : null, !!pw, req.user.email]
+        );
+        created.push({ user: publicUser({ ...rows[0], sso_only: !pw }), tempPassword: pw });
+      } catch (e) {
+        failed.push({ email, error: e.code === '23505' ? '이미 등록된 이메일입니다.' : e.message });
+      }
     }
-    const pw = password && String(password).length >= 8 ? String(password) : randomPassword();
-    try {
-      const { rows } = await pool.query(
-        `INSERT INTO users (email, name, dept, role, status, password_hash, must_change_pw, created_by)
-         VALUES ($1,$2,$3,$4,'active',$5,true,$6) RETURNING ${USER_COLS}`,
-        [normEmail(email), name || null, dept || null,
-         role === 'admin' ? 'admin' : 'member', hashPassword(pw), req.user.email]
-      );
-      res.json({ user: publicUser(rows[0]), tempPassword: pw });
-    } catch (e) {
-      if (e.code === '23505') return res.status(409).json({ error: '이미 등록된 이메일입니다.' });
-      res.status(500).json({ error: e.message });
+
+    if (created.length === 0) {
+      return res.status(failed.length === 1 ? 400 : 207).json({ created, failed, error: failed[0].error });
     }
+    res.json({ created, failed });
   });
 
   // 계정 수정 (이름/소속/권한/상태=제한)

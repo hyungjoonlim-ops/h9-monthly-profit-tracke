@@ -21,7 +21,10 @@
     border-radius:7px;font:inherit;font-size:12px;cursor:pointer}
   .h9bar button:hover{color:#eef3f9;border-color:#3ea6ff}
   @media(max-width:720px){.h9bar{height:auto;flex-wrap:wrap;padding:8px 14px;gap:8px}
-    .h9bar .h9right{margin-left:0;width:100%}}
+    .h9bar .h9apps{flex-wrap:wrap}
+    .h9bar .h9right{margin-left:0;width:100%;flex-wrap:wrap;min-width:0}
+    .h9bar .h9who{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .h9bar .h9who small{display:none}}
 
   .h9modal-bg{position:fixed;inset:0;background:rgba(4,10,18,.66);display:none;align-items:center;
     justify-content:center;z-index:200;padding:20px}

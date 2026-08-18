@@ -241,6 +241,32 @@ export function requireAdmin(req, res, next) {
 }
 
 // ── 인증 라우터 (게이트 이전에 마운트) ─────────────────────
+// ── 로그인 시도 제한 ────────────────────────────────────────
+// 같은 IP+이메일 조합이 10분 안에 10번 틀리면 잠시 차단합니다 (메모리 기준).
+// 성공하면 카운터는 즉시 초기화됩니다.
+const LOGIN_WINDOW_MS = 10 * 60 * 1000;
+const LOGIN_MAX_FAILS = 10;
+const loginFails = new Map();   // key → { n, first }
+function loginKey(req, email) {
+  const ip = String(req.headers['x-forwarded-for'] || req.ip || '').split(',')[0].trim();
+  return `${ip}|${String(email || '').toLowerCase()}`;
+}
+function loginBlocked(key) {
+  const e = loginFails.get(key);
+  if (!e) return false;
+  if (Date.now() - e.first > LOGIN_WINDOW_MS) { loginFails.delete(key); return false; }
+  return e.n >= LOGIN_MAX_FAILS;
+}
+function noteLoginFail(key) {
+  const e = loginFails.get(key);
+  if (!e || Date.now() - e.first > LOGIN_WINDOW_MS) loginFails.set(key, { n: 1, first: Date.now() });
+  else e.n += 1;
+  if (loginFails.size > 5000) {           // 무한히 자라지 않게 오래된 항목 정리
+    const cut = Date.now() - LOGIN_WINDOW_MS;
+    for (const [k, v] of loginFails) if (v.first < cut) loginFails.delete(k);
+  }
+}
+
 export function authRoutes(appKey) {
   const r = express.Router();
 
@@ -258,6 +284,12 @@ export function authRoutes(appKey) {
 
   r.post('/login', async (req, res) => {
     const { email, password } = req.body || {};
+    const key = loginKey(req, email);
+    if (loginBlocked(key)) {
+      return res.status(429).json({
+        error: '로그인 시도가 너무 많습니다. 10분 뒤에 다시 시도하세요.',
+      });
+    }
     try {
       const u = await findByEmail(email);
       if (u && !u.password_hash) {
@@ -266,8 +298,10 @@ export function authRoutes(appKey) {
         });
       }
       if (!u || !verifyHash(String(password || ''), u.password_hash)) {
+        noteLoginFail(key);
         return res.status(401).json({ error: '이메일 또는 비밀번호가 올바르지 않습니다.' });
       }
+      loginFails.delete(key);
       if (u.status !== 'active') {
         return res.status(403).json({ error: '사용이 제한된 계정입니다. 관리자에게 문의하세요.' });
       }

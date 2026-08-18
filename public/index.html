@@ -64,6 +64,11 @@
   .card .foot{font-size:11.5px;color:var(--muted);margin-top:4px}
   .card .val .unit{font-size:13px;font-weight:600;color:var(--muted);margin-left:2px}
   .card .lbl .tag{margin-left:4px}
+  /* 단계별 인건비 변동 서술 박스 */
+  .stepbox{border:1px solid var(--line);border-radius:8px;background:var(--panel2);
+    padding:11px 13px;margin-bottom:12px}
+  .stepbox .stept{font-size:12.5px;font-weight:700;color:var(--ink);margin-bottom:6px}
+  #laborDetail>.stepbox:last-child{margin-bottom:0}
   /* 진행중 프로젝트의 잠정 변동 — 확정값과 구분해 흐리게 */
   .prov{opacity:.55;font-size:11px;white-space:nowrap}
   /* 합계 행에서 그 열이 무엇을 더한 값인지 */
@@ -76,7 +81,8 @@
   /* ── 프로젝트별 수익률 변동 막대그래프 (좌우 스와이프) ── */
   .lgd{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted)}
   .lgd .sw{width:10px;height:10px;border-radius:2px;display:inline-block}
-  .lgd .sw.c{background:var(--warn)} .lgd .sw.f{background:var(--accent)}
+  .lgd .sw.c{background:var(--warn)} .lgd .sw.a{background:var(--good)}
+  .lgd .sw.f{background:var(--accent)}
   .barwrap{overflow-x:auto;overflow-y:hidden;padding-bottom:6px;
     scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;
     overscroll-behavior-x:contain;cursor:grab}
@@ -94,15 +100,18 @@
     cursor:pointer;border-radius:8px;padding:4px 2px}
   .mg:hover{background:var(--panel2)}
   .mg .mval{font-size:10.5px;color:var(--muted);white-space:nowrap;height:14px;line-height:14px}
-  .mg .mval .vc{color:var(--warn)} .mg .mval .vf{color:var(--accent)}
+  .mg .mval{font-size:10px}
+  .mg .mval .vc{color:var(--warn)} .mg .mval .va{color:var(--good)}
+  .mg .mval .vf{color:var(--accent)}
   /* 막대 영역은 고정 폭 — 막대 14px 두 개 + 사이 8px = 36px */
-  .mg .mplot{position:relative;width:36px;min-width:36px;height:132px}
+  .mg .mplot{position:relative;width:52px;min-width:52px;height:132px}
   .mg .mzero{position:absolute;left:-6px;right:-6px;border-top:1px dashed #3a4d63}
   .mg .mbar{position:absolute;width:14px;min-width:14px;max-width:14px;
     border-radius:3px 3px 0 0;min-height:2px}
   .mg .mbar.neg{border-radius:0 0 3px 3px}
   .mg .mbar.c{left:0;background:var(--warn)}
-  .mg .mbar.f{left:22px;background:var(--accent)}
+  .mg .mbar.a{left:19px;background:var(--good)}
+  .mg .mbar.f{left:38px;background:var(--accent)}
   .mg .mbar.none{background:repeating-linear-gradient(45deg,#33465c,#33465c 3px,transparent 3px,transparent 6px)}
   .mg .mname{font-size:11px;color:var(--ink2);text-align:center;line-height:1.25;
     width:96px;height:34px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
@@ -143,11 +152,21 @@
   .msg.err{color:var(--bad)} .msg.ok{color:var(--good)}
   .status{font-size:12.5px;color:var(--muted)} .status.err{color:var(--bad)}
   .del-x{color:var(--bad);cursor:pointer;font-weight:700;padding:0 4px}
-  .two{display:grid;grid-template-columns:1fr;gap:16px}
-  @media (min-width:1500px){.two{grid-template-columns:1fr 1fr}}
+  .two{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
+  @media (min-width:1500px){.two{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  .two>*{min-width:0}
+  /* 3단계(계약 · 협의 · 확정) — 넓으면 3열, 중간이면 2열, 좁으면 1열.
+     minmax(0,1fr) 이어야 안쪽 표(min-width 620px)에 밀려 칸이 넓어지지 않는다
+     (표는 카드 안에서 좌우 스크롤된다) */
+  .three{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
+  @media (min-width:1150px){.three{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media (min-width:1700px){.three{grid-template-columns:repeat(3,minmax(0,1fr))}}
+  .three>.phase{min-width:0}
   .phase{border:1px solid var(--line);border-radius:9px;padding:14px;background:var(--panel)}
   .phase.c{border-left:3px solid var(--warn)}
+  .phase.a{border-left:3px solid var(--good)}
   .phase.f{border-left:3px solid var(--accent)}
+  .pill.acc{background:rgba(90,214,143,.14);color:var(--good)}
   .phase h3{font-size:13.5px;margin:0 0 12px;font-weight:700;display:flex;gap:8px;align-items:center}
   .phase .tw table{min-width:620px}
   /* 두 시점 카드의 입력칸을 같은 4열 그리드로 맞춘다
@@ -265,8 +284,9 @@
     <div class="toolbar">
       <h2>프로젝트별 수익률 변동 <span class="tag" id="barCount"></span></h2>
       <div class="sp">
-        <span class="lgd"><i class="sw c"></i>계약 시점</span>
-        <span class="lgd"><i class="sw f"></i>확정 시점</span>
+        <span class="lgd"><i class="sw c"></i>계약</span>
+        <span class="lgd"><i class="sw a"></i>협의</span>
+        <span class="lgd"><i class="sw f"></i>확정</span>
         <button class="ghost sm" id="barLeft" title="왼쪽으로">←</button>
         <button class="ghost sm" id="barRight" title="오른쪽으로">→</button>
       </div>
@@ -296,6 +316,7 @@
         <thead><tr>
           <th>번호</th><th>프로젝트</th><th>담당 PM</th><th>클라이언트</th><th>유형</th><th>상태</th>
           <th class="right">계약액</th><th class="right">계약 수익률</th>
+          <th class="right">협의 수익률</th>
           <th class="right">확정 매출</th><th class="right">확정 수익률</th>
           <th class="right">변동</th><th>사유</th>
         </tr></thead>
@@ -361,10 +382,10 @@
 
   <div class="cards" id="vsCards"></div>
 
-  <div class="two" style="margin-top:16px">
-    <!-- 계약 시점 -->
+  <div class="three" style="margin-top:16px">
+    <!-- ① 계약 시점 -->
     <div class="phase c">
-      <h3>① 계약 시점 (기준) <span class="pill warn">고정 기준</span></h3>
+      <h3>① 계약 시점 <span class="pill warn">계약 MM · 고정 기준</span></h3>
       <div class="row">
         <div class="field"><label>계약액 (VAT 제외)</label><input id="cAmount" class="num" inputmode="numeric" value="0"></div>
         <div class="field"><label>외주비</label><input id="cOut" class="num" inputmode="numeric" value="0"></div>
@@ -387,9 +408,40 @@
       </div>
     </div>
 
-    <!-- 확정 시점 -->
+    <!-- ② 협의 시점 (고객사와 협의해 MM 수정) -->
+    <div class="phase a">
+      <h3>② 협의 시점 <span class="pill acc">고객사 협의 MM</span></h3>
+      <div class="row">
+        <div class="field"><label title="계약금액은 보통 변하지 않습니다. 0으로 두면 계약액을 그대로 씁니다.">협의 매출 <span class="muted">(0 = 계약액)</span></label><input id="aRev" class="num" inputmode="numeric" value="0"><div class="revhint" id="aRevHint"></div></div>
+        <div class="field"><label>외주비</label><input id="aOut" class="num" inputmode="numeric" value="0"></div>
+        <div class="field"><label>부대비</label><input id="aEtc" class="num" inputmode="numeric" value="0"></div>
+        <div class="field"><label>협의 월</label><input type="month" id="aAgreed"></div>
+      </div>
+      <div class="tw" style="margin-top:12px">
+        <table>
+          <thead><tr><th style="min-width:110px">소속</th><th style="min-width:82px">등급</th>
+            <th class="right" style="width:140px">단가/MM</th>
+            <th class="right" style="width:96px">MM</th>
+            <th class="right" style="width:130px">인건비</th>
+            <th style="width:26px"></th></tr></thead>
+          <tbody id="aBody"></tbody>
+          <tfoot><tr id="aFoot"></tr></tfoot>
+        </table>
+      </div>
+      <div class="row" style="margin-top:12px;grid-template-columns:1fr">
+        <div class="field"><label>협의 사유 (MM 을 왜 조정했는지)</label>
+          <input id="aReason" placeholder="예: 과업 범위 축소로 UX 2MM 감축 합의"></div>
+      </div>
+      <div class="savebar">
+        <button class="ghost sm" id="aAdd">+ 투입 행 추가</button>
+        <button class="ghost sm" id="aCopy">← 계약 투입 복사</button>
+        <span class="status" id="aMsg"></span>
+      </div>
+    </div>
+
+    <!-- ③ 확정 시점 (H9 실투입) -->
     <div class="phase f">
-      <h3>② 확정 시점 (실적) <span class="pill flat">실제 결과</span></h3>
+      <h3>③ 확정 시점 <span class="pill flat">H9 실투입 MM</span></h3>
       <div class="row">
         <div class="field"><label title="계약금액은 보통 변하지 않습니다. 0으로 두면 계약액을 그대로 씁니다.">실제 매출 <span class="muted">(0 = 계약액)</span></label><input id="fRev" class="num" inputmode="numeric" value="0"><div class="revhint" id="revHint"></div></div>
         <div class="field"><label>외주비</label><input id="fOut" class="num" inputmode="numeric" value="0"></div>
@@ -409,17 +461,18 @@
       </div>
       <div class="savebar">
         <button class="ghost sm" id="fAdd">+ 투입 행 추가</button>
-        <button class="ghost sm" id="fCopy">← 계약 투입 복사</button>
+        <button class="ghost sm" id="fCopy">← 협의 투입 복사</button>
         <span class="status" id="fMsg"></span>
       </div>
     </div>
   </div>
 
   <div class="panel" style="margin-top:16px">
-    <h2>변동 분석 <span class="tag">확정 − 계약</span></h2>
+    <h2>변동 분석 <span class="tag">계약 → 협의 → 확정</span></h2>
     <div class="tw">
       <table>
-        <thead><tr><th>항목</th><th class="right">계약 시점</th><th class="right">확정 시점</th><th class="right">차이</th><th>영향</th></tr></thead>
+        <thead><tr><th>항목</th><th class="right">① 계약</th><th class="right">② 협의</th>
+          <th class="right">③ 확정</th><th class="right">차이 (확정−계약)</th><th>영향</th></tr></thead>
         <tbody id="varBody"></tbody>
       </table>
     </div>
@@ -554,7 +607,8 @@
     </div>
 
     <h3><span class="n">1</span>전체 흐름</h3>
-    <p>처음 쓰신다면 아래 순서대로 한 번 따라 하시면 됩니다. <b>①②는 처음 한 번만</b>, ③~⑦은 프로젝트마다 반복합니다.</p>
+    <p>처음 쓰신다면 아래 순서대로 한 번 따라 하시면 됩니다. <b>STEP 1~2 는 처음 한 번만</b>,
+      STEP 3~8 은 프로젝트마다 반복합니다. 수익률은 <b>계약 → 협의 → 실투입</b> 세 단계로 각각 관리합니다.</p>
     <div class="flow">
       <div class="fs"><div class="fn">STEP 1</div><div class="ft">직원 명부 등록</div>
         <div class="fd">직원 명부·단가 탭 → 엑셀/구글시트로 일괄 등록</div></div>
@@ -565,16 +619,19 @@
       <div class="fs"><div class="fn">STEP 3</div><div class="ft">프로젝트 등록</div>
         <div class="fd">일괄 등록 또는 [+ 새 프로젝트]</div></div>
       <div class="fa">›</div>
-      <div class="fs"><div class="fn">STEP 4</div><div class="ft">계약 시점 입력</div>
-        <div class="fd">계약액·투입계획 → 기준 수익률 확정</div></div>
+      <div class="fs"><div class="fn">STEP 4</div><div class="ft">① 계약 MM 입력</div>
+        <div class="fd">계약액 + 계약 시점 투입계획 → 기준 수익률</div></div>
       <div class="fa">›</div>
-      <div class="fs"><div class="fn">STEP 5</div><div class="ft">확정 시점 입력</div>
-        <div class="fd">실제 매출·실제 투입 입력</div></div>
+      <div class="fs"><div class="fn">STEP 5</div><div class="ft">② 협의 MM 입력</div>
+        <div class="fd">고객사와 협의해 조정한 MM + 협의 사유</div></div>
       <div class="fa">›</div>
-      <div class="fs"><div class="fn">STEP 6</div><div class="ft">변동 사유 기록</div>
+      <div class="fs"><div class="fn">STEP 6</div><div class="ft">③ 실투입 MM 입력</div>
+        <div class="fd">H9 가 실제로 투입한 MM</div></div>
+      <div class="fa">›</div>
+      <div class="fs"><div class="fn">STEP 7</div><div class="ft">변동 사유 기록</div>
         <div class="fd">차이 원인을 적고 [수익률 저장]</div></div>
       <div class="fa">›</div>
-      <div class="fs"><div class="fn">STEP 7</div><div class="ft">상태 = 완료</div>
+      <div class="fs"><div class="fn">STEP 8</div><div class="ft">상태 = 완료</div>
         <div class="fd">대시보드 최종 집계에 반영</div></div>
     </div>
 
@@ -597,13 +654,16 @@
           <tr><td><b>4</b></td><td>프로젝트 수익률<br><span class="muted">① 계약 시점</span></td>
             <td><b>계약액(VAT 제외)</b> · 외주비 · 부대비를 넣고, <span class="btn-ref g">+ 투입 행 추가</span> 로 <b>소속 · 등급 · MM</b> 을 채웁니다. 소속·등급을 고르면 단가가 자동으로 들어옵니다.</td>
             <td>여기가 <b>기준값</b>입니다. 저장하면 그때의 단가가 <b>고정 보관</b>되어, 이후 단가표를 바꿔도 계약 기준 수익률은 흔들리지 않습니다. 실제 계약 단가가 다르면 단가 칸을 직접 고치세요.</td></tr>
-          <tr><td><b>5</b></td><td>프로젝트 수익률<br><span class="muted">② 확정 시점</span></td>
-            <td><b>실제 매출</b> · 실제 외주비 · 부대비 · 확정(정산) 월을 넣고, 실제 투입 인력을 채웁니다. <span class="btn-ref g">← 계약 투입 복사</span> 를 누르면 <b>계약액·외주비·부대비와 투입 인력이 그대로 복사</b>되니 <b>달라진 부분만</b> 고치면 빠릅니다.</td>
-            <td>실제 매출을 <b>0으로 두면 계약액과 같다고</b> 봅니다. 금액 칸이 <b>0일 때 클릭하면 0이 지워지므로</b> 바로 숫자를 입력하면 됩니다(비운 채 벗어나면 0으로 돌아갑니다). 진행 중에도 그때까지의 투입을 넣어 두면 예상 수익률을 미리 볼 수 있습니다(대시보드에서는 <span class="prov">잠정</span> 으로 표시).</td></tr>
-          <tr><td><b>6</b></td><td>프로젝트 수익률<br><span class="muted">변동 분석</span></td>
-            <td>변동 분석표와 <b>인건비 변동 상세</b>(어느 소속·등급에서 MM이 늘거나 줄어 개선·악화됐는지 문장으로 설명)를 확인하고, <b>수익률 변동 사유</b>를 적고 <span class="btn-ref">수익률 저장 (이력 기록)</span>.</td>
-            <td>이 버튼이 <b>투입 행과 이력까지 함께 저장</b>합니다. 위쪽 <span class="btn-ref">프로젝트 정보 저장</span> 은 이름·PM·상태 같은 <b>정보만</b> 저장합니다 — 둘을 구분해서 누르세요.</td></tr>
-          <tr><td><b>7</b></td><td>프로젝트 수익률 → 대시보드</td>
+          <tr><td><b>5</b></td><td>프로젝트 수익률<br><span class="muted">② 협의 시점</span></td>
+            <td>고객사와 협의해 <b>조정된 MM</b> 을 넣습니다. <span class="btn-ref g">← 계약 투입 복사</span> 로 계약 내용을 가져온 뒤 <b>달라진 MM 만</b> 고치면 빠릅니다. <b>협의 사유</b>(왜 조정했는지)와 협의 월도 함께 적어 두세요.</td>
+            <td>협의 단계가 없는 프로젝트는 <b>비워 두면 됩니다</b> — 비어 있으면 협의 수익률이 <code>-</code> 로 남고 계약 → 확정만 비교합니다. 협의 매출도 <b>0이면 계약액</b>을 씁니다(고객사 계약금액은 보통 그대로).</td></tr>
+          <tr><td><b>6</b></td><td>프로젝트 수익률<br><span class="muted">③ 확정 시점</span></td>
+            <td><b>H9 가 실제로 투입한 MM</b> 을 넣습니다. <span class="btn-ref g">← 협의 투입 복사</span> 를 누르면 <b>협의 내용</b>(협의가 비어 있으면 계약 내용)이 금액까지 그대로 복사됩니다. 확정(정산) 월도 넣습니다.</td>
+            <td>금액 칸이 <b>0일 때 클릭하면 0이 지워지므로</b> 바로 숫자를 입력하면 됩니다. 진행 중에도 그때까지의 투입을 넣어 두면 예상 수익률을 미리 볼 수 있습니다(대시보드에서는 <span class="prov">잠정</span> 으로 표시).</td></tr>
+          <tr><td><b>7</b></td><td>프로젝트 수익률<br><span class="muted">변동 분석</span></td>
+            <td>변동 분석표(<b>계약 / 협의 / 확정</b> 3열)와 <b>인건비 변동 상세</b>를 확인합니다. 상세는 <b>① 계약 → ② 협의</b>, <b>② 협의 → ③ 확정</b>, <b>① 계약 → ③ 확정(총 변동)</b> 세 묶음으로 나와, 어느 단계에서 어느 소속·등급의 MM 이 늘거나 줄었는지 문장으로 설명합니다. <b>수익률 변동 사유</b>를 적고 <span class="btn-ref">수익률 저장 (이력 기록)</span>.</td>
+            <td>이 버튼이 <b>3단계 투입 행과 이력까지 함께 저장</b>합니다. 이력에는 그 시점의 <b>세 단계 수익률과 MM(계약 → 협의 → 실투입)</b> 이 함께 쌓입니다. 위쪽 <span class="btn-ref">프로젝트 정보 저장</span> 은 이름·PM·상태 같은 <b>정보만</b> 저장합니다 — 둘을 구분해서 누르세요.</td></tr>
+          <tr><td><b>8</b></td><td>프로젝트 수익률 → 대시보드</td>
             <td>정산이 끝나면 <b>상태</b>를 <code>완료</code> 로 바꾸고 저장합니다. 대시보드에서 요약·그래프·표로 확인합니다.</td>
             <td><b>상태가 진행중이면 최종 집계에 들어가지 않습니다.</b> 완료로 바꿔야 확정 수익률과 변동에 반영됩니다.</td></tr>
         </tbody>
@@ -616,8 +676,11 @@
         <thead><tr><th style="width:170px">항목</th><th>산식</th></tr></thead>
         <tbody>
           <tr><td><b>계약 시점 수익률</b></td><td>( 계약액 − ( Σ 계약MM × <b>저장된 단가</b> + 계약 외주비 + 계약 부대비 ) ) ÷ 계약액 × 100</td></tr>
+          <tr><td><b>협의 시점 수익률</b></td><td>( 협의 매출 − ( Σ 협의MM × 단가 + 협의 외주비 + 협의 부대비 ) ) ÷ 협의 매출 × 100<br>
+            <span class="muted">협의 매출이 0이면 계약액을 씁니다</span></td></tr>
           <tr><td><b>확정 시점 수익률</b></td><td>( 실제 매출 − ( Σ 실투입MM × 단가 + 실제 외주비 + 실제 부대비 ) ) ÷ 실제 매출 × 100</td></tr>
-          <tr><td><b>수익률 변동</b></td><td>확정 시점 수익률 − 계약 시점 수익률 &nbsp;(단위 <code>%p</code>)</td></tr>
+          <tr><td><b>수익률 변동</b></td><td><b>총 변동</b> = 확정 − 계약 &nbsp;(단위 <code>%p</code>)<br>
+            단계별로 <b>협의 − 계약</b>, <b>확정 − 협의</b> 도 각각 보여 줍니다</td></tr>
           <tr><td><b>인건비</b></td><td>Σ ( 투입 MM × 단가/MM ) &nbsp;— 단가는 소속 × 등급으로 단가표에서 찾습니다</td></tr>
           <tr><td><b>대시보드 합계</b></td><td>프로젝트별 평균이 아니라 <b>금액 가중 평균</b> — ( Σ 매출 − Σ 원가 ) ÷ Σ 매출</td></tr>
         </tbody>
@@ -792,7 +855,8 @@
           <tr><td><b>단가/MM</b></td><td>1 MM 당 금액(원). 소속 × 등급으로 정해집니다.</td></tr>
           <tr><td><b>%p</b></td><td>퍼센트 포인트. 수익률 50% → 40% 는 <b>−10%p</b>.</td></tr>
           <tr><td><b>계약 시점 (기준)</b></td><td>계약할 때 계획한 수익률. 저장 시점 단가로 고정.</td></tr>
-          <tr><td><b>확정 시점 (실적)</b></td><td>실제 매출·실제 투입으로 확정된 결과 수익률. 화면의 <b>확정 매출 · 확정 수익률</b>이 이 값입니다.</td></tr>
+          <tr><td><b>협의 시점</b></td><td>고객사와 협의해 <b>MM 을 조정한 단계</b>. 계약과 실투입 사이의 중간 기준입니다.</td></tr>
+          <tr><td><b>확정 시점 (실적)</b></td><td><b>H9 가 실제로 투입한 MM</b> 으로 확정된 결과 수익률. 화면의 <b>확정 매출 · 확정 수익률</b>이 이 값입니다.</td></tr>
           <tr><td><b>상태 <code>완료</code></b></td><td>프로젝트 진행 상태값(진행중 / 완료 / 보류). <b>확정</b>은 금액·수익률 이름이고, <b>완료</b>는 상태 이름입니다 — 서로 다릅니다.</td></tr>
           <tr><td><span class="prov">잠정</span></td><td>상태가 진행중이라 아직 확정이 아닌 변동값. 합계에서 제외됩니다.</td></tr>
           <tr><td><b>유형 (정산 형태)</b></td><td>월 정산, 30/30/40 등 대금 정산 방식. 대시보드에서 유형별로 묶어 봅니다.</td></tr>
@@ -960,10 +1024,10 @@
 </div>
 
 <script>
-const APP_VERSION='v4.9 · 유형 표기 통합';
+const APP_VERSION='v5.0 · 3단계 MM 관리';
 const GRADES=['초급','중급','고급','특급'];
 let projects=[],staff=[],rates={},allRows=[];
-let curId=null,cDraft=[],fDraft=[];
+let curId=null,cDraft=[],aDraft=[],fDraft=[];
 
 // ── 공통 ──────────────────────────────────────────────
 async function api(path,opts){
@@ -979,7 +1043,7 @@ function commify(el){
   const v=el.value.replace(/[^0-9]/g,'');
   el.value=v===''?'':(neg?'-':'')+Number(v).toLocaleString('ko-KR');
 }
-const MONEY_IDS=['cAmount','cOut','cEtc','fRev','fOut','fEtc'];
+const MONEY_IDS=['cAmount','cOut','cEtc','aRev','aOut','aEtc','fRev','fOut','fEtc'];
 // 숫자 칸이 0 일 때 클릭하면 0 을 비운다.
 // (0 이 남아 있으면 앞에 커서를 두고 입력할 때 5000000 → 50000000 처럼 0 이 하나 더 붙는다)
 // 비운 채로 벗어나면 다시 0 으로 돌려놓는다.
@@ -1116,6 +1180,17 @@ function contractStats(p,draft){
   const margin=p.cAmount>0?(p.cAmount-cost)/p.cAmount*100:null;
   return {mm,labor,cost,revenue:p.cAmount,margin,rows};
 }
+// 협의 시점: 고객사와 협의해 수정한 MM (현재 단가 적용)
+function agreedStats(p,draft){
+  const rows=draft||rowsOf(p.id,'A');
+  let mm=0,labor=0;
+  rows.forEach(r=>{mm+=r.mm;labor+=r.mm*(r.rate||rateOf(r.dept,r.grade));});
+  const revenue=p.aRevenue>0?p.aRevenue:p.cAmount;
+  const cost=labor+p.aCostOut+p.aCostEtc;
+  const has=rows.length>0||p.aRevenue>0||p.aCostOut>0||p.aCostEtc>0;
+  const margin=(has&&revenue>0)?(revenue-cost)/revenue*100:null;
+  return {mm,labor,cost,revenue,margin,has,rows};
+}
 // 확정 시점: 현재 단가 사용 (인력 등급이 바뀌면 따라 바뀜)
 function finalStats(p,draft){
   const rows=draft||rowsOf(p.id,'F');
@@ -1131,10 +1206,12 @@ const curProject=()=>projects.find(p=>p.id===curId)||null;
 // 실제 매출을 0(=계약액과 동일)으로 둔 경우, 실제로 적용되는 금액을 칸 옆에 흐리게 보여준다.
 // 계약금액은 보통 변하지 않으므로 이 상태가 정상이며, 매출이 0이라고 오해하지 않게 한다.
 function syncRevHint(){
-  const el=document.getElementById('revHint');if(!el)return;
-  const rev=pnum(document.getElementById('fRev').value);
   const amt=pnum(document.getElementById('cAmount').value);
-  el.innerHTML=(rev===0&&amt>0)?'계약액 <b>'+won(amt)+'</b> 적용':'';
+  [['revHint','fRev'],['aRevHint','aRev']].forEach(([hid,rid])=>{
+    const el=document.getElementById(hid);if(!el)return;
+    const rev=pnum(document.getElementById(rid).value);
+    el.innerHTML=(rev===0&&amt>0)?'계약액 <b>'+won(amt)+'</b> 적용':'';
+  });
 }
 
 // ── 대시보드 ──────────────────────────────────────────
@@ -1147,9 +1224,11 @@ function aggregate(list){
   // 변동 비교용 — 계약 기준과 확정 실적이 '둘 다' 산출되는 프로젝트만 짝지어 모은다.
   // (한쪽만 넣으면 서로 다른 집합끼리 비교해 변동이 실제와 달라진다)
   let bAmt=0,bCost=0,dRev=0,dCost=0,pairs=0;
+  let aRev=0,aCost=0,aCnt=0;      // ② 협의 단계가 입력된 프로젝트
   list.forEach(p=>{
-    const c=contractStats(p),fs=finalStats(p);
+    const c=contractStats(p),ag=agreedStats(p),fs=finalStats(p);
     if(p.cAmount>0){cAmt+=p.cAmount;cCost+=c.cost;}
+    if(ag.has&&ag.revenue>0){aRev+=ag.revenue;aCost+=ag.cost;aCnt++;}
     if(isDone(p)){
       if(fs.has&&fs.revenue>0){
         fRev+=fs.revenue;fCost+=fs.cost;doneWith++;
@@ -1159,9 +1238,9 @@ function aggregate(list){
       }
     }else if(p.status==='진행중')ongoing++;
   });
-  const cM=pctOf(cAmt,cCost),fM=pctOf(fRev,fCost);
+  const cM=pctOf(cAmt,cCost),fM=pctOf(fRev,fCost),aM=pctOf(aRev,aCost);
   const bM=pctOf(bAmt,bCost),dM=pctOf(dRev,dCost);
-  return {cAmt,cCost,fRev,fCost,cM,fM,bM,dM,pairs,
+  return {cAmt,cCost,fRev,fCost,cM,fM,aM,aRev,aCost,aCnt,bM,dM,pairs,
     delta:(bM!=null&&dM!=null)?dM-bM:null,doneWith,ongoing};
 }
 // 담당 PM 셀렉트 — 프로젝트에 지정된 담당자만 목록에 넣는다 (선택값은 유지)
@@ -1232,13 +1311,13 @@ function renderDash(){
     +(pmf==='all'?'':' · '+(pmf==='__none'?'담당 미지정':pmf))
     +(filtered?' / 전체 '+projects.length+'건':'');
   if(!list.length){
-    body.innerHTML='<tr><td colspan="12" class="empty">'+(projects.length
+    body.innerHTML='<tr><td colspan="13" class="empty">'+(projects.length
       ?'조건에 맞는 프로젝트가 없습니다. 담당 PM·상태 필터를 바꿔 보세요.'
       :'프로젝트가 없습니다. 프로젝트 수익률 탭에서 등록하거나 구글시트로 일괄 등록하세요.')+'</td></tr>';
     document.getElementById('dashFoot').innerHTML='';
     document.getElementById('footNote').innerHTML='';renderTypeDash();return;}
   body.innerHTML=list.map(p=>{
-    const c=contractStats(p),fs=finalStats(p);
+    const c=contractStats(p),ag=agreedStats(p),fs=finalStats(p);
     const d=(c.margin!=null&&fs.margin!=null)?fs.margin-c.margin:null;
     // 진행중이면 아직 최종 변동이 아니므로 '잠정' 으로 표시하고 합계에서는 뺀다
     const dCell=d==null?'<span class="delta flat">–</span>'
@@ -1253,6 +1332,7 @@ function renderDash(){
       '<td><span class="pill '+(p.status==='진행중'?'good':p.status==='완료'?'flat':'warn')+'">'+p.status+'</span></td>'+
       '<td class="right">'+won(p.cAmount)+'</td>'+
       '<td class="right">'+(c.margin!=null?'<span class="pill '+cls(c.margin)+'">'+c.margin.toFixed(1)+'%</span>':'-')+'</td>'+
+      '<td class="right">'+(ag.margin!=null?'<span class="pill '+cls(ag.margin)+'">'+ag.margin.toFixed(1)+'%</span>':'-')+'</td>'+
       '<td class="right">'+(fs.has?won(fs.revenue):'-')+'</td>'+
       '<td class="right">'+(fs.margin!=null?'<span class="pill '+cls(fs.margin)+'">'+fs.margin.toFixed(1)+'%</span>':'-')+'</td>'+
       '<td class="right">'+dCell+'</td>'+
@@ -1270,6 +1350,7 @@ function renderDash(){
     '<td></td><td>합계 '+list.length+'건</td><td></td><td></td><td></td><td></td>'+
     '<td class="right">'+won(la.cAmt)+basis('전체 '+nContract+'건')+'</td>'+
     '<td class="right">'+(la.cM!=null?la.cM.toFixed(1)+'%':'-')+basis('전체 기준')+'</td>'+
+    '<td class="right">'+(la.aM!=null?la.aM.toFixed(1)+'%':'-')+basis(la.aCnt?'협의 '+la.aCnt+'건':'–')+'</td>'+
     '<td class="right">'+won(la.fRev)+basis('완료 '+la.doneWith+'건')+'</td>'+
     '<td class="right">'+(la.fM!=null?la.fM.toFixed(1)+'%':'-')+basis('완료 기준')+'</td>'+
     '<td class="right">'+(la.delta!=null?deltaHtml(la.delta):'–')
@@ -1302,17 +1383,17 @@ function renderBars(list){
   const wrap=document.getElementById('barWrap'),el=document.getElementById('barChart');
   // 계약 수익률이 산출되는(계약액이 입력된) 프로젝트만
   const items=list.map(p=>{
-    const c=contractStats(p),f=finalStats(p);
-    return {p,c:c.margin,f:f.margin,
+    const c=contractStats(p),ag=agreedStats(p),f=finalStats(p);
+    return {p,c:c.margin,a:ag.margin,f:f.margin,
       d:(c.margin!=null&&f.margin!=null)?f.margin-c.margin:null};
-  }).filter(x=>x.c!=null||x.f!=null);
+  }).filter(x=>x.c!=null||x.a!=null||x.f!=null);
   document.getElementById('barCount').textContent=items.length?items.length+'건':'';
   if(!items.length){
     el.innerHTML='<div class="empty">수익률이 입력된 프로젝트가 없습니다. 프로젝트 수익률 탭에서 계약액과 투입을 입력하세요.</div>';
     document.getElementById('barHint').style.display='none';return;}
   document.getElementById('barHint').style.display='';
   // 0 을 기준선으로 두고 위(+)·아래(−) 로 뻗는다
-  const vals=items.flatMap(x=>[x.c,x.f]).filter(v=>v!=null);
+  const vals=items.flatMap(x=>[x.c,x.a,x.f]).filter(v=>v!=null);
   const hi=Math.max(0,...vals),lo=Math.min(0,...vals);
   const span=(hi-lo)||1;
   const zero=PLOT_H*(hi/span);                       // 위에서부터 기준선까지
@@ -1329,11 +1410,12 @@ function renderBars(list){
   el.innerHTML=items.map(x=>{
     const dt=x.d==null?'변동 미산출':'변동 '+(x.d>=0?'+':'')+x.d.toFixed(1)+'%p'+(isDone(x.p)?'':' (진행중 잠정)');
     return '<div class="mg'+(isDone(x.p)?' done':'')+'" data-bar="'+x.p.id+'" title="'+
-      esc(x.p.name)+' — 계약 '+(x.c!=null?x.c.toFixed(1)+'%':'-')+' → 확정 '+
-      (x.f!=null?x.f.toFixed(1)+'%':'미입력')+' · '+dt+'">'+
-      '<div class="mval"><b class="vc">'+pct(x.c)+'</b> → <b class="vf">'+pct(x.f)+'</b></div>'+
+      esc(x.p.name)+' — 계약 '+(x.c!=null?x.c.toFixed(1)+'%':'-')+
+      ' → 협의 '+(x.a!=null?x.a.toFixed(1)+'%':'미입력')+
+      ' → 확정 '+(x.f!=null?x.f.toFixed(1)+'%':'미입력')+' · '+dt+'">'+
+      '<div class="mval"><b class="vc">'+pct(x.c)+'</b>→<b class="va">'+pct(x.a)+'</b>→<b class="vf">'+pct(x.f)+'</b></div>'+
       '<div class="mplot"><div class="mzero" style="top:'+zero.toFixed(1)+'px"></div>'+
-        bar(x.c,'c')+bar(x.f,'f')+'</div>'+
+        bar(x.c,'c')+bar(x.a,'a')+bar(x.f,'f')+'</div>'+
       '<div class="mname">'+esc(x.p.name)+'</div></div>';
   }).join('');
   el.querySelectorAll('[data-bar]').forEach(g=>g.onclick=()=>{
@@ -1443,14 +1525,19 @@ document.getElementById('dashFilter').onchange=renderDash;
 document.getElementById('dashMine').onchange=renderDash;
 document.getElementById('dashPm').onchange=renderDash;
 document.getElementById('btnCsv').onclick=()=>{
-  const rows=[['번호','프로젝트','담당PM','클라이언트','유형','상태','계약액','계약수익률(%)','확정매출','확정수익률(%)','변동(%p)','변동확정','사유']];
+  const rows=[['번호','프로젝트','담당PM','클라이언트','유형','상태','계약액',
+    '계약수익률(%)','협의수익률(%)','확정수익률(%)','확정매출',
+    '계약MM','협의MM','실투입MM','변동(%p)','변동확정','협의사유','사유']];
   projects.forEach(p=>{
-    const c=contractStats(p),fs=finalStats(p);
+    const c=contractStats(p),ag=agreedStats(p),fs=finalStats(p);
     const d=(c.margin!=null&&fs.margin!=null)?(fs.margin-c.margin).toFixed(2):'';
     rows.push([p.code,p.name,p.pm,p.client,p.projType,p.status,Math.round(p.cAmount),
-      c.margin!=null?c.margin.toFixed(2):'',fs.has?Math.round(fs.revenue):'',
+      c.margin!=null?c.margin.toFixed(2):'',
+      ag.margin!=null?ag.margin.toFixed(2):'',
       fs.margin!=null?fs.margin.toFixed(2):'',
-      d,d===''?'':(isDone(p)?'확정':'잠정(진행중)'),p.reason||'']);
+      fs.has?Math.round(fs.revenue):'',
+      c.mm.toFixed(2),ag.mm.toFixed(2),fs.mm.toFixed(2),
+      d,d===''?'':(isDone(p)?'확정':'잠정(진행중)'),p.aReason||'',p.reason||'']);
   });
   const csv='﻿'+rows.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
   const a=document.createElement('a');
@@ -1479,12 +1566,13 @@ function renderPjSelect(){
 function loadProject(){
   renderPjSelect();
   const p=curProject();
-  const ids=['fCode','fName','fClient','fPm','fType','fStart','fEnd','cAmount','cOut','cEtc','fRev','fOut','fEtc','fClosed','fReason'];
+  const ids=['fCode','fName','fClient','fPm','fType','fStart','fEnd','cAmount','cOut','cEtc',
+    'aRev','aOut','aEtc','aAgreed','aReason','fRev','fOut','fEtc','fClosed','fReason'];
   if(!p){ids.forEach(i=>{const el=document.getElementById(i);if(el)el.value='';});
     MONEY_IDS.forEach(i=>{document.getElementById(i).value='0';});
     document.getElementById('fStatus').value='진행중';
     document.getElementById('lastEdit').textContent='';
-    cDraft=[];fDraft=[];renderPhase();renderVs();cleanSnap=null;updateDirty();return;}
+    cDraft=[];aDraft=[];fDraft=[];renderPhase();renderVs();cleanSnap=null;updateDirty();return;}
   document.getElementById('fCode').value=p.code||'';
   document.getElementById('fName').value=p.name;
   document.getElementById('fClient').value=p.client||'';
@@ -1498,6 +1586,11 @@ function loadProject(){
   document.getElementById('cAmount').value=won(p.cAmount);
   document.getElementById('cOut').value=won(p.cCostOut);
   document.getElementById('cEtc').value=won(p.cCostEtc);
+  document.getElementById('aRev').value=won(p.aRevenue);
+  document.getElementById('aOut').value=won(p.aCostOut);
+  document.getElementById('aEtc').value=won(p.aCostEtc);
+  document.getElementById('aAgreed').value=p.aAgreedAt||'';
+  document.getElementById('aReason').value=p.aReason||'';
   document.getElementById('fRev').value=won(p.fRevenue);
   syncRevHint();
   document.getElementById('fOut').value=won(p.fCostOut);
@@ -1505,6 +1598,7 @@ function loadProject(){
   document.getElementById('fClosed').value=p.fClosedAt||'';
   document.getElementById('fReason').value=p.reason||'';
   cDraft=rowsOf(p.id,'C').map(r=>({...r}));
+  aDraft=rowsOf(p.id,'A').map(r=>({...r}));
   fDraft=rowsOf(p.id,'F').map(r=>({...r}));
   renderPhase();renderVs();
   loadedId=curId;
@@ -1530,6 +1624,11 @@ function formProject(){
     fRevenue:pnum(document.getElementById('fRev').value),
     fCostOut:pnum(document.getElementById('fOut').value),
     fCostEtc:pnum(document.getElementById('fEtc').value),
+    aRevenue:pnum(document.getElementById('aRev').value),
+    aCostOut:pnum(document.getElementById('aOut').value),
+    aCostEtc:pnum(document.getElementById('aEtc').value),
+    aAgreedAt:document.getElementById('aAgreed').value||null,
+    aReason:document.getElementById('aReason').value.trim(),
     fClosedAt:document.getElementById('fClosed').value||null,
     reason:document.getElementById('fReason').value.trim(),
   };
@@ -1539,12 +1638,13 @@ function formProject(){
 // 수정 중이면 자동 새로고침이 값을 덮어쓰지 않는다 (덮어써서 입력이 사라지던 문제).
 let cleanSnap=null,loadedId=null;   // loadedId — 지금 화면에 그려져 있는 프로젝트
 const FORM_IDS=['fCode','fName','fClient','fPm','fType','fStatus','fStart','fEnd',
-  'cAmount','cOut','cEtc','fRev','fOut','fEtc','fClosed','fReason'];
+  'cAmount','cOut','cEtc','aRev','aOut','aEtc','aAgreed','aReason',
+  'fRev','fOut','fEtc','fClosed','fReason'];
 function snapshot(){
   const rows=d=>d.map(r=>[r.dept,r.grade,+r.mm||0,+r.rate||0].join('~')).join('|');
   return JSON.stringify({id:curId,
     form:FORM_IDS.map(i=>{const el=document.getElementById(i);return el?el.value:'';}),
-    c:rows(cDraft),f:rows(fDraft)});
+    c:rows(cDraft),a:rows(aDraft),f:rows(fDraft)});
 }
 const markClean=()=>{cleanSnap=snapshot();updateDirty();};
 const isDirty=()=>cleanSnap!=null&&curId!=null&&snapshot()!==cleanSnap;
@@ -1560,60 +1660,47 @@ window.addEventListener('beforeunload',e=>{
 });
 const deptOptions=sel=>Object.keys(rates).map(d=>'<option '+(d===sel?'selected':'')+'>'+esc(d)+'</option>').join('');
 const gradeOptions=sel=>GRADES.map((g,i)=>'<option value="'+i+'" '+(i===sel?'selected':'')+'>'+g+'</option>').join('');
+// 3단계(계약 · 협의 · 확정) 투입 표를 같은 규칙으로 그린다.
+// PHASES — key: 화면 요소 접두사, draft: 편집 중 배열 이름, label: 안내 문구
+const PHASES=[
+  {k:'c',label:'계약 시점 투입',empty:'[+ 투입 행 추가]로 계약 MM 을 넣으세요.',
+   get:()=>cDraft,set:v=>{cDraft=v;},stats:(p,d)=>contractStats(p,d)},
+  {k:'a',label:'협의 시점 투입',empty:'[← 계약 투입 복사] 로 가져온 뒤 협의된 MM 으로 고치세요.',
+   get:()=>aDraft,set:v=>{aDraft=v;},stats:(p,d)=>agreedStats(p,d)},
+  {k:'f',label:'확정 시점 투입',empty:'[← 협의 투입 복사] 로 가져온 뒤 실투입 MM 으로 고치세요.',
+   get:()=>fDraft,set:v=>{fDraft=v;},stats:(p,d)=>finalStats(p,d)},
+];
 function renderPhase(){
   const p=formProject();
-  // 계약 시점 표
-  const cb=document.getElementById('cBody');
-  cb.innerHTML=cDraft.length?cDraft.map((r,i)=>{
-    const rate=r.rate||rateOf(r.dept,r.grade);
-    return '<tr><td><select data-c="'+i+'" data-f="dept">'+deptOptions(r.dept)+'</select></td>'+
-      '<td><select data-c="'+i+'" data-f="grade">'+gradeOptions(r.grade)+'</select></td>'+
-      '<td><input class="num" data-c="'+i+'" data-f="rate" value="'+won(rate)+'" inputmode="numeric"></td>'+
-      '<td><input class="num" data-c="'+i+'" data-f="mm" value="'+r.mm+'" inputmode="decimal"></td>'+
-      '<td class="right">'+won(rate*r.mm)+'</td>'+
-      '<td><span class="del-x" data-cdel="'+i+'">×</span></td></tr>';
-  }).join(''):'<tr><td colspan="6" class="empty">[+ 투입 행 추가]로 계약 시점 투입계획을 넣으세요.</td></tr>';
-  const cs=p?contractStats(p,cDraft):{mm:0,labor:0};
-  document.getElementById('cFoot').innerHTML=cDraft.length
-    ?'<td>합계</td><td></td><td></td><td class="right">'+cs.mm.toFixed(2)+'</td><td class="right">'+won(cs.labor)+'</td><td></td>':'';
-  cb.querySelectorAll('[data-c]').forEach(el=>el.onchange=e=>{
-    const i=+e.target.dataset.c,f=e.target.dataset.f;
-    if(f==='dept'){cDraft[i].dept=e.target.value;cDraft[i].rate=rateOf(cDraft[i].dept,cDraft[i].grade);}
-    else if(f==='grade'){cDraft[i].grade=+e.target.value;cDraft[i].rate=rateOf(cDraft[i].dept,cDraft[i].grade);}
-    else cDraft[i][f]=pnum(e.target.value);
-    renderPhase();renderVs();
+  PHASES.forEach(ph=>{
+    const tb=document.getElementById(ph.k+'Body');
+    if(!tb)return;
+    const draft=ph.get();
+    tb.innerHTML=draft.length?draft.map((r,i)=>{
+      const rate=r.rate||rateOf(r.dept,r.grade);
+      return '<tr><td><select data-p="'+ph.k+'" data-i="'+i+'" data-f="dept">'+deptOptions(r.dept)+'</select></td>'+
+        '<td><select data-p="'+ph.k+'" data-i="'+i+'" data-f="grade">'+gradeOptions(r.grade)+'</select></td>'+
+        '<td><input class="num" data-p="'+ph.k+'" data-i="'+i+'" data-f="rate" value="'+won(rate)+'" inputmode="numeric"></td>'+
+        '<td><input class="num" data-p="'+ph.k+'" data-i="'+i+'" data-f="mm" value="'+r.mm+'" inputmode="decimal"></td>'+
+        '<td class="right">'+won(rate*r.mm)+'</td>'+
+        '<td><span class="del-x" data-pdel="'+ph.k+'" data-i="'+i+'">×</span></td></tr>';
+    }).join(''):'<tr><td colspan="6" class="empty">'+ph.empty+'</td></tr>';
+    const st=p?ph.stats(p,draft):{mm:0,labor:0};
+    document.getElementById(ph.k+'Foot').innerHTML=draft.length
+      ?'<td>합계</td><td></td><td></td><td class="right">'+st.mm.toFixed(2)+
+       '</td><td class="right">'+won(st.labor)+'</td><td></td>':'';
+    tb.querySelectorAll('[data-p]').forEach(el=>el.onchange=e=>{
+      const d=ph.get(),i=+e.target.dataset.i,f=e.target.dataset.f;
+      if(f==='dept'){d[i].dept=e.target.value;d[i].rate=rateOf(d[i].dept,d[i].grade);}
+      else if(f==='grade'){d[i].grade=+e.target.value;d[i].rate=rateOf(d[i].dept,d[i].grade);}
+      else d[i][f]=pnum(e.target.value);
+      renderPhase();renderVs();
+    });
+    tb.querySelectorAll('[data-pdel]').forEach(x=>x.onclick=async e=>{
+      const d=ph.get(),i=+e.target.dataset.i;
+      if(!await askDelete(rowDelOpt(d[i],ph.label)))return;
+      d.splice(i,1);renderPhase();renderVs();});
   });
-  cb.querySelectorAll('[data-cdel]').forEach(x=>x.onclick=async e=>{
-    const i=+e.target.dataset.cdel;
-    if(!await askDelete(rowDelOpt(cDraft[i],'계약 시점 투입')))return;
-    cDraft.splice(i,1);renderPhase();renderVs();});
-
-  // 확정 시점 표
-  const fb=document.getElementById('fBody');
-  fb.innerHTML=fDraft.length?fDraft.map((r,i)=>{
-    const rate=r.rate||rateOf(r.dept,r.grade);
-    return '<tr><td><select data-r="'+i+'" data-f="dept">'+deptOptions(r.dept)+'</select></td>'+
-      '<td><select data-r="'+i+'" data-f="grade">'+gradeOptions(r.grade)+'</select></td>'+
-      '<td><input class="num" data-r="'+i+'" data-f="rate" value="'+won(rate)+'" inputmode="numeric"></td>'+
-      '<td><input class="num" data-r="'+i+'" data-f="mm" value="'+r.mm+'" inputmode="decimal"></td>'+
-      '<td class="right">'+won(rate*r.mm)+'</td>'+
-      '<td><span class="del-x" data-fdel="'+i+'">×</span></td></tr>';
-  }).join(''):'<tr><td colspan="6" class="empty">실제 투입을 추가하거나 [← 계약 투입 복사]를 누르세요.</td></tr>';
-  const fs=p?finalStats(p,fDraft):{mm:0,labor:0};
-  document.getElementById('fFoot').innerHTML=fDraft.length
-    ?'<td>합계</td><td></td><td></td><td class="right">'+fs.mm.toFixed(2)+
-     '</td><td class="right">'+won(fs.labor)+'</td><td></td>':'';
-  fb.querySelectorAll('[data-r]').forEach(el=>el.onchange=e=>{
-    const i=+e.target.dataset.r,f=e.target.dataset.f;
-    if(f==='dept'){fDraft[i].dept=e.target.value;fDraft[i].rate=rateOf(fDraft[i].dept,fDraft[i].grade);}
-    else if(f==='grade'){fDraft[i].grade=+e.target.value;fDraft[i].rate=rateOf(fDraft[i].dept,fDraft[i].grade);}
-    else fDraft[i][f]=pnum(e.target.value);
-    renderPhase();renderVs();
-  });
-  fb.querySelectorAll('[data-fdel]').forEach(x=>x.onclick=async e=>{
-    const i=+e.target.dataset.fdel;
-    if(!await askDelete(rowDelOpt(fDraft[i],'확정 시점 투입')))return;
-    fDraft.splice(i,1);renderPhase();renderVs();});
   updateDirty();   // 행 추가·삭제도 '저장 안 된 변경' 에 반영
 }
 // 투입 행 삭제 확인 문구 — 어떤 행을 지우는지 소속·등급·MM 으로 보여준다
@@ -1625,9 +1712,9 @@ function rowDelOpt(r,label){
 }
 // 인건비 변동을 소속·등급 단위로 비교해 원인을 문장으로 서술
 const gLabel=x=>GRADES[Math.max(0,Math.min(3,Math.round(x)))];
-function renderLaborDetail(cRows,fRows){
-  const box=document.getElementById('laborDetail');
-  if(!cRows.length&&!fRows.length){box.innerHTML='';return;}
+// 두 단계의 투입을 비교해 원인 서술 + 소속×등급 표 HTML 을 만든다 (단계별로 재사용)
+function laborDetailHtml(cRows,fRows){
+  if(!cRows.length&&!fRows.length)return '';
   const rateFor=r=>r.rate||rateOf(r.dept,r.grade);
   // 소속×등급 단위 집계
   const agg=rows=>{
@@ -1685,7 +1772,7 @@ function renderLaborDetail(cRows,fRows){
     (l.diff>0?'⚠️':l.diff<0?'✅':'•')+' <b>'+esc(l.dept)+'</b> — '+l.text+
     ' → 인건비 <b style="color:'+(l.diff>0?'var(--bad)':'var(--good)')+'">'+
     (l.diff>0?'+':'')+won(l.diff)+'</b></div>').join('')
-    :'<div class="hint">계약 시점과 확정 시점의 투입이 동일합니다.</div>';
+    :'<div class="hint">두 단계의 투입이 동일합니다.</div>';
 
   // 소속×등급 상세 표
   const keys=[...new Set([...C.keys(),...F.keys()])].sort();
@@ -1707,11 +1794,10 @@ function renderLaborDetail(cRows,fRows){
         (dl>0?'+':'')+won(dl)+'</td><td>'+state+'</td></tr>';
   }).join('');
 
-  box.innerHTML='<h2 style="font-size:13.5px;margin:0 0 10px">인건비 변동 상세 <span class="tag">소속 · 등급별</span></h2>'+
-    head+narrative+
-    '<div class="tw" style="margin-top:12px"><table><thead><tr><th>소속</th><th>등급</th>'+
-    '<th class="right">계약 MM</th><th class="right">확정 MM</th><th class="right">MM 차이</th>'+
-    '<th class="right">계약 인건비</th><th class="right">확정 인건비</th><th class="right">인건비 차이</th>'+
+  return head+narrative+
+    '<div class="tw" style="margin-top:10px"><table><thead><tr><th>소속</th><th>등급</th>'+
+    '<th class="right">이전 MM</th><th class="right">이후 MM</th><th class="right">MM 차이</th>'+
+    '<th class="right">이전 인건비</th><th class="right">이후 인건비</th><th class="right">인건비 차이</th>'+
     '<th>구분</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
 function renderVs(){
@@ -1720,45 +1806,83 @@ function renderVs(){
   if(!p){document.getElementById('laborDetail').innerHTML='';
     cards.innerHTML='<div class="card" style="grid-column:1/-1"><div class="lbl">프로젝트 미선택</div>'+
     '<div class="foot" style="margin-top:2px">위에서 프로젝트를 선택하거나 [+ 새 프로젝트] · [구글시트 일괄 등록]으로 만드세요.</div></div>';
-    vb.innerHTML='<tr><td colspan="5" class="empty">프로젝트를 선택하세요.</td></tr>';return;}
-  const c=contractStats(p,cDraft),f=finalStats(p,fDraft);
-  const d=(c.margin!=null&&f.margin!=null)?f.margin-c.margin:null;
+    vb.innerHTML='<tr><td colspan="7" class="empty">프로젝트를 선택하세요.</td></tr>';return;}
+  const c=contractStats(p,cDraft),a=agreedStats(p,aDraft),f=finalStats(p,fDraft);
+  const dAll=(c.margin!=null&&f.margin!=null)?f.margin-c.margin:null;   // 계약 → 확정 (총 변동)
+  const dCA=(c.margin!=null&&a.margin!=null)?a.margin-c.margin:null;    // 계약 → 협의
+  const dAF=(a.margin!=null&&f.margin!=null)?f.margin-a.margin:null;    // 협의 → 확정
+  const pct=m=>m!=null?m.toFixed(1)+'%':'-';
   cards.innerHTML=
-    '<div class="card"><div class="lbl">① 계약 시점 수익률</div><div class="val '+cls(c.margin)+'">'+(c.margin!=null?c.margin.toFixed(1)+'%':'-')+'</div>'+
-      '<div class="foot">계약액 '+won(c.revenue)+' · 원가 '+won(c.cost)+'</div></div>'+
-    '<div class="card"><div class="lbl">② 확정 시점 수익률</div><div class="val '+cls(f.margin)+'">'+(f.margin!=null?f.margin.toFixed(1)+'%':'-')+'</div>'+
-      '<div class="foot">매출 '+won(f.revenue)+' · 원가 '+won(f.cost)+'</div></div>'+
-    '<div class="card hl"><div class="lbl">수익률 변동</div><div class="val '+(d==null?'':d>=0?'good':'bad')+'">'+(d!=null?(d>=0?'+':'')+d.toFixed(1)+'%p':'-')+'</div>'+
-      '<div class="foot">'+(d==null?'확정 시점 입력 필요':d>=0?'계약 기준보다 개선':'계약 기준보다 악화')+'</div></div>'+
+    '<div class="card"><div class="lbl">① 계약 수익률</div><div class="val '+cls(c.margin)+'">'+pct(c.margin)+'</div>'+
+      '<div class="foot">계약액 '+won(c.revenue)+' · 원가 '+won(c.cost)+'<br>계약 MM '+c.mm.toFixed(2)+'</div></div>'+
+    '<div class="card"><div class="lbl">② 협의 수익률</div><div class="val '+cls(a.margin)+'">'+pct(a.margin)+'</div>'+
+      '<div class="foot">'+(a.has
+        ? '원가 '+won(a.cost)+' · 협의 MM '+a.mm.toFixed(2)+'<br>계약 대비 '+(dCA!=null?deltaHtml(dCA):'–')
+        : '고객사 협의 내용을 입력하세요')+'</div></div>'+
+    '<div class="card"><div class="lbl">③ 확정 수익률</div><div class="val '+cls(f.margin)+'">'+pct(f.margin)+'</div>'+
+      '<div class="foot">'+(f.has
+        ? '원가 '+won(f.cost)+' · 실투입 MM '+f.mm.toFixed(2)+'<br>협의 대비 '+(dAF!=null?deltaHtml(dAF):'–')
+        : 'H9 실투입 내용을 입력하세요')+'</div></div>'+
+    '<div class="card hl"><div class="lbl">총 변동 <span class="tag">확정 − 계약</span></div>'+
+      '<div class="val '+(dAll==null?'':dAll>=0?'good':'bad')+'">'+(dAll!=null?(dAll>=0?'+':'')+dAll.toFixed(1)+'%p':'-')+'</div>'+
+      '<div class="foot">'+(dAll==null?'확정 시점 입력 필요'
+        :(dCA!=null?'협의 '+(dCA>=0?'+':'')+dCA.toFixed(1)+'%p · ':'')
+         +(dAF!=null?'실투입 '+(dAF>=0?'+':'')+dAF.toFixed(1)+'%p':''))+'</div></div>'+
     '<div class="card"><div class="lbl">투입 MM</div><div class="val">'+f.mm.toFixed(2)+'</div>'+
-      '<div class="foot">계약 '+c.mm.toFixed(2)+' MM · 차이 '+((f.mm-c.mm)>=0?'+':'')+(f.mm-c.mm).toFixed(2)+'</div></div>';
-  const line=(label,a,b,invert)=>{
-    const diff=b-a;
+      '<div class="foot">계약 '+c.mm.toFixed(2)+' → 협의 '+a.mm.toFixed(2)+' → 실투입 '+f.mm.toFixed(2)+
+      '<br>계약 대비 '+((f.mm-c.mm)>=0?'+':'')+(f.mm-c.mm).toFixed(2)+' MM</div></div>';
+
+  // 변동 분석 — 계약 / 협의 / 확정 3열 + 총 차이
+  const row=(label,vc,va,vf,invert,note)=>{
+    const diff=vf-vc;
     const bad=invert?diff>0:diff<0;
-    const impact=Math.abs(diff)<1?'<span class="muted">-</span>'
+    const impact=note?'<span class="muted">'+note+'</span>'
+      :Math.abs(diff)<1?'<span class="muted">-</span>'
       :'<span class="pill '+(bad?'bad':'good')+'">'+(bad?'수익률 악화':'수익률 개선')+'</span>';
-    return '<tr><td>'+label+'</td><td class="right">'+won(a)+'</td><td class="right">'+won(b)+'</td>'+
-      '<td class="right" style="color:'+(diff===0?'inherit':bad?'var(--bad)':'var(--good)')+'">'+(diff>0?'+':'')+won(diff)+'</td>'+
-      '<td>'+impact+'</td></tr>';
+    const col=v=>'<td class="right">'+won(v)+'</td>';
+    return '<tr><td>'+label+'</td>'+col(vc)+col(va)+col(vf)+
+      '<td class="right" style="color:'+(diff===0?'inherit':bad?'var(--bad)':'var(--good)')+'">'+
+      (diff>0?'+':'')+won(diff)+'</td><td>'+impact+'</td></tr>';
   };
-  const sameRev=Math.abs(f.revenue-c.revenue)<1;
+  const sameRev=Math.abs(f.revenue-c.revenue)<1&&Math.abs(a.revenue-c.revenue)<1;
   vb.innerHTML=
-    (sameRev
-      ? '<tr><td>매출</td><td class="right">'+won(c.revenue)+'</td><td class="right">'+won(f.revenue)+'</td>'
-        +'<td class="right">0</td><td><span class="muted">계약금액 변동 없음</span></td></tr>'
-      : line('매출',c.revenue,f.revenue,false))+
-    line('인건비',c.labor,f.labor,true)+
-    line('외주비',p.cCostOut,p.fCostOut,true)+
-    line('부대비',p.cCostEtc,p.fCostEtc,true)+
-    '<tr><td style="font-weight:650">총원가</td><td class="right">'+won(c.cost)+'</td><td class="right">'+won(f.cost)+'</td>'+
-    '<td class="right" style="color:'+((f.cost-c.cost)>0?'var(--bad)':'var(--good)')+'">'+((f.cost-c.cost)>0?'+':'')+won(f.cost-c.cost)+'</td>'+
-    '<td>'+(d!=null?deltaHtml(d):'–')+'</td></tr>'+
-    '<tr><td style="font-weight:650">순익</td><td class="right">'+won(c.revenue-c.cost)+'</td><td class="right">'+won(f.revenue-f.cost)+'</td>'+
-    '<td class="right" style="color:'+(((f.revenue-f.cost)-(c.revenue-c.cost))>=0?'var(--good)':'var(--bad)')+'">'+
-      (((f.revenue-f.cost)-(c.revenue-c.cost))>=0?'+':'')+won((f.revenue-f.cost)-(c.revenue-c.cost))+'</td><td></td></tr>';
-  renderLaborDetail(cDraft.filter(r=>r.mm>0),fDraft.filter(r=>r.mm>0));
+    row('매출',c.revenue,a.revenue,f.revenue,false,sameRev?'계약금액 변동 없음':'')+
+    row('인건비',c.labor,a.labor,f.labor,true)+
+    row('외주비',p.cCostOut,p.aCostOut,p.fCostOut,true)+
+    row('부대비',p.cCostEtc,p.aCostEtc,p.fCostEtc,true)+
+    '<tr><td style="font-weight:650">총원가</td>'+
+      '<td class="right">'+won(c.cost)+'</td><td class="right">'+won(a.cost)+'</td><td class="right">'+won(f.cost)+'</td>'+
+      '<td class="right" style="color:'+((f.cost-c.cost)>0?'var(--bad)':'var(--good)')+'">'+
+      ((f.cost-c.cost)>0?'+':'')+won(f.cost-c.cost)+'</td>'+
+      '<td>'+(dAll!=null?deltaHtml(dAll):'–')+'</td></tr>'+
+    '<tr><td style="font-weight:650">투입 MM</td>'+
+      '<td class="right">'+c.mm.toFixed(2)+'</td><td class="right">'+a.mm.toFixed(2)+'</td><td class="right">'+f.mm.toFixed(2)+'</td>'+
+      '<td class="right" style="color:'+((f.mm-c.mm)>0?'var(--bad)':'var(--good)')+'">'+
+      ((f.mm-c.mm)>0?'+':'')+(f.mm-c.mm).toFixed(2)+'</td><td></td></tr>'+
+    '<tr><td style="font-weight:650">순익</td>'+
+      '<td class="right">'+won(c.revenue-c.cost)+'</td><td class="right">'+won(a.revenue-a.cost)+'</td>'+
+      '<td class="right">'+won(f.revenue-f.cost)+'</td>'+
+      '<td class="right" style="color:'+(((f.revenue-f.cost)-(c.revenue-c.cost))>=0?'var(--good)':'var(--bad)')+'">'+
+      (((f.revenue-f.cost)-(c.revenue-c.cost))>=0?'+':'')+won((f.revenue-f.cost)-(c.revenue-c.cost))+'</td><td></td></tr>'+
+    '<tr><td style="font-weight:650">수익률</td>'+
+      '<td class="right">'+pct(c.margin)+'</td><td class="right">'+pct(a.margin)+'</td><td class="right">'+pct(f.margin)+'</td>'+
+      '<td class="right">'+(dAll!=null?(dAll>=0?'+':'')+dAll.toFixed(1)+'%p':'-')+'</td><td></td></tr>';
+  renderLaborSteps(p);
 }
-['fCode','fName','fClient','fPm','fType','fStatus','fStart','fEnd','cAmount','cOut','cEtc','fRev','fOut','fEtc','fClosed'].forEach(id=>{
+// 단계별 인건비 변동 서술 — 계약→협의, 협의→확정, 그리고 계약→확정(총)
+function renderLaborSteps(p){
+  const box=document.getElementById('laborDetail');
+  const C=cDraft.filter(r=>r.mm>0),A=aDraft.filter(r=>r.mm>0),F=fDraft.filter(r=>r.mm>0);
+  if(!C.length&&!A.length&&!F.length){box.innerHTML='';return;}
+  const parts=[];
+  if(A.length)parts.push({t:'① 계약 → ② 협의 (고객사 협의)',a:C,b:A});
+  if(F.length)parts.push({t:(A.length?'② 협의 → ③ 확정 (H9 실투입)':'① 계약 → ③ 확정'),a:A.length?A:C,b:F});
+  if(A.length&&F.length)parts.push({t:'① 계약 → ③ 확정 (총 변동)',a:C,b:F});
+  box.innerHTML=parts.map(x=>
+    '<div class="stepbox"><div class="stept">'+x.t+'</div>'+laborDetailHtml(x.a,x.b)+'</div>').join('');
+}
+['fCode','fName','fClient','fPm','fType','fStatus','fStart','fEnd','cAmount','cOut','cEtc',
+ 'aRev','aOut','aEtc','aAgreed','fRev','fOut','fEtc','fClosed'].forEach(id=>{
   const el=document.getElementById(id);
   const money=MONEY_IDS.includes(id);
   // 요약만 다시 그린다. 투입 표를 글자마다 다시 그리면 표 안의 입력칸이
@@ -1769,27 +1893,37 @@ function renderVs(){
 // 프로젝트 화면의 어떤 입력이든 바뀌면 '저장 안 된 변경' 표시를 갱신한다
 ['input','change'].forEach(ev=>
   document.getElementById('tab-proj').addEventListener(ev,()=>updateDirty()));
-document.getElementById('cAdd').onclick=()=>{
-  const d=Object.keys(rates)[0]||'';
-  cDraft.push({dept:d,grade:1,mm:1,rate:rateOf(d,1),staffId:null});renderPhase();renderVs();
-};
-document.getElementById('fAdd').onclick=()=>{
-  const d=Object.keys(rates)[0]||'';
-  fDraft.push({dept:d,grade:1,mm:1,rate:rateOf(d,1),staffId:null});renderPhase();renderVs();
-};
+PHASES.forEach(ph=>{
+  const btn=document.getElementById(ph.k+'Add');
+  if(btn)btn.onclick=()=>{
+    const d=Object.keys(rates)[0]||'';
+    ph.get().push({dept:d,grade:1,mm:1,rate:rateOf(d,1),staffId:null});
+    renderPhase();renderVs();
+  };
+});
 // 계약 시점 내용을 확정 시점으로 그대로 가져온다 —
 // 금액(계약액→실제 매출, 외주비, 부대비)까지 복사한 뒤 달라진 부분만 고치면 된다.
-document.getElementById('fCopy').onclick=()=>{
-  fDraft=cDraft.map(r=>({dept:r.dept,grade:r.grade,mm:r.mm,
+// 앞 단계 내용을 그대로 가져온다 (금액 + 투입 행). 달라진 부분만 고치면 된다.
+function copyPhase(fromKey,toKey,msgId,label){
+  const src=fromKey==='c'?cDraft:aDraft;
+  const rows=src.map(r=>({dept:r.dept,grade:r.grade,mm:r.mm,
     rate:r.rate||rateOf(r.dept,r.grade),staffId:null}));
-  [['cAmount','fRev'],['cOut','fOut'],['cEtc','fEtc']].forEach(([from,to])=>{
-    const dst=document.getElementById(to);
+  if(toKey==='a')aDraft=rows; else fDraft=rows;
+  const money={c:['cAmount','cOut','cEtc'],a:['aRev','aOut','aEtc'],f:['fRev','fOut','fEtc']};
+  money[fromKey].forEach((from,i)=>{
+    const dst=document.getElementById(money[toKey][i]);
     dst.value=document.getElementById(from).value;commify(dst);
   });
   renderPhase();renderVs();updateDirty();syncRevHint();
-  const s=document.getElementById('fMsg');
-  s.className='status';s.textContent='계약 시점의 금액과 투입을 복사했습니다 — 달라진 부분만 고치세요.';
+  const s=document.getElementById(msgId);
+  s.className='status';s.textContent=label+'의 금액과 투입을 복사했습니다 — 달라진 부분만 고치세요.';
   setTimeout(()=>{if(s.textContent.indexOf('복사했습니다')>=0)s.textContent='';},4000);
+}
+document.getElementById('aCopy').onclick=()=>copyPhase('c','a','aMsg','계약 시점');
+document.getElementById('fCopy').onclick=()=>{
+  // 협의 내용이 있으면 협의에서, 없으면 계약에서 가져온다
+  const from=aDraft.length?'a':'c';
+  copyPhase(from,'f','fMsg',from==='a'?'협의 시점':'계약 시점');
 };
 document.getElementById('btnNew').onclick=async()=>{
   const name=prompt('새 프로젝트명을 입력하세요');
@@ -1815,10 +1949,10 @@ document.getElementById('btnSaveInfo').onclick=async()=>{
 };
 document.getElementById('btnDel').onclick=async()=>{
   const p=curProject();if(!p)return;
-  const nC=rowsOf(p.id,'C').length,nF=rowsOf(p.id,'F').length;
+  const nC=rowsOf(p.id,'C').length,nA=rowsOf(p.id,'A').length,nF=rowsOf(p.id,'F').length;
   if(!await askDelete({
     what:'<b>'+esc(p.name)+'</b>'+(p.code?' <span class="muted">('+esc(p.code)+')</span>':'')+' 프로젝트',
-    note:'계약 투입 '+nC+'행 · 확정 투입 '+nF+'행과 변동 이력까지 함께 삭제됩니다. 되돌릴 수 없습니다.'}))return;
+    note:'계약 '+nC+'행 · 협의 '+nA+'행 · 확정 '+nF+'행의 투입과 변동 이력까지 함께 삭제됩니다. 되돌릴 수 없습니다.'}))return;
   try{await api('/projects/'+p.id,{method:'DELETE'});curId=null;await refresh();loadProject();}
   catch(e){alert('삭제 실패: '+e.message);}
 };
@@ -1830,13 +1964,18 @@ document.getElementById('btnSaveAll').onclick=async()=>{
   s.className='status';s.textContent='저장 중…';
   try{
     await api('/projects/'+p.id,{method:'PUT',body:JSON.stringify(p)});
-    await api('/projects/'+p.id+'/rows/C',{method:'PUT',body:JSON.stringify(
-      cDraft.filter(r=>r.mm>0).map(r=>({...r,rate:r.rate||rateOf(r.dept,r.grade)})))});
-    await api('/projects/'+p.id+'/rows/F',{method:'PUT',body:JSON.stringify(
-      fDraft.filter(r=>r.mm>0).map(r=>({...r,rate:r.rate||rateOf(r.dept,r.grade)})))});
-    const c=contractStats(p,cDraft),f=finalStats(p,fDraft);
+    // 3단계 투입을 각각 저장한다
+    const send=async(phase,draft)=>api('/projects/'+p.id+'/rows/'+phase,{method:'PUT',
+      body:JSON.stringify(draft.filter(r=>r.mm>0)
+        .map(r=>({...r,rate:r.rate||rateOf(r.dept,r.grade)})))});
+    await send('C',cDraft); await send('A',aDraft); await send('F',fDraft);
+    // 이력에 3단계 수익률과 MM 을 함께 남긴다
+    const c=contractStats(p,cDraft),ag=agreedStats(p,aDraft),f=finalStats(p,fDraft);
     await api('/projects/'+p.id+'/logs',{method:'POST',body:JSON.stringify({
-      cMargin:c.margin,fMargin:f.margin,reason:p.reason,by:myName()})});
+      cMargin:c.margin,aMargin:ag.margin,fMargin:f.margin,
+      cMm:c.mm,aMm:ag.mm,fMm:f.mm,
+      reason:[p.aReason?'[협의] '+p.aReason:'',p.reason].filter(Boolean).join(' / '),
+      by:myName()})});
     await refresh();loadProject();
     s.textContent='✓ 수익률이 저장되고 이력에 기록되었습니다.';setTimeout(()=>s.textContent='',3000);
   }catch(e){s.className='status err';s.textContent='✗ '+e.message;
@@ -1857,18 +1996,25 @@ document.getElementById('btnLogs').onclick=async()=>{
   logModal.classList.add('show');
   try{
     const logs=await api('/projects/'+p.id+'/logs');
+    const pc=v=>v!=null?v.toFixed(1)+'%':'-';
+    const mm=v=>v!=null?v.toFixed(2):'-';
     box.innerHTML=logs.length?'<div class="tw"><table><thead><tr><th>기록 시각</th>'+
-      '<th class="right">계약 수익률</th><th class="right">확정 수익률</th><th class="right">변동</th><th>입력자</th><th>사유</th></tr></thead><tbody>'+
+      '<th class="right">① 계약</th><th class="right">② 협의</th><th class="right">③ 확정</th>'+
+      '<th class="right">총 변동</th>'+
+      '<th class="right">MM (계약 → 협의 → 확정)</th><th>입력자</th><th>사유</th></tr></thead><tbody>'+
       logs.map(l=>{
         const d=(l.cMargin!=null&&l.fMargin!=null)?l.fMargin-l.cMargin:null;
+        const hasMm=l.cMm!=null||l.aMm!=null||l.fMm!=null;
         return '<tr><td class="muted">'+String(l.createdAt).replace('T',' ').slice(0,16)+'</td>'+
-          '<td class="right">'+(l.cMargin!=null?l.cMargin.toFixed(1)+'%':'-')+'</td>'+
-          '<td class="right">'+(l.fMargin!=null?l.fMargin.toFixed(1)+'%':'-')+'</td>'+
+          '<td class="right">'+pc(l.cMargin)+'</td>'+
+          '<td class="right">'+pc(l.aMargin)+'</td>'+
+          '<td class="right">'+pc(l.fMargin)+'</td>'+
           '<td class="right">'+deltaHtml(d)+'</td>'+
+          '<td class="right muted">'+(hasMm?mm(l.cMm)+' → '+mm(l.aMm)+' → '+mm(l.fMm):'-')+'</td>'+
           '<td>'+(l.author?esc(l.author):'<span class="muted">-</span>')+'</td>'+
           '<td>'+esc(l.reason||'-')+'</td></tr>';
       }).join('')+'</tbody></table></div>'
-      :'<div class="empty">기록이 없습니다. [수익률 저장]을 하면 그 시점의 두 수익률과 사유가 쌓입니다.</div>';
+      :'<div class="empty">기록이 없습니다. [수익률 저장]을 하면 그 시점의 3단계 수익률·MM 과 사유가 쌓입니다.</div>';
   }catch(e){box.innerHTML='<div class="empty">'+esc(e.message)+'</div>';}
 };
 
@@ -2560,7 +2706,7 @@ document.getElementById('btnReset').onclick=async()=>{
       resetStaff:document.getElementById('rsStaff').checked,
       resetRates:document.getElementById('rsRates').checked})});
     document.getElementById('rsConfirm').value='';
-    curId=null;cDraft=[];fDraft=[];
+    curId=null;cDraft=[];aDraft=[];fDraft=[];
     await refresh();loadProject();
     const d=r.deleted,k=r.kept;
     msg.className='msg ok';
@@ -2670,6 +2816,7 @@ async function refresh(){
 // ── 업데이트 히스토리 ─────────────────────────────────
 // 새 버전을 낼 때 APP_VERSION 을 올리고 이 목록 맨 위에 한 줄 추가한다.
 const CHANGELOG=[
+  ['v5.0','3단계 MM 관리','수익률 관리를 <b>3단계</b>로 확장 — ① <b>계약 시점</b>(계약 MM) ② <b>협의 시점</b>(고객사와 협의한 MM) ③ <b>확정 시점</b>(H9 실투입 MM). 단계마다 금액·투입 인력을 따로 넣고 수익률이 각각 산출되며, <b>계약→협의 / 협의→확정 / 계약→확정(총)</b> 변동을 단계별로 서술한다. 대시보드에 협의 수익률 열·막대, 이력에 3단계 수익률과 MM(계약→협의→확정)이 함께 쌓인다. CSV 에도 단계별 수익률·MM 이 나간다.'],
   ['v4.9','유형 표기 통합','유형(정산 형태)이 자유 입력이라 <b>월정산 / 월 정산</b> 처럼 갈리던 것을 정리 — 유형별 수익률은 <b>공백·대소문자를 무시해 한 묶음</b>으로 집계하고 가장 많이 쓰인 표기를 대표로 보여 준다(갈린 표기는 옆에 함께 표시). 유형 입력칸에 <b>이미 쓰인 유형 목록</b>을 제시해 새 변형이 생기지 않게 하고, <b>[표기 통일]</b> 버튼으로 기존 데이터의 표기를 대표 이름으로 맞출 수 있다.'],
   ['v4.8','두 시점 표 정렬','계약 시점과 확정 시점의 <b>투입 표가 20px 어긋나 있던 문제</b> 수정 — 실제 매출 아래 안내 문구가 확정 시점 카드만 높여 놓았다. 두 카드의 입력칸에 같은 공간을 예약해 <b>표 머리글·행·합계가 모두 같은 높이</b>에서 시작한다.'],
   ['v4.7','확정매출 합계 카드','대시보드 요약에 <b>확정 매출 합계</b> 카드를 계약액 합계 옆에 추가하고, 두 카드에 <b>전체 N건 / 완료 M건</b> 기준을 붙여 금액 차이가 바로 보이게 했다. 주소를 항상 <code>#dash</code> 로 시작하게 맞춰 [뒤로]가 대시보드로 정확히 돌아온다.'],

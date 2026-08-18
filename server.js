@@ -111,6 +111,8 @@ const mapProject = (r) => ({
   startYm: r.start_ym, endYm: r.end_ym,
   cAmount: num(r.c_amount), cCostOut: num(r.c_cost_out), cCostEtc: num(r.c_cost_etc),
   fRevenue: num(r.f_revenue), fCostOut: num(r.f_cost_out), fCostEtc: num(r.f_cost_etc),
+  aRevenue: num(r.a_revenue), aCostOut: num(r.a_cost_out), aCostEtc: num(r.a_cost_etc),
+  aAgreedAt: r.a_agreed_at || '', aReason: r.a_reason || '',
   fClosedAt: r.f_closed_at || '', reason: r.reason || '', memo: r.memo || '',
   updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : null,
 });
@@ -284,6 +286,7 @@ const projParams = (p) => [
   num(p.cAmount), num(p.cCostOut), num(p.cCostEtc),
   num(p.fRevenue), num(p.fCostOut), num(p.fCostEtc),
   ym(p.fClosedAt), txt(p.reason), txt(p.memo),
+  num(p.aRevenue), num(p.aCostOut), num(p.aCostEtc), ym(p.aAgreedAt), txt(p.aReason),
 ];
 
 app.post('/api/projects', async (req, res) => {
@@ -294,8 +297,10 @@ app.post('/api/projects', async (req, res) => {
       `INSERT INTO h9_projects
          (code, name, client, pm, updated_by, proj_type, status, start_ym, end_ym,
           c_amount, c_cost_out, c_cost_etc, f_revenue, f_cost_out, f_cost_etc,
-          f_closed_at, reason, memo)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
+          f_closed_at, reason, memo,
+          a_revenue, a_cost_out, a_cost_etc, a_agreed_at, a_reason)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,
+               $19,$20,$21,$22,$23) RETURNING *`,
       projParams(p)
     );
     res.json(mapProject(rows[0]));
@@ -316,10 +321,12 @@ app.put('/api/projects/:id', async (req, res) => {
               updated_by=COALESCE($5,updated_by), proj_type=$6, status=$7,
               start_ym=$8, end_ym=$9, c_amount=$10, c_cost_out=$11, c_cost_etc=$12,
               f_revenue=$13, f_cost_out=$14, f_cost_etc=$15, f_closed_at=$16,
-              reason=$17, memo=$18, updated_at=now()
-       WHERE id=$19
-         AND ($20::timestamptz IS NULL
-              OR date_trunc('milliseconds', updated_at) <= $20::timestamptz)
+              reason=$17, memo=$18,
+              a_revenue=$19, a_cost_out=$20, a_cost_etc=$21, a_agreed_at=$22, a_reason=$23,
+              updated_at=now()
+       WHERE id=$24
+         AND ($25::timestamptz IS NULL
+              OR date_trunc('milliseconds', updated_at) <= $25::timestamptz)
        RETURNING *`,
       [...projParams(p), req.params.id, base]
     );
@@ -355,7 +362,9 @@ app.get('/api/rows', async (req, res) => {
 
 app.put('/api/projects/:id/rows/:phase', async (req, res) => {
   const phase = String(req.params.phase).toUpperCase();
-  if (phase !== 'C' && phase !== 'F') return res.status(400).json({ error: 'phase 는 C 또는 F 입니다.' });
+  if (!['C', 'A', 'F'].includes(phase)) {
+    return res.status(400).json({ error: 'phase 는 C(계약) · A(협의) · F(확정) 입니다.' });
+  }
   const list = Array.isArray(req.body) ? req.body : [];
   const client = await pool.connect();
   try {
@@ -388,7 +397,12 @@ app.get('/api/projects/:id/logs', async (req, res) => {
     res.json(rows.map((r) => ({
       id: Number(r.id),
       cMargin: r.c_margin == null ? null : Number(r.c_margin),
+      aMargin: r.a_margin == null ? null : Number(r.a_margin),
       fMargin: r.f_margin == null ? null : Number(r.f_margin),
+      phase: r.phase || '', 
+      cMm: r.c_mm == null ? null : Number(r.c_mm),
+      aMm: r.a_mm == null ? null : Number(r.a_mm),
+      fMm: r.f_mm == null ? null : Number(r.f_mm),
       reason: r.reason || '', author: r.author || '', createdAt: r.created_at,
     })));
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -398,11 +412,17 @@ app.post('/api/projects/:id/logs', async (req, res) => {
   const b = req.body || {};
   try {
     await pool.query(
-      `INSERT INTO h9_logs (project_id, c_margin, f_margin, reason, author) VALUES ($1,$2,$3,$4,$5)`,
+      `INSERT INTO h9_logs (project_id, c_margin, a_margin, f_margin, reason, author,
+                            phase, c_mm, a_mm, f_mm)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
       [req.params.id,
        b.cMargin == null ? null : num(b.cMargin),
+       b.aMargin == null ? null : num(b.aMargin),
        b.fMargin == null ? null : num(b.fMargin),
-       txt(b.reason), txt(b.by)]);
+       txt(b.reason), txt(b.by), txt(b.phase),
+       b.cMm == null ? null : num(b.cMm),
+       b.aMm == null ? null : num(b.aMm),
+       b.fMm == null ? null : num(b.fMm)]);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

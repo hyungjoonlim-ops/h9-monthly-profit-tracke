@@ -63,6 +63,12 @@ create table if not exists h9_projects (
   updated_at      timestamptz not null default now()
 );
 alter table h9_projects add column if not exists code text;
+-- ② 협의 시점 (고객사와 협의해 수정한 단계)
+alter table h9_projects add column if not exists a_revenue  numeric not null default 0;
+alter table h9_projects add column if not exists a_cost_out numeric not null default 0;
+alter table h9_projects add column if not exists a_cost_etc numeric not null default 0;
+alter table h9_projects add column if not exists a_agreed_at text;   -- 협의 월 'YYYY-MM'
+alter table h9_projects add column if not exists a_reason   text;    -- 협의 사유
 alter table h9_projects add column if not exists pm text;          -- 담당 PM
 alter table h9_projects add column if not exists updated_by text;  -- 최종 입력자
 create index if not exists idx_h9_projects_code on h9_projects(code);
@@ -76,13 +82,14 @@ end $$;
 create index if not exists idx_h9_projects_type on h9_projects(proj_type);
 create index if not exists idx_h9_projects_status on h9_projects(status);
 
--- 투입 인력 — phase 로 계약/완료를 구분해 같은 표 구조로 관리
---   phase 'C' = 계약 시점 투입계획 (단가 스냅샷 고정)
---   phase 'F' = 완료 시점 실제 투입 (현재 단가 적용)
+-- 투입 인력 — phase 로 3단계를 구분해 같은 표 구조로 관리
+--   phase 'C' = ① 계약 시점 투입계획 (계약 MM, 단가 스냅샷 고정)
+--   phase 'A' = ② 협의 시점 (고객사와 협의해 수정한 MM)
+--   phase 'F' = ③ 확정 시점 (H9 실투입 MM)
 create table if not exists h9_rows (
   id         bigserial primary key,
   project_id bigint not null references h9_projects(id) on delete cascade,
-  phase      char(1) not null check (phase in ('C','F')),
+  phase      char(1) not null check (phase in ('C','A','F')),
   staff_id   bigint references h9_staff(id) on delete set null,  -- 인력 미정이면 null
   dept       text not null default '',     -- 소속 (인력 미정일 때 직접 입력)
   grade      integer not null default 1,
@@ -91,6 +98,13 @@ create table if not exists h9_rows (
   sort_order integer not null default 0
 );
 create index if not exists idx_h9_rows_project on h9_rows(project_id, phase, sort_order);
+-- 이미 만들어진 DB 는 제약이 ('C','F') 이므로 'A'(협의) 를 받도록 넓힌다
+do $$
+begin
+  alter table h9_rows drop constraint if exists h9_rows_phase_check;
+  alter table h9_rows add constraint h9_rows_phase_check check (phase in ('C','A','F'));
+exception when others then null;
+end $$;
 
 -- 수익률 변동 이력 — 저장할 때마다 두 시점 수익률과 사유를 남긴다
 create table if not exists h9_logs (
@@ -102,5 +116,10 @@ create table if not exists h9_logs (
   created_at  timestamptz not null default now()
 );
 alter table h9_logs add column if not exists author text;          -- 입력자
+alter table h9_logs add column if not exists a_margin numeric;     -- 그 시점의 협의 수익률(%)
+alter table h9_logs add column if not exists phase    text;        -- 어느 단계를 저장한 기록인지
+alter table h9_logs add column if not exists c_mm numeric;         -- 단계별 투입 MM 합계 (이력 비교용)
+alter table h9_logs add column if not exists a_mm numeric;
+alter table h9_logs add column if not exists f_mm numeric;
 create index if not exists idx_h9_logs_project on h9_logs(project_id, created_at desc);
 create index if not exists idx_h9_projects_pm on h9_projects(pm);

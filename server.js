@@ -1,11 +1,14 @@
 import 'dotenv/config';
 import express from 'express';
-import cookieSession from 'cookie-session';
-import crypto from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { pool } from './db.js';
+import {
+  sessionMiddleware, loadUser, requireAuth, authRoutes, accountRoutes,
+  ensureUsersTable, ensureBootstrapAdmin, SHARED_PUBLIC,
+} from './shared/auth.js';
+import { oidcRoutes, autoSsoGate } from './shared/oidc.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -14,79 +17,19 @@ const PUBLIC = join(__dirname, 'public');
 app.set('trust proxy', 1);
 app.use(express.json({ limit: '2mb' }));
 
-// ══ 인증 ═══════════════════════════════════════════════
-const APP_PASSWORD = process.env.APP_PASSWORD || '';
-let hasDbPassword = false;
-const authEnabled = () => APP_PASSWORD.length > 0 || hasDbPassword;
+// ══ 인증 — H9 통합 계정 (PMO 프로젝트 관리와 같은 계정·구글 SSO) ══
+// 로그인 계정·권한은 users 테이블 하나로 통합 관리되고, 계정 등록/제한은
+// 상단바 "계정 관리" 에서 어느 앱에서나 동일하게 동작합니다.
+app.use(sessionMiddleware());
+app.use(loadUser());
 
-function hashPassword(pw) {
-  const salt = crypto.randomBytes(16).toString('hex');
-  return `scrypt$${salt}$${crypto.scryptSync(pw, salt, 64).toString('hex')}`;
-}
-function verifyHash(pw, stored) {
-  const [scheme, salt, dk] = String(stored).split('$');
-  if (scheme !== 'scrypt' || !salt || !dk) return false;
-  const calc = crypto.scryptSync(pw, salt, 64);
-  const a = Buffer.from(dk, 'hex');
-  return a.length === calc.length && crypto.timingSafeEqual(a, calc);
-}
-async function getStoredHash() {
-  const { rows } = await pool.query("SELECT value FROM h9_settings WHERE key='password_hash'");
-  return rows[0] ? rows[0].value : null;
-}
-async function checkPassword(pw) {
-  const hash = await getStoredHash();
-  if (hash) return verifyHash(pw, hash);
-  if (APP_PASSWORD) return pw === APP_PASSWORD;
-  return true;
-}
+app.use(authRoutes('monthly'));
+app.use(oidcRoutes());                                   // 회사 계정 SSO
+app.use('/shared', express.static(SHARED_PUBLIC));
 
-app.use(cookieSession({
-  name: 'h9sess',
-  keys: [process.env.SESSION_SECRET || 'dev-insecure-secret-please-change'],
-  maxAge: 12 * 60 * 60 * 1000,
-  httpOnly: true, sameSite: 'lax',
-  secure: process.env.NODE_ENV === 'production',
-}));
-
-app.post('/login', async (req, res) => {
-  try {
-    if (await checkPassword((req.body || {}).password || '')) {
-      req.session.auth = true;
-      return res.json({ ok: true });
-    }
-  } catch (e) { return res.status(500).json({ error: e.message }); }
-  res.status(401).json({ error: '비밀번호가 올바르지 않습니다.' });
-});
-app.post('/logout', (req, res) => { req.session = null; res.json({ ok: true }); });
-app.get('/api/me', (req, res) =>
-  res.json({ authed: !!(req.session && req.session.auth), authEnabled: authEnabled() }));
-app.get('/login.html', (req, res) => res.sendFile(join(PUBLIC, 'login.html')));
-
-app.use((req, res, next) => {
-  if (!authEnabled() || (req.session && req.session.auth)) return next();
-  if (req.path.startsWith('/api')) return res.status(401).json({ error: 'unauthorized' });
-  return res.redirect('/login.html');
-});
-
-app.post('/api/change-password', async (req, res) => {
-  const { current, next } = req.body || {};
-  if (!next || String(next).length < 4) {
-    return res.status(400).json({ error: '새 비밀번호는 4자 이상이어야 합니다.' });
-  }
-  try {
-    if (!(await checkPassword(current || ''))) {
-      return res.status(401).json({ error: '현재 비밀번호가 올바르지 않습니다.' });
-    }
-    await pool.query(
-      `INSERT INTO h9_settings(key,value,updated_at) VALUES('password_hash',$1,now())
-       ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=now()`,
-      [hashPassword(String(next))]
-    );
-    hasDbPassword = true;
-    res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
+app.use(autoSsoGate());                                  // 미로그인 → 바로 회사 계정 인증
+app.use(requireAuth);                                    // 인증 게이트
+app.use(accountRoutes());                                // 본인 비밀번호 변경 + 계정 관리
 
 app.use(express.static(PUBLIC));
 
@@ -798,10 +741,15 @@ try {
   console.error('❌ DB 초기화 실패 — 접속 정보(PGHOST/PGUSER/PGPASSWORD)를 확인하세요:', e.message);
 }
 
-try { hasDbPassword = !!(await getStoredHash()); } catch (e) { /* 테이블 미생성 */ }
-if (!authEnabled()) console.warn('⚠️  비밀번호 미설정 — 누구나 접근 가능합니다.');
+// 통합 계정 테이블 확인 (PMO 앱과 공유). 계정이 하나도 없으면 관리자 1명을 만들어
+// 잠기지 않게 하고, 기존에 쓰던 앱 비밀번호를 그대로 승계합니다.
+try {
+  await ensureUsersTable();
+  await ensureBootstrapAdmin();
+} catch (e) {
+  console.error('❌ 통합 계정 초기화 실패:', e.message);
+}
 
 app.listen(PORT, () => {
-  console.log(`✅ H9 프로젝트 수익률 관리 → http://localhost:${PORT}`);
-  console.log(`   인증: ${authEnabled() ? '활성화됨' : '비활성화(경고)'}`);
+  console.log(`✅ H9 월 수익률 관리 → http://localhost:${PORT}`);
 });

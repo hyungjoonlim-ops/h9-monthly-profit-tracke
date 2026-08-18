@@ -250,6 +250,8 @@
     font-size:11px;color:var(--muted);line-height:1.6}
 </style>
 
+<script src="/shared/h9common.js" defer></script>
+
 <header>
   <h1>H9 프로젝트 수익률 관리</h1>
   <span class="sub">계약 시점 수익률 ↔ 확정 시점 수익률 · 변동 관리 <span class="muted" id="appVer"></span></span>
@@ -260,8 +262,7 @@
     <span class="muted">입력자</span>
     <input id="myName" placeholder="이름 입력" style="width:96px;padding:4px 7px;font-size:12px">
     <button class="ghost sm" id="btnReload">새로고침</button>
-    <button class="ghost sm" id="btnPw" style="display:none">비밀번호 변경</button>
-    <button class="ghost sm" id="btnOut" style="display:none">로그아웃</button></span>
+    </span>
 </header>
 
 <nav>
@@ -1012,16 +1013,7 @@
 </div>
 
 <!-- 모달: 비밀번호 변경 -->
-<div class="modal-bg" id="pwModal">
-  <form class="modal" id="pwForm" style="max-width:380px">
-    <h3>비밀번호 변경</h3>
-    <div class="field" style="margin-bottom:10px"><label>현재 비밀번호</label><input type="password" id="pwCur"></div>
-    <div class="field" style="margin-bottom:10px"><label>새 비밀번호 (4자 이상)</label><input type="password" id="pwNew"></div>
-    <div class="field"><label>새 비밀번호 확인</label><input type="password" id="pwNew2"></div>
-    <div class="msg" id="pwMsg"></div>
-    <div class="btns"><button type="button" class="ghost" id="pwCancel">취소</button><button type="submit">변경</button></div>
-  </form>
-</div>
+
 
 <script>
 const APP_VERSION='v5.0 · 3단계 MM 관리';
@@ -1105,13 +1097,20 @@ function parseGrade(t){
   const i=['초','중','고','특'].indexOf(v[0]);
   return i>=0?i:null;
 }
-// 입력자 이름 (브라우저에 저장) — 여러 PM이 같은 계정으로 접속하므로 누가 입력했는지 남긴다
+// 입력자 이름 — 통합 로그인 도입 후에는 로그인한 본인 이름으로 자동 설정됩니다.
+// (직접 고쳐 쓸 수도 있고, 고친 값은 브라우저에 남습니다.)
 const myName=()=>(localStorage.getItem('h9_user')||'').trim();
 function initMyName(){
   const el=document.getElementById('myName');
   el.value=myName();
   el.onchange=()=>{localStorage.setItem('h9_user',el.value.trim());renderDash();};
   el.onblur=el.onchange;
+  // 로그인 정보가 오면 비어 있는 경우 자동으로 채웁니다.
+  document.addEventListener('h9:ready',(ev)=>{
+    const u=ev.detail&&ev.detail.user;if(!u)return;
+    const who=(u.name||u.email||'').trim();
+    if(who&&!myName()){localStorage.setItem('h9_user',who);el.value=who;renderDash();}
+  });
 }
 // ── 삭제 확인 ─────────────────────────────────────────
 // 모든 삭제는 이 창을 거친다. 무엇을 지우는지 보여주고 '삭제' 를 눌러야 진행된다.
@@ -2786,27 +2785,6 @@ document.addEventListener('visibilitychange',async()=>{
   }
   try{await refresh();if(curId!=null)loadProject();}catch(e){}
 });
-document.getElementById('btnOut').onclick=async()=>{
-  try{await fetch('/logout',{method:'POST'});}catch(e){}
-  location.href='/login.html';
-};
-const pwModal=document.getElementById('pwModal');
-document.getElementById('btnPw').onclick=()=>{document.getElementById('pwMsg').textContent='';pwModal.classList.add('show');};
-document.getElementById('pwCancel').onclick=()=>pwModal.classList.remove('show');
-document.getElementById('pwForm').onsubmit=async e=>{
-  e.preventDefault();
-  const msg=document.getElementById('pwMsg');msg.className='msg';
-  const nw=document.getElementById('pwNew').value;
-  if(nw.length<4){msg.className='msg err';msg.textContent='새 비밀번호는 4자 이상이어야 합니다.';return;}
-  if(nw!==document.getElementById('pwNew2').value){msg.className='msg err';msg.textContent='새 비밀번호가 일치하지 않습니다.';return;}
-  try{
-    await api('/change-password',{method:'POST',body:JSON.stringify({
-      current:document.getElementById('pwCur').value,next:nw})});
-    msg.className='msg ok';msg.textContent='✓ 변경되었습니다.';
-    setTimeout(()=>pwModal.classList.remove('show'),1200);
-  }catch(err){msg.className='msg err';msg.textContent='✗ '+err.message;}
-};
-
 async function refresh(){
   [projects,staff,rates,allRows]=await Promise.all([
     api('/projects'),api('/staff'),api('/rates'),api('/rows')]);
@@ -2866,11 +2844,6 @@ function renderChangelog(){
   switchTab(tabFromHash());     // 주소에 #proj 등이 있으면 그 탭으로 시작
   renderChangelog();
   initMyName();
-  try{
-    const me=await fetch('/api/me').then(r=>r.json()).catch(()=>({}));
-    if(me.authEnabled){document.getElementById('btnOut').style.display='inline-block';
-      document.getElementById('btnPw').style.display='inline-block';}
-  }catch(e){}
   try{
     await refresh();
     if(tabFromHash()==='proj')loadProject();   // 주소가 #proj 면 프로젝트 화면까지 채운다

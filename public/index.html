@@ -232,6 +232,46 @@
   .mn .fs .fd{font-size:11px;color:var(--muted);line-height:1.5}
   .mn .fa{flex:0 0 22px;display:flex;align-items:center;justify-content:center;
     color:var(--muted);font-size:14px}
+  /* 3단계 도식 — 누가 정하는지 / 무엇이 달라지는지 / 무엇을 답하는지 */
+  .mn .s3{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin:6px 0 14px}
+  @media (min-width:980px){.mn .s3{grid-template-columns:repeat(3,minmax(0,1fr));gap:0}}
+  .mn .s3-col{position:relative;min-width:0;background:var(--panel2);
+    border:1px solid var(--line);border-radius:10px;padding:12px 13px 11px}
+  @media (min-width:980px){
+    .mn .s3-col{border-radius:0;border-left:none}
+    .mn .s3-col:first-child{border-radius:10px 0 0 10px;border-left:1px solid var(--line)}
+    .mn .s3-col:last-child{border-radius:0 10px 10px 0}
+    /* 칸 사이 화살표 */
+    .mn .s3-col+.s3-col::before{content:'›';position:absolute;left:-9px;top:50%;
+      transform:translateY(-50%);width:18px;height:18px;line-height:16px;text-align:center;
+      background:var(--panel);border:1px solid var(--line);border-radius:50%;
+      color:var(--muted);font-size:12px;z-index:1}
+  }
+  .mn .s3-col.c{border-top:3px solid var(--warn)}
+  .mn .s3-col.a{border-top:3px solid var(--accent)}
+  .mn .s3-col.f{border-top:3px solid var(--good)}
+  .mn .s3-h{font-size:13px;font-weight:800;color:var(--ink);margin-bottom:2px}
+  .mn .s3-col.c .s3-h{color:var(--warn)}
+  .mn .s3-col.a .s3-h{color:var(--accent)}
+  .mn .s3-col.f .s3-h{color:var(--good)}
+  .mn .s3-who{font-size:10.5px;font-weight:700;letter-spacing:.02em;color:var(--muted);
+    margin-bottom:9px;text-transform:none}
+  .mn .s3-r{border-top:1px dashed var(--line);padding:7px 0 0;margin-top:7px}
+  .mn .s3-r:first-of-type{border-top:none;padding-top:0;margin-top:0}
+  .mn .s3-k{font-size:10px;color:var(--accent);font-weight:700;letter-spacing:.03em}
+  .mn .s3-v{font-size:11.5px;color:var(--ink2);line-height:1.55;margin-top:1px}
+  .mn .s3-v b{color:var(--ink)}
+  .mn .s3-q{font-size:11.5px;color:var(--ink);line-height:1.5;margin-top:9px;
+    background:var(--panel);border-radius:7px;padding:7px 9px}
+  /* 단계 사이의 '차이'를 읽는 두 개의 눈금 */
+  .mn .s3-gap{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin:0 0 14px}
+  @media (min-width:780px){.mn .s3-gap{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  .mn .s3-gap>div{min-width:0;border:1px solid var(--line);border-radius:9px;
+    padding:10px 12px;background:var(--panel2)}
+  .mn .s3-gap .gt{font-size:12px;font-weight:800;color:var(--ink);margin-bottom:3px}
+  .mn .s3-gap .gd{font-size:11px;color:var(--muted);line-height:1.55}
+  .mn .s3-gap .g1{border-left:3px solid var(--accent)}
+  .mn .s3-gap .g2{border-left:3px solid var(--good)}
   /* 안내 박스 */
   .mn .box{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;
     background:var(--panel2);padding:11px 13px;margin:8px 0 12px}
@@ -287,7 +327,7 @@
 <!-- ═══════════ 대시보드 ═══════════ -->
 <section id="tab-dash">
   <div class="panel">
-    <h2>전체 요약 <span class="tag">확정 수익률·변동은 상태가 '완료'인 프로젝트만 집계 (진행중은 잠정치)</span></h2>
+    <h2>전체 요약 <span class="tag">실투입 수익률·변동은 상태가 '완료'인 프로젝트만 집계 (진행중은 잠정치)</span></h2>
     <div class="cards" id="dashCards"></div>
   </div>
 
@@ -330,7 +370,7 @@
           <th class="right">계약액</th><th class="right">계약 수익률</th>
           <th class="right">협의 수익률</th>
           <th class="right">확정 매출</th>
-          <th class="right" title="③ 리소스 실투입 단계의 결과 수익률">확정 수익률</th>
+          <th class="right" title="③ 리소스 실투입 단계의 결과 수익률">실투입 수익률</th>
           <th class="right">변동</th><th>사유</th>
         </tr></thead>
         <tbody id="dashBody"></tbody>
@@ -338,13 +378,13 @@
       </table>
     </div>
     <div class="hint" id="footNote" style="margin-bottom:6px"></div>
-    <div class="hint">목록은 <b>담당 PM 기준으로 묶여</b> 정렬되고(같은 PM 끼리 모임, 그 안에서는 프로젝트명 순), 위 <b>담당 PM</b> 셀렉트로 한 사람만 골라 볼 수 있습니다. 행을 클릭하면 그 프로젝트의 수익률 입력 화면으로 이동합니다. 계약 수익률은 계약 시점 투입계획으로 산출한 기준값이고, <b>확정 수익률</b>은 <b>③ 리소스 실투입</b> 단계의 결과값(실제 투입·매출)입니다.
+    <div class="hint">목록은 <b>담당 PM 기준으로 묶여</b> 정렬되고(같은 PM 끼리 모임, 그 안에서는 프로젝트명 순), 위 <b>담당 PM</b> 셀렉트로 한 사람만 골라 볼 수 있습니다. 행을 클릭하면 그 프로젝트의 수익률 입력 화면으로 이동합니다. 계약 수익률은 계약 시점 투입계획으로 산출한 기준값이고, <b>실투입 수익률</b>은 <b>③ 리소스 실투입</b> 단계의 결과값(실제 투입·매출)입니다.
       <b>상태가 '진행중'인 프로젝트의 변동은 아직 확정이 아니므로 <span class="prov">잠정</span> 으로 표시되고 합계·요약에서 제외됩니다.</b> 최종 변동을 반영하려면 상태를 '완료'로 바꿔 주세요.</div>
   </div>
 
   <div class="panel">
     <div class="toolbar">
-      <h2>유형별 수익률 <span class="tag">정산 형태 기준 · 확정 수익률과 변동은 완료 프로젝트만 집계</span></h2>
+      <h2>유형별 수익률 <span class="tag">정산 형태 기준 · 실투입 수익률과 변동은 완료 프로젝트만 집계</span></h2>
       <div class="sp"><button class="ghost sm" id="btnTypeFix" style="display:none">표기 통일</button></div>
     </div>
     <div class="tw">
@@ -352,7 +392,7 @@
         <thead><tr>
           <th>유형</th><th class="right">건수</th><th class="right">진행중 / 완료</th>
           <th class="right">계약액 합계</th>
-          <th class="right">계약 수익률</th><th class="right">확정 수익률</th><th class="right">변동</th>
+          <th class="right">계약 수익률</th><th class="right">실투입 수익률</th><th class="right">변동</th>
         </tr></thead>
         <tbody id="typeBody"></tbody>
       </table>
@@ -691,7 +731,120 @@
         <div class="fd">대시보드 최종 집계에 반영</div></div>
     </div>
 
-    <h3><span class="n">2</span>단계별 상세</h3>
+    <h3><span class="n">2</span>왜 수익률을 3단계로 나누나</h3>
+    <p>한 프로젝트의 수익률을 <b>숫자 하나</b>로만 두면 "왜 남았는지 · 왜 빠졌는지"를 설명할 수 없습니다.
+      그래서 <b>누가 정하는가</b>를 기준으로 세 번 끊어 기록합니다.
+      아래 도식의 세 칸은 <b>서로 다른 판단 주체</b>를 뜻합니다.</p>
+
+    <div class="s3">
+      <div class="s3-col c">
+        <div class="s3-h">① 계약 시점</div>
+        <div class="s3-who">누가 정하나 — 계약서 (고객사 ↔ H9)</div>
+        <div class="s3-r"><div class="s3-k">넣는 값</div>
+          <div class="s3-v">계약액 · 계약서에 적힌 <b>등급 × MM</b></div></div>
+        <div class="s3-r"><div class="s3-k">단가 기준</div>
+          <div class="s3-v"><b>계약 당시 단가로 고정</b> (스냅샷)</div></div>
+        <div class="s3-r"><div class="s3-k">언제 바뀌나</div>
+          <div class="s3-v">바뀌지 않습니다 — <b>기준선</b></div></div>
+        <div class="s3-q">답하는 질문<br><b>"이 계약은 원래 얼마나 남기는 계약이었나?"</b></div>
+      </div>
+      <div class="s3-col a">
+        <div class="s3-h">② 협의 시점</div>
+        <div class="s3-who">누가 정하나 — 고객사와의 <b>합의</b> (대외)</div>
+        <div class="s3-r"><div class="s3-k">넣는 값</div>
+          <div class="s3-v">협의로 조정된 <b>등급 × MM</b> · 협의 사유</div></div>
+        <div class="s3-r"><div class="s3-k">단가 기준</div>
+          <div class="s3-v">현재 단가표</div></div>
+        <div class="s3-r"><div class="s3-k">언제 바뀌나</div>
+          <div class="s3-v">과업 범위·요구사항이 <b>공식적으로</b> 달라질 때</div></div>
+        <div class="s3-q">답하는 질문<br><b>"고객사와 합의해서 얼마가 달라졌나?"</b></div>
+      </div>
+      <div class="s3-col f">
+        <div class="s3-h">③ 리소스 실투입</div>
+        <div class="s3-who">누가 정하나 — <b>각 실의 리소스 상황</b> (내부)</div>
+        <div class="s3-r"><div class="s3-k">넣는 값</div>
+          <div class="s3-v">그때 <b>실제로 투입 가능한 사람</b>의 등급 × MM</div></div>
+        <div class="s3-r"><div class="s3-k">단가 기준</div>
+          <div class="s3-v">현재 단가표</div></div>
+        <div class="s3-r"><div class="s3-k">언제 바뀌나</div>
+          <div class="s3-v">가용 인력이 달라질 때 — <b>고객사와 무관</b></div></div>
+        <div class="s3-q">답하는 질문<br><b>"우리 인력을 어떻게 넣어서 얼마가 달라졌나?"</b></div>
+      </div>
+    </div>
+
+    <p>그래서 <b>단계 사이의 차이</b>가 그 자체로 의미를 갖습니다. 변동 분석표가 이 두 눈금을 따로 보여 줍니다.</p>
+    <div class="s3-gap">
+      <div class="g1"><div class="gt">② − ① &nbsp;=&nbsp; 대외 요인 (고객사 협의분)</div>
+        <div class="gd">과업이 늘었는데 금액은 그대로인지, 범위를 줄여 준 만큼 원가도 줄었는지.
+          <b>영업·협상</b> 쪽에서 볼 숫자입니다.</div></div>
+      <div class="g2"><div class="gt">③ − ① &nbsp;=&nbsp; 총 변동 &nbsp;/&nbsp; ③ − ② &nbsp;=&nbsp; 내부 요인</div>
+        <div class="gd">계약 기준보다 높은 등급을 넣었는지, MM 이 늘어났는지.
+          <b>리소스 운영·가동율</b> 쪽에서 볼 숫자입니다.</div></div>
+    </div>
+
+    <div class="box">
+      <div class="bt">숫자로 보면 이렇습니다</div>
+      <div class="tw"><table>
+        <thead><tr><th style="width:150px">단계</th><th class="right" style="width:120px">매출</th>
+          <th class="right" style="width:90px">MM</th><th class="right" style="width:130px">인건비</th>
+          <th class="right" style="width:90px">수익률</th><th>무슨 일이 있었나</th></tr></thead>
+        <tbody>
+          <tr><td><b>① 계약</b></td><td class="right">300,000,000</td><td class="right">10.00</td>
+            <td class="right">67,000,000</td><td class="right"><b>77.7%</b></td>
+            <td>계약서 기준 — 고급 10MM</td></tr>
+          <tr><td><b>② 협의</b></td><td class="right">300,000,000</td><td class="right">8.00</td>
+            <td class="right">53,600,000</td><td class="right"><b>82.1%</b></td>
+            <td>과업 축소 합의로 고급 2MM 감축 → <b>+4.5%p</b> (대외 요인)</td></tr>
+          <tr><td><b>③ 리소스 실투입</b></td><td class="right">300,000,000</td><td class="right">9.00</td>
+            <td class="right">61,000,000</td><td class="right"><b>79.7%</b></td>
+            <td>고급이 8MM 밖에 안 빠져서 <b>특급 1MM 을 더 붙임</b> → <b>−2.5%p</b> (내부 요인)</td></tr>
+        </tbody>
+      </table></div>
+      <p style="margin-top:8px" class="muted">단가 예시 — PM 고급 6,700,000 / PM 특급 7,400,000 원·MM.
+        ① 6,700,000×10 = 67,000,000 · ② 6,700,000×8 = 53,600,000 ·
+        ③ 6,700,000×8 + 7,400,000×1 = 61,000,000</p>
+      <p style="margin-top:10px">총 변동은 <b>79.7% − 77.7% = +2.0%p</b> 입니다.
+        <b>한 숫자만 보면 "계약보다 2%p 좋아졌다"</b> 로 끝나지만, 3단계로 끊으면
+        <b>협의로 +4.5%p 벌고 내부 투입에서 −2.5%p 잃었다</b> 는 것이 드러납니다.
+        고칠 곳이 <b>협상이 아니라 인력 배치</b>라는 판단이 여기서 나옵니다.</p>
+    </div>
+
+    <p><b>이렇게 나눈 이유를 정리하면 네 가지입니다.</b></p>
+    <div class="tw">
+      <table>
+        <thead><tr><th style="width:170px">이유</th><th>내용</th></tr></thead>
+        <tbody>
+          <tr><td><b>원인을 분리한다</b></td>
+            <td>수익률이 빠졌을 때 <b>고객사와의 협의 때문인지, 우리 인력 배치 때문인지</b>를
+              숫자로 구분합니다. 한 단계만 관리하면 원인을 사후에 되짚을 수 없습니다.</td></tr>
+          <tr><td><b>책임 주체가 다르다</b></td>
+            <td>②는 <b>대외(영업·협상)</b>, ③은 <b>내부(각 실 리소스 운영)</b> 의 결과입니다.
+              섞어 놓으면 어느 쪽을 개선해야 하는지 판단할 수 없습니다.</td></tr>
+          <tr><td><b>기준선이 흔들리면<br>변동을 못 잰다</b></td>
+            <td>① 은 <b>계약 당시 단가로 고정</b>됩니다. 그래서 나중에 단가표를 올려도
+              "계약 기준 수익률"은 그대로 남고, 변동을 항상 같은 자리에서 잴 수 있습니다.
+              ②③ 은 현재 단가를 쓰므로 지금 시점의 실제 원가를 반영합니다.</td></tr>
+          <tr><td><b>내부 리소스 가동율</b></td>
+            <td>③ 은 <b>각 실에 실제로 사람이 있었는지</b>를 남기는 기록이기도 합니다.
+              계약은 고급 2MM 인데 실제로는 특급 1MM + 중급 2MM 였다는 사실이 쌓이면,
+              어느 실에 어느 등급이 부족한지가 보입니다.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="box warn">
+      <div class="bt">세 단계 모두 채워야 하는 것은 아닙니다</div>
+      <p><b>② 협의는 없으면 비워 두세요</b> — 고객사와 조정한 일이 없는 프로젝트가 대부분입니다.
+        비어 있으면 협의 수익률이 <code>-</code> 로 남고 <b>① 계약 → ③ 리소스 실투입</b> 만 비교합니다.
+        ③ 도 진행 중에는 그때까지의 투입만 넣어 두면 되고, 대시보드에서
+        <span class="prov">잠정</span> 으로 표시됩니다.</p>
+      <p><b>계약금액(매출)은 세 단계가 같습니다.</b> 등급이 올라가거나 MM 이 늘어도 고객사에서
+        더 받는 것이 아니므로 위 예시처럼 매출은 300,000,000 그대로입니다 —
+        즉 <b>수익률 변동은 사실상 투입 인력의 등급·MM 에서만 나옵니다</b>.
+        감액 정산처럼 실제로 받는 금액이 달라진 경우에만 ②③ 의 매출을 다르게 입력하세요.</p>
+    </div>
+
+    <h3><span class="n">3</span>단계별 상세</h3>
     <div class="tw">
       <table>
         <thead><tr><th style="width:52px">단계</th><th style="width:150px">어디서</th>
@@ -721,12 +874,12 @@
             <td>이 버튼이 <b>3단계 투입 행과 이력까지 함께 저장</b>합니다. 이력에는 그 시점의 <b>세 단계 수익률과 MM(계약 → 협의 → 실투입)</b> 이 함께 쌓입니다. 위쪽 <span class="btn-ref">프로젝트 정보 저장</span> 은 이름·PM·상태 같은 <b>정보만</b> 저장합니다 — 둘을 구분해서 누르세요.</td></tr>
           <tr><td><b>8</b></td><td>프로젝트 수익률 → 대시보드</td>
             <td>정산이 끝나면 <b>상태</b>를 <code>완료</code> 로 바꾸고 저장합니다. 대시보드에서 요약·그래프·표로 확인합니다.</td>
-            <td><b>상태가 진행중이면 최종 집계에 들어가지 않습니다.</b> 완료로 바꿔야 확정 수익률과 변동에 반영됩니다.</td></tr>
+            <td><b>상태가 진행중이면 최종 집계에 들어가지 않습니다.</b> 완료로 바꿔야 실투입 수익률과 변동에 반영됩니다.</td></tr>
         </tbody>
       </table>
     </div>
 
-    <h3><span class="n">3</span>계산 규칙</h3>
+    <h3><span class="n">4</span>계산 규칙</h3>
     <div class="tw">
       <table>
         <thead><tr><th style="width:170px">항목</th><th>산식</th></tr></thead>
@@ -734,7 +887,7 @@
           <tr><td><b>계약 시점 수익률</b></td><td>( 계약액 − ( Σ 계약MM × <b>저장된 단가</b> + 계약 외주비 + 계약 부대비 ) ) ÷ 계약액 × 100</td></tr>
           <tr><td><b>협의 시점 수익률</b></td><td>( 협의 매출 − ( Σ 협의MM × 단가 + 협의 외주비 + 협의 부대비 ) ) ÷ 협의 매출 × 100<br>
             <span class="muted">협의 매출이 0이면 계약액을 씁니다</span></td></tr>
-          <tr><td><b>③ 리소스 실투입 수익률</b><br><span class="muted">= 확정 수익률</span></td><td>( 실제 매출 − ( Σ 실투입MM × 단가 + 실제 외주비 + 실제 부대비 ) ) ÷ 실제 매출 × 100</td></tr>
+          <tr><td><b>③ 리소스 실투입 수익률</b><br><span class="muted">= 대시보드의 실투입 수익률</span></td><td>( 실제 매출 − ( Σ 실투입MM × 단가 + 실제 외주비 + 실제 부대비 ) ) ÷ 실제 매출 × 100</td></tr>
           <tr><td><b>수익률 변동</b></td><td><b>총 변동</b> = 실투입 − 계약 &nbsp;(단위 <code>%p</code>)<br>
             단계별로 <b>협의 − 계약</b>(고객사 협의분), <b>실투입 − 협의</b>(내부 리소스 사정) 도 각각 보여 줍니다</td></tr>
           <tr><td><b>인건비</b></td><td>Σ ( 투입 MM × 단가/MM ) &nbsp;— 단가는 소속 × 등급으로 단가표에서 찾습니다</td></tr>
@@ -757,12 +910,12 @@
     </div>
     <div class="box">
       <div class="bt">변동은 같은 프로젝트끼리만 비교합니다</div>
-      <p>대시보드의 <b>확정 수익률</b>과 <b>변동</b>은 상태가 <code>완료</code> 이고 실적이 입력된 프로젝트만 모아 계산하고,
+      <p>대시보드의 <b>실투입 수익률</b>과 <b>변동</b>은 상태가 <code>완료</code> 이고 실적이 입력된 프로젝트만 모아 계산하고,
       그 변동은 <b>바로 그 프로젝트들의 계약 기준 수익률</b>과 비교합니다. 전체 평균과 섞지 않기 때문에
       "계약 66.7% → 실투입 57.1%, 변동 −9.5%p" 처럼 서로 짝이 맞는 숫자가 나옵니다.</p>
     </div>
 
-    <h3><span class="n">4</span>반드시 알아야 할 유의사항</h3>
+    <h3><span class="n">5</span>반드시 알아야 할 유의사항</h3>
     <div class="two-col">
       <div>
         <div class="box warn"><div class="bt">① 저장 버튼이 두 개입니다</div>
@@ -780,7 +933,7 @@
         <div class="box"><div class="bt">③ 계약 시점 단가는 고정됩니다</div>
           <p>계약 시점 투입을 저장하면 <b>그 시점의 단가가 그대로 보관</b>됩니다. 나중에 단가표를 올려도
           과거 계약 기준은 바뀌지 않습니다. 반대로 <b>협의·리소스 실투입</b> 단계는 현재 단가를 따르므로,
-          단가표를 수정하면 확정 수익률이 달라질 수 있습니다.</p>
+          단가표를 수정하면 실투입 수익률이 달라질 수 있습니다.</p>
         </div>
         <div class="box good"><div class="bt">④ 저장 안 한 입력은 보호됩니다</div>
           <p>입력 중 변경이 있으면 저장바에 <b>● 저장 안 된 변경 있음</b>이 뜹니다. 이 상태에서는
@@ -813,7 +966,7 @@
       </div>
     </div>
 
-    <h3><span class="n">5</span>일괄 등록 — 시트 형식</h3>
+    <h3><span class="n">6</span>일괄 등록 — 시트 형식</h3>
     <p>세 가지 방법을 지원합니다. <b>엑셀 파일 업로드</b>(권한 설정 불필요, 가장 확실) · <b>구글시트 링크</b>(현재 탭 / 모든 탭) · <b>붙여넣기</b>.
     열 <b>순서는 상관없고</b>, 제목 행이 위에 몇 줄 있어도 머리글을 찾아냅니다.</p>
     <div class="tw">
@@ -843,7 +996,7 @@
     <b>파일이 구글시트가 아니라 업로드된 <code>.xlsx</code></b> 인 경우입니다 — 이때는
     구글시트로 변환하거나 그냥 <b>엑셀 파일 업로드</b>를 쓰세요.</p>
 
-    <h3><span class="n">6</span>소속 이름 자동 해석</h3>
+    <h3><span class="n">7</span>소속 이름 자동 해석</h3>
     <p>시트의 파트·소속 표기가 단가표와 달라도 자동으로 맞춰 줍니다.</p>
     <div class="tw">
       <table>
@@ -861,7 +1014,7 @@
       </table>
     </div>
 
-    <h3><span class="n">7</span>자주 겪는 문제</h3>
+    <h3><span class="n">8</span>자주 겪는 문제</h3>
     <div class="tw">
       <table>
         <thead><tr><th style="width:300px">증상</th><th>원인과 해결</th></tr></thead>
@@ -879,9 +1032,9 @@
               <b>완료 + 실적 입력된 건만</b>. 차액은 대부분 <b>아직 진행중인 계약</b>입니다.
               표 아래 설명에 차액이 어디서 나오는지(진행중·보류·실적 미입력 건수) 표시되며,
               같은 기준으로 보려면 상태 필터를 <code>완료</code> 로 바꾸세요.</td></tr>
-          <tr><td>확정 수익률이 <b>-</b> 로만 보인다</td>
+          <tr><td>실투입 수익률이 <b>-</b> 로만 보인다</td>
             <td><b>③ 리소스 실투입</b> 단계에 아무것도 입력되지 않은 상태입니다. 실제 매출이나 실제 투입 중 하나라도 넣으면 계산됩니다.</td></tr>
-          <tr><td>대시보드 <b>확정 수익률</b>에 내 프로젝트가 안 잡힌다</td>
+          <tr><td>대시보드 <b>실투입 수익률</b>에 내 프로젝트가 안 잡힌다</td>
             <td>상태가 <code>진행중</code> 이면 집계에서 빠집니다. <code>완료</code> 로 바꿔 주세요.</td></tr>
           <tr><td>저장했더니 <b>"다른 사용자가 먼저 저장했습니다"</b></td>
             <td>같은 프로젝트를 다른 사람이 먼저 저장했습니다. 입력값을 복사해 두고
@@ -902,7 +1055,7 @@
       </table>
     </div>
 
-    <h3><span class="n">8</span>용어</h3>
+    <h3><span class="n">9</span>용어</h3>
     <div class="tw">
       <table>
         <thead><tr><th style="width:150px">용어</th><th>뜻</th></tr></thead>
@@ -914,7 +1067,7 @@
           <tr><td><b>② 협의 시점</b></td><td><b>고객사와 협의해 MM 을 조정한 단계</b>. 대외적으로 합의된 기준입니다 — 내부 사정과는 구분됩니다.</td></tr>
           <tr><td><b>③ 리소스 실투입</b></td><td><b>각 실의 리소스 상황(가용 인력)에 맞춰 실제로 투입한 MM</b>.
             고객사 협의나 계약 기준과 <b>별개</b>이며, <b>내부 리소스 가동율</b>을 보기 위한 단계입니다.
-            대시보드의 <b>확정 매출 · 확정 수익률</b>이 이 단계의 결과입니다 (같은 단계의 다른 이름).</td></tr>
+            대시보드 목록의 <b>실투입 수익률</b>이 이 단계의 결과값이고, <b>확정 매출</b>도 이 단계의 매출입니다.</td></tr>
           <tr><td><b>상태 <code>완료</code></b></td><td>프로젝트 진행 상태값(진행중 / 완료 / 보류). <b>확정</b>은 금액·수익률 이름이고, <b>완료</b>는 상태 이름입니다 — 서로 다릅니다.</td></tr>
           <tr><td><span class="prov">잠정</span></td><td>상태가 진행중이라 아직 확정이 아닌 변동값. 합계에서 제외됩니다.</td></tr>
           <tr><td><b>유형 (정산 형태)</b></td><td>월 정산, 30/30/40 등 대금 정산 방식. 대시보드에서 유형별로 묶어 봅니다.</td></tr>
@@ -922,7 +1075,7 @@
       </table>
     </div>
 
-    <h3><span class="n">9</span>문의</h3>
+    <h3><span class="n">10</span>문의</h3>
     <div class="box good">
       <div class="bt">개발 수정 및 오류 문의 — PMO 그룹 임형준</div>
       <p><a href="mailto:hyungjoon.lim@hnine.com" style="color:var(--accent)">hyungjoon.lim@hnine.com</a>
@@ -1073,7 +1226,7 @@
 
 
 <script>
-const APP_VERSION='v5.3 · PMO 연계';
+const APP_VERSION='v5.5 · 3단계 도식';
 const GRADES=['초급','중급','고급','특급'];
 let projects=[],staff=[],rates={},allRows=[];
 let curId=null,cDraft=[],aDraft=[],fDraft=[];
@@ -1271,7 +1424,7 @@ function syncRevHint(){
 }
 
 // ── 대시보드 ──────────────────────────────────────────
-// 진행중 프로젝트는 아직 최종 실적이 아니므로 확정 수익률·변동 집계에서 제외한다.
+// 진행중 프로젝트는 아직 최종 실적이 아니므로 실투입 수익률·변동 집계에서 제외한다.
 // (화면에는 '잠정' 으로만 보여주고 요약·합계 수치에는 넣지 않는다)
 const isDone=p=>p.status==='완료';
 const pctOf=(rev,cost)=>rev>0?(rev-cost)/rev*100:null;
@@ -1354,7 +1507,7 @@ function renderDash(){
         :'완료 프로젝트의 실적이 입력되면 표시됩니다')+'</div></div>'+
     '<div class="card"><div class="lbl">계약 기준 수익률</div><div class="val '+cls(a.cM)+'">'+(a.cM!=null?a.cM.toFixed(1)+'%':'-')+'</div>'+
       '<div class="foot">전 프로젝트 가중 평균</div></div>'+
-    '<div class="card hl"><div class="lbl">확정 수익률 <span class="tag">완료 '+a.doneWith+'건</span></div>'+
+    '<div class="card hl"><div class="lbl">실투입 수익률 <span class="tag">완료 '+a.doneWith+'건</span></div>'+
       '<div class="val '+cls(a.fM)+'">'+(a.fM!=null?a.fM.toFixed(1)+'%':'-')+'</div>'+
       '<div class="foot">'+(a.delta!=null
         ?'같은 '+a.pairs+'건의 계약 기준 '+a.bM.toFixed(1)+'% 대비 '+deltaHtml(a.delta)
@@ -1582,7 +1735,7 @@ document.getElementById('dashMine').onchange=renderDash;
 document.getElementById('dashPm').onchange=renderDash;
 document.getElementById('btnCsv').onclick=()=>{
   const rows=[['번호','프로젝트','담당PM','클라이언트','유형','상태','계약액',
-    '계약수익률(%)','협의수익률(%)','확정수익률(%)','확정매출',
+    '계약수익률(%)','협의수익률(%)','실투입수익률(%)','확정매출',
     '계약MM','협의MM','실투입MM','변동(%p)','변동확정','협의사유','사유']];
   projects.forEach(p=>{
     const c=contractStats(p),ag=agreedStats(p),fs=finalStats(p);
@@ -2883,6 +3036,8 @@ async function refresh(){
 // ── 업데이트 히스토리 ─────────────────────────────────
 // 새 버전을 낼 때 APP_VERSION 을 올리고 이 목록 맨 위에 한 줄 추가한다.
 const CHANGELOG=[
+  ['v5.5','3단계 도식','매뉴얼에 <b>「왜 수익률을 3단계로 나누나」</b> 절을 새로 넣었다(2번). 세 단계를 <b>누가 정하는가</b>(계약서 / 고객사 합의 / 각 실의 리소스 상황) 기준으로 나란히 놓은 도식과, 각 단계가 <b>답하는 질문</b>·<b>단가 기준</b>·<b>언제 바뀌나</b> 를 함께 표시한다. 단계 사이의 차이가 뜻하는 것도 두 눈금으로 갈랐다 — <b>② − ① = 대외 요인(영업·협상)</b>, <b>③ − ② = 내부 요인(리소스 운영·가동율)</b>. 숫자 예시(77.7% → 82.1% → 79.7%)로 <b>한 숫자만 보면 +2.0%p 로 끝나지만 3단계로 끊으면 협의로 +4.5%p 벌고 내부 투입에서 −2.5%p 잃었다</b> 는 것이 드러남을 보여 준다. 나눈 이유 4가지(원인 분리 · 책임 주체 · 기준선 고정 · 내부 리소스 가동율)와 "세 단계를 모두 채울 필요는 없다" 안내도 함께 넣었다. 이후 절 번호가 하나씩 밀렸다(3~10).'],
+  ['v5.4','실투입 수익률','대시보드의 <b>확정 수익률 → 실투입 수익률</b> 로 명칭을 바꿨다 — 프로젝트별 수익률 목록의 열, 전체 요약 카드, 유형별 수익률 표, 매뉴얼·FAQ·용어 설명이 모두 <b>③ 리소스 실투입</b> 단계 이름과 같아졌다. CSV 머리글도 <code>확정수익률(%)</code> → <code>실투입수익률(%)</code> 로 바뀐다. <b>확정 매출</b> 은 이름을 그대로 두었다(그 단계의 매출액이라는 뜻).'],
   ['v5.3','PMO 연계','<b>PMO 프로젝트 관리</b>(H9 Works) 와의 연계를 정리했다 — 전사 수익률은 <b>⓿ 견적(PMO 견적서) → ① 계약 → ② 협의 → ③ 리소스 실투입</b> 네 단계이고, 이 앱이 ①②③ 을 담당한다. PMO 프로젝트의 <b>수익률</b> 탭에서 [월 수익률 관리에 등록·연결] 을 누르면 같은 프로젝트로 묶이고, <b>① 계약 투입</b>(견적서의 파트·등급·MM·원가) 과 <b>③ 리소스 실투입</b>(PMO 투입인력) 의 첫 줄이 자동으로 채워진다(이미 입력된 단계는 건드리지 않는다). 연결된 프로젝트에는 저장줄에 <b>[PMO 프로젝트 관리에서 열기 ↗]</b> 링크가 생기고, 반대로 PMO 에서 넘어오는 <code>#proj/{id}</code> 딥링크도 받는다. 또한 <b>견적서 원가가 이 앱의 단가표를 단일 기준으로 쓰도록</b> 바로잡았다 — 전에는 PMO 리포의 별도 표를 읽어서, 이 앱에서 단가를 고쳐도 견적 수익률이 따라오지 않았다. 매뉴얼 앞에 전사 4단계와 두 앱의 데이터 분담 표를 넣었다.'],
   ['v5.2','3단 막대그래프','대시보드의 프로젝트별 수익률 변동 그래프를 <b>3단(① 계약 · ② 협의 · ③ 리소스 실투입)</b> 으로 맞추고 영역을 넓혔다 — 막대 폭 14→18px, 프로젝트 한 칸 96→122px, 그래프 높이 132→156px. 색은 <b>① 계약 = 주황(기준) · ② 협의 = 파랑(고객사 협의) · ③ 리소스 실투입 = 녹색(내부 결과)</b> 으로 정리했고, 범례와 안내 문구에도 같은 색·순서를 표시한다.'],
   ['v5.1','리소스 실투입','③ 단계 명칭을 <b>확정 시점 → 리소스 실투입</b> 으로 바꾸고 뜻을 분명히 했다 — 이 단계는 <b>고객사와 협의한 값이 아니라</b>, <b>각 실의 리소스 상황(가용 인력)에 맞춰 내부적으로 투입한 실제 MM</b> 이다. 계약서의 등급·MM 대신 그때 투입 가능한 사람을 넣어 <b>내부 리소스 가동율</b>을 보는 값이므로 <b>계약 기준·고객사 협의와는 별개</b>다. 세 카드에 각 단계가 무엇을 뜻하는지 한 줄 설명을 넣고(표 정렬은 그대로 유지), 변동 상세·이력·대시보드 안내 문구를 <b>협의 = 대외 기준 / 실투입 = 내부 사정</b> 으로 통일했다. 대시보드의 <b>확정 매출·확정 수익률</b> 이름은 그대로 두고, 그것이 ③ 리소스 실투입 단계의 결과값임을 도움말과 용어표에 명시했다.'],

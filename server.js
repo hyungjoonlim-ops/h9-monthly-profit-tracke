@@ -222,6 +222,34 @@ app.get('/api/projects', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// PMO 프로젝트 관리와의 연결 — 같은 DB 의 pmo_projects.h9_project_id 를 읽습니다.
+// 그 앱이 아직 없을 수도 있으므로 테이블이 없으면 빈 목록을 돌려줍니다.
+// 프로젝트 화면에서 [PMO 프로젝트 관리에서 열기] 링크를 띄우는 데 씁니다.
+// 있으면 60초, 없으면 5초만 기억합니다 — PMO 앱이 나중에 배포돼도 금방 인식됩니다.
+let hasPmo = null, hasPmoAt = 0;
+async function pmoAvailable() {
+  if (hasPmo !== null && Date.now() - hasPmoAt < (hasPmo ? 60000 : 5000)) return hasPmo;
+  try {
+    const { rows } = await pool.query("SELECT to_regclass('public.pmo_projects') AS t");
+    hasPmo = !!rows[0].t;
+  } catch { hasPmo = false; }
+  hasPmoAt = Date.now();
+  return hasPmo;
+}
+app.get('/api/pmo-links', async (req, res) => {
+  try {
+    if (!(await pmoAvailable())) return res.json([]);
+    const { rows } = await pool.query(
+      `SELECT h9_project_id, id, name, stage FROM pmo_projects
+        WHERE h9_project_id IS NOT NULL AND deleted_at IS NULL`
+    );
+    res.json(rows.map((r) => ({
+      projectId: Number(r.h9_project_id), pmoId: Number(r.id),
+      pmoName: r.name, stage: r.stage,
+    })));
+  } catch { res.json([]); }
+});
+
 const projParams = (p) => [
   txt(p.code), txt(p.name), txt(p.client), txt(p.pm), txt(p.by),
   txt(p.projType), txt(p.status) || '진행중',

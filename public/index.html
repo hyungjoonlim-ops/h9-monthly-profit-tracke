@@ -101,6 +101,10 @@
   .mg:hover{background:var(--panel2)}
   .mg .mval{font-size:10.5px;color:var(--muted);white-space:nowrap;height:14px;line-height:14px}
   .mg .mval{font-size:10px}
+  /* PMO 프로젝트 관리로 넘어가는 링크 (연결된 프로젝트에만 보인다) */
+  .pmolink{font-size:11.5px;color:var(--accent);text-decoration:none;border:1px solid var(--line);
+    border-radius:20px;padding:3px 10px;white-space:nowrap}
+  .pmolink:hover{border-color:var(--accent)}
   .lg-c{color:var(--warn)} .lg-a{color:var(--accent)} .lg-f{color:var(--good)}
   .mg .mval .vc{color:var(--warn)} .mg .mval .va{color:var(--accent)}
   .mg .mval .vf{color:var(--good)}
@@ -382,6 +386,7 @@
       <button class="danger sm" id="btnDel">삭제</button>
       <span class="status" id="infoMsg"></span>
       <span class="status dirty" id="dirtyMark"></span>
+      <a class="pmolink" id="pmoLink" target="_blank" rel="noopener" style="display:none"></a>
       <span class="status" id="lastEdit" style="margin-left:auto"></span>
     </div>
     <datalist id="pmList"></datalist>
@@ -602,6 +607,9 @@
           <div class="n2">scrypt 해시 저장 · HttpOnly 쿠키 세션(12시간) · 앱에서 비밀번호 변경 가능</div></div>
         <div class="sp-i"><div class="k">외부 연동</div><div class="v"><b>구글시트</b> 읽기 · <b>엑셀/CSV</b> 업로드</div>
           <div class="n2">보기 권한만으로 읽기 · <code>.xlsx</code> <code>.xls</code> <code>.csv</code>(UTF-8·CP949) 인식</div></div>
+        <div class="sp-i"><div class="k">사내 연계</div><div class="v"><b>PMO 프로젝트 관리</b>(H9 Works) 와 같은 DB</div>
+          <div class="n2">직원 명부·단가표·발주처·담당 PM 을 그쪽이 그대로 읽어 씁니다 ·
+            프로젝트를 1:1 로 연결하면 <b>⓿ 견적 → ① 계약 → ② 협의 → ③ 리소스 실투입</b> 4단계로 이어집니다</div></div>
         <div class="sp-i"><div class="k">동시 사용</div><div class="v"><b>여러 PM 동시 접속</b> 지원</div>
           <div class="n2">낙관적 잠금으로 같은 프로젝트 덮어쓰기 차단 · 프로젝트번호 unique 제약</div></div>
         <div class="sp-i"><div class="k">구축 이력</div><div class="v">최초 구축 <b>2026-07-25</b> · v2.0 전면 재구축</div>
@@ -616,6 +624,42 @@
       <div class="sp-f">환경변수 <code>PGHOST</code> <code>PGPORT</code> <code>PGUSER</code> <code>PGPASSWORD</code>
         <code>PGDATABASE</code> <code>APP_PASSWORD</code> (<code>SESSION_SECRET</code> 은 자동 생성) —
         비밀값은 소스에 두지 않고 Render 대시보드에서 관리합니다.</div>
+    </div>
+
+    <!-- 전사 흐름에서 이 앱의 위치 -->
+    <div class="box" style="margin-bottom:18px">
+      <div class="bt">이 앱은 전사 수익률 4단계 중 ①②③ 을 담당합니다</div>
+      <p><b>PMO 프로젝트 관리</b>(H9 Works) 와 <b>같은 데이터베이스</b>를 씁니다. 계정도 하나이고,
+        상단바로 오가면 다시 로그인하지 않습니다.</p>
+      <div class="tw"><table>
+        <thead><tr><th style="width:150px">단계</th><th style="width:170px">어디서 입력</th><th>무엇을 뜻하나</th></tr></thead>
+        <tbody>
+          <tr><td><b>⓿ 견적</b></td><td>PMO 프로젝트 관리 → 견적서</td>
+            <td>고객사에 제출한 <b>제안 기준</b>. 원가는 견적서 안에 스냅샷으로 고정됩니다.</td></tr>
+          <tr><td><b>① 계약 시점</b></td><td><b>이 앱</b> → 프로젝트 수익률</td>
+            <td>체결한 계약서 기준. 이후 단계가 흔들리지 않는 <b>기준선</b>입니다.</td></tr>
+          <tr><td><b>② 협의 시점</b></td><td><b>이 앱</b> → 프로젝트 수익률</td>
+            <td><b>고객사와 합의</b>해 과업·MM 을 조정한 대외 기준. 없으면 비워 둡니다.</td></tr>
+          <tr><td><b>③ 리소스 실투입</b></td><td><b>이 앱</b> → 프로젝트 수익률</td>
+            <td><b>각 실의 리소스 상황(가용 인력)</b>에 맞춘 내부 실투입 MM.
+              고객사 협의·계약 기준과 <b>별개</b>이며 <b>내부 리소스 가동율</b>을 보기 위한 값입니다.</td></tr>
+        </tbody>
+      </table></div>
+      <p style="margin-top:12px">양쪽이 데이터를 이렇게 나눠 씁니다.</p>
+      <ul>
+        <li><b>이 앱 → PMO</b> — <b>직원 명부</b>(투입인력 선택 목록), <b>단가표</b>(견적서 원가의 단일 기준),
+          <b>발주처·담당 PM</b>(선택 목록). 이 앱에서 고친 값이 그쪽에 바로 보입니다.</li>
+        <li><b>PMO → 이 앱</b> — PMO 프로젝트의 <b>수익률</b> 탭에서
+          <span class="btn-ref">월 수익률 관리에 등록 · 연결</span> 을 누르면 같은 프로젝트로 묶이고,
+          <b>① 계약 투입</b>(견적서의 파트·등급·MM·원가) 과 <b>③ 리소스 실투입</b>(PMO 투입인력) 의
+          첫 줄을 대신 채워 줍니다. <b>이미 입력된 단계는 건드리지 않습니다.</b></li>
+        <li>연결된 프로젝트에는 이 화면 위쪽 저장줄에
+          <span class="btn-ref g">PMO 프로젝트 관리에서 열기 ↗</span> 링크가 생깁니다 —
+          개요·고객사 담당자·계약 지급조건·변동이력은 그쪽에서 봅니다.</li>
+      </ul>
+      <p class="muted" style="margin-top:10px">계약금액은 ⓿ 부터 ③ 까지 같습니다 —
+        등급이나 MM 이 달라져도 고객사에서 더 받는 것이 아니므로, 수익률 변동은 사실상
+        <b>투입 인력의 등급·MM</b> 에서 나옵니다.</p>
     </div>
 
     <h3><span class="n">1</span>전체 흐름</h3>
@@ -1029,7 +1073,7 @@
 
 
 <script>
-const APP_VERSION='v5.2 · 3단 막대그래프';
+const APP_VERSION='v5.3 · PMO 연계';
 const GRADES=['초급','중급','고급','특급'];
 let projects=[],staff=[],rates={},allRows=[];
 let curId=null,cDraft=[],aDraft=[],fDraft=[];
@@ -1584,7 +1628,9 @@ function loadProject(){
     MONEY_IDS.forEach(i=>{document.getElementById(i).value='0';});
     document.getElementById('fStatus').value='진행중';
     document.getElementById('lastEdit').textContent='';
-    cDraft=[];aDraft=[];fDraft=[];renderPhase();renderVs();cleanSnap=null;updateDirty();return;}
+    cDraft=[];aDraft=[];fDraft=[];renderPhase();renderVs();cleanSnap=null;updateDirty();
+    syncPmoLink();return;}
+  syncPmoLink();
   document.getElementById('fCode').value=p.code||'';
   document.getElementById('fName').value=p.name;
   document.getElementById('fClient').value=p.client||'';
@@ -2738,10 +2784,14 @@ function switchTab(name){
 }
 // 탭을 주소(#해시)에 기록한다 — 브라우저 [뒤로]가 이전 탭으로 돌아가고,
 // 로그인 화면으로 되돌아가지 않는다. 새로고침해도 보던 탭이 유지된다.
-const tabFromHash=()=>{
+// '#proj/12' 처럼 뒤에 프로젝트 id 를 붙이면 그 프로젝트를 바로 엽니다.
+// PMO 프로젝트 관리에서 [월 수익률 관리에서 열기] 로 넘어올 때 쓰는 주소입니다.
+const parseHash=()=>{
   const h=String(location.hash||'').replace(/^#/,'');
-  return TABS.includes(h)?h:'dash';
+  const [name,arg]=h.split('/');
+  return {tab:TABS.includes(name)?name:'dash',id:/^\d+$/.test(arg||'')?+arg:null};
 };
+const tabFromHash=()=>parseHash().tab;
 function goTab(name){
   if(!TABS.includes(name))name='dash';
   if(tabFromHash()===name){applyTab(name);return;}
@@ -2749,9 +2799,15 @@ function goTab(name){
 }
 function applyTab(name){
   switchTab(name);
+  if(name!=='proj')return;
+  // 주소에 id 가 있으면 (다른 앱에서 넘어온 딥링크) 그 프로젝트를 연다
+  const want=parseHash().id;
+  if(want&&want!==curId&&projects.some(p=>p.id===want)){
+    curId=want;renderPjSelect();loadProject();return;
+  }
   // 프로젝트 탭으로 돌아올 때, 같은 프로젝트를 편집 중이면 다시 불러오지 않는다
   // (불러오면 저장하지 않은 입력이 DB 값으로 덮어써진다)
-  if(name==='proj'&&!(loadedId===curId&&isDirty()))loadProject();
+  if(!(loadedId===curId&&isDirty()))loadProject();
 }
 window.addEventListener('hashchange',()=>applyTab(tabFromHash()));
 // 창 크기가 바뀌면 (줄바꿈으로 행 높이가 달라질 수 있어) 다시 계산
@@ -2796,15 +2852,38 @@ document.addEventListener('visibilitychange',async()=>{
   }
   try{await refresh();if(curId!=null)loadProject();}catch(e){}
 });
+// ── PMO 프로젝트 관리 연결 ────────────────────────────────
+// 같은 프로젝트가 PMO 쪽에 있으면 프로젝트 화면에 [PMO 프로젝트 관리에서 열기] 를 띄운다.
+// PMO 앱 주소는 서버 환경변수(PMO_APP_URL) 로 정해지고 /api/me 가 알려 준다.
+let pmoLinks=[];
+async function loadPmoLinks(){
+  try{pmoLinks=await api('/pmo-links');}catch(e){pmoLinks=[];}
+}
+const pmoBase=()=>{
+  const me=window.H9&&window.H9.me;
+  return (me&&me.apps&&me.apps.pmo)||'';
+};
+function syncPmoLink(){
+  const el=document.getElementById('pmoLink');if(!el)return;
+  const hit=curId!=null&&pmoLinks.find(x=>x.projectId===curId);
+  const base=pmoBase();
+  if(!hit||!base){el.style.display='none';return;}
+  el.style.display='';
+  el.href=base.replace(/\/$/,'')+'/#p'+hit.pmoId;
+  el.textContent='PMO 프로젝트 관리에서 열기 ↗';
+  el.title=hit.pmoName+' — 개요·투입인력·계약·변동이력은 PMO 프로젝트 관리에서 봅니다';
+}
 async function refresh(){
   [projects,staff,rates,allRows]=await Promise.all([
     api('/projects'),api('/staff'),api('/rates'),api('/rows')]);
+  loadPmoLinks().then(syncPmoLink);
   renderDash();renderStaff();renderRates();renderPjSelect();renderPmList();renderClientList();renderTypeList();
   if(!document.getElementById('tab-proj').classList.contains('hidden')){renderPhase();renderVs();}
 }
 // ── 업데이트 히스토리 ─────────────────────────────────
 // 새 버전을 낼 때 APP_VERSION 을 올리고 이 목록 맨 위에 한 줄 추가한다.
 const CHANGELOG=[
+  ['v5.3','PMO 연계','<b>PMO 프로젝트 관리</b>(H9 Works) 와의 연계를 정리했다 — 전사 수익률은 <b>⓿ 견적(PMO 견적서) → ① 계약 → ② 협의 → ③ 리소스 실투입</b> 네 단계이고, 이 앱이 ①②③ 을 담당한다. PMO 프로젝트의 <b>수익률</b> 탭에서 [월 수익률 관리에 등록·연결] 을 누르면 같은 프로젝트로 묶이고, <b>① 계약 투입</b>(견적서의 파트·등급·MM·원가) 과 <b>③ 리소스 실투입</b>(PMO 투입인력) 의 첫 줄이 자동으로 채워진다(이미 입력된 단계는 건드리지 않는다). 연결된 프로젝트에는 저장줄에 <b>[PMO 프로젝트 관리에서 열기 ↗]</b> 링크가 생기고, 반대로 PMO 에서 넘어오는 <code>#proj/{id}</code> 딥링크도 받는다. 또한 <b>견적서 원가가 이 앱의 단가표를 단일 기준으로 쓰도록</b> 바로잡았다 — 전에는 PMO 리포의 별도 표를 읽어서, 이 앱에서 단가를 고쳐도 견적 수익률이 따라오지 않았다. 매뉴얼 앞에 전사 4단계와 두 앱의 데이터 분담 표를 넣었다.'],
   ['v5.2','3단 막대그래프','대시보드의 프로젝트별 수익률 변동 그래프를 <b>3단(① 계약 · ② 협의 · ③ 리소스 실투입)</b> 으로 맞추고 영역을 넓혔다 — 막대 폭 14→18px, 프로젝트 한 칸 96→122px, 그래프 높이 132→156px. 색은 <b>① 계약 = 주황(기준) · ② 협의 = 파랑(고객사 협의) · ③ 리소스 실투입 = 녹색(내부 결과)</b> 으로 정리했고, 범례와 안내 문구에도 같은 색·순서를 표시한다.'],
   ['v5.1','리소스 실투입','③ 단계 명칭을 <b>확정 시점 → 리소스 실투입</b> 으로 바꾸고 뜻을 분명히 했다 — 이 단계는 <b>고객사와 협의한 값이 아니라</b>, <b>각 실의 리소스 상황(가용 인력)에 맞춰 내부적으로 투입한 실제 MM</b> 이다. 계약서의 등급·MM 대신 그때 투입 가능한 사람을 넣어 <b>내부 리소스 가동율</b>을 보는 값이므로 <b>계약 기준·고객사 협의와는 별개</b>다. 세 카드에 각 단계가 무엇을 뜻하는지 한 줄 설명을 넣고(표 정렬은 그대로 유지), 변동 상세·이력·대시보드 안내 문구를 <b>협의 = 대외 기준 / 실투입 = 내부 사정</b> 으로 통일했다. 대시보드의 <b>확정 매출·확정 수익률</b> 이름은 그대로 두고, 그것이 ③ 리소스 실투입 단계의 결과값임을 도움말과 용어표에 명시했다.'],
   ['v5.0','3단계 MM 관리','수익률 관리를 <b>3단계</b>로 확장 — ① <b>계약 시점</b>(계약 MM) ② <b>협의 시점</b>(고객사와 협의한 MM) ③ <b>확정 시점</b>(H9 실투입 MM). 단계마다 금액·투입 인력을 따로 넣고 수익률이 각각 산출되며, <b>계약→협의 / 협의→확정 / 계약→확정(총)</b> 변동을 단계별로 서술한다. 대시보드에 협의 수익률 열·막대, 이력에 3단계 수익률과 MM(계약→협의→확정)이 함께 쌓인다. CSV 에도 단계별 수익률·MM 이 나간다.'],
@@ -2852,14 +2931,20 @@ function renderChangelog(){
   document.getElementById('appVer').textContent=APP_VERSION;
   // 주소에 탭이 없으면 #dash 로 맞춰 둔다 (기록을 늘리지 않는 replaceState).
   // 이렇게 해야 다른 탭으로 갔을 때 [뒤로]가 대시보드로 정확히 돌아온다.
-  if(!TABS.includes(String(location.hash||'').replace(/^#/,'')))
+  if(!TABS.includes(String(location.hash||'').replace(/^#/,'').split('/')[0]))
     history.replaceState(null,'','#dash');
   switchTab(tabFromHash());     // 주소에 #proj 등이 있으면 그 탭으로 시작
   renderChangelog();
   initMyName();
   try{
     await refresh();
-    if(tabFromHash()==='proj')loadProject();   // 주소가 #proj 면 프로젝트 화면까지 채운다
+    // 주소가 #proj 면 프로젝트 화면까지 채운다. '#proj/12' 처럼 id 가 붙어 있으면
+    // (PMO 프로젝트 관리에서 넘어온 딥링크) 그 프로젝트를 골라서 연다.
+    if(tabFromHash()==='proj'){
+      const want=parseHash().id;
+      if(want&&projects.some(p=>p.id===want)){curId=want;renderPjSelect();}
+      loadProject();
+    }
     setConn(true,'DB 연결됨');
   }catch(e){
     setConn(false,'DB 연결 실패');

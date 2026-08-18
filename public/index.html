@@ -232,6 +232,49 @@
   .mn .fs .fd{font-size:11px;color:var(--muted);line-height:1.5}
   .mn .fa{flex:0 0 22px;display:flex;align-items:center;justify-content:center;
     color:var(--muted);font-size:14px}
+  /* 프로세스 도식 (스윔레인) — 단계 띠를 위에서 아래로 잇는다 */
+  .mn .pf{margin:6px 0 6px}
+  .mn .pfl{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;
+    border:1px solid var(--line);border-radius:11px;background:var(--panel2);
+    padding:12px 13px}
+  @media (min-width:900px){.mn .pfl{grid-template-columns:168px minmax(0,1fr);gap:14px;align-items:center}}
+  .mn .pfl.prep{border-left:3px solid var(--muted)}
+  .mn .pfl.reg{border-left:3px solid var(--ink2)}
+  .mn .pfl.calc{border-left:3px solid var(--warn)}
+  .mn .pfl.save{border-left:3px solid var(--accent)}
+  .mn .pfl.dash{border-left:3px solid var(--good)}
+  .mn .pfl-h{min-width:0}
+  .mn .pfl-h .pn{font-size:10px;font-weight:800;letter-spacing:.05em;color:var(--accent)}
+  .mn .pfl-h .pt{font-size:13.5px;font-weight:800;color:var(--ink);margin:1px 0 2px;line-height:1.3}
+  .mn .pfl-h .pw{font-size:10.5px;color:var(--muted);line-height:1.5}
+  .mn .pfl.prep .pn{color:var(--muted)}
+  .mn .pfl.calc .pn{color:var(--warn)}
+  .mn .pfl.dash .pn{color:var(--good)}
+  /* 띠 안의 단계 상자들 */
+  .mn .pfs{display:flex;flex-wrap:wrap;align-items:stretch;gap:0;min-width:0}
+  .mn .pfb{flex:1 1 150px;min-width:150px;box-sizing:border-box;
+    background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:9px 11px}
+  .mn .pfb .bl{font-size:12px;font-weight:700;color:var(--ink);line-height:1.35}
+  .mn .pfb .bs{font-size:10.5px;color:var(--muted);line-height:1.5;margin-top:3px}
+  .mn .pfb.opt{border-style:dashed}
+  .mn .pfb.opt .bl{color:var(--ink2)}
+  .mn .pfb.hi{border-color:var(--accent)}
+  .mn .pfarr{flex:0 0 20px;display:flex;align-items:center;justify-content:center;
+    color:var(--muted);font-size:15px}
+  /* '또는' 처럼 글자가 들어가는 연결부는 줄바꿈되지 않게 폭을 넓힌다 */
+  .mn .pfarr.or{flex:0 0 44px;font-size:10.5px;white-space:nowrap}
+  /* 띠 사이 연결선 + 조건 라벨 */
+  .mn .pfj{display:flex;align-items:center;gap:9px;margin:0 0 0 12px;padding:7px 0}
+  .mn .pfj .pfjb{width:1px;height:20px;background:var(--line)}
+  .mn .pfj .pfjt{font-size:10.5px;color:var(--muted)}
+  .mn .pfj .pfjt b{color:var(--ink2)}
+  /* 외부 연계 (PMO) 표시 */
+  .mn .pfx{display:flex;align-items:center;gap:8px;font-size:10.5px;color:var(--muted);
+    margin:8px 0 0;padding:7px 10px;border:1px dashed var(--line);border-radius:8px;
+    background:var(--panel)}
+  .mn .pfx b{color:var(--accent)}
+  .mn .pfx .tagx{flex:0 0 auto;font-size:9.5px;font-weight:800;letter-spacing:.04em;
+    color:var(--accent);border:1px solid var(--accent);border-radius:20px;padding:1px 7px}
   /* 3단계 도식 — 누가 정하는지 / 무엇이 달라지는지 / 무엇을 답하는지 */
   .mn .s3{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin:6px 0 14px}
   @media (min-width:980px){.mn .s3{grid-template-columns:repeat(3,minmax(0,1fr));gap:0}}
@@ -702,33 +745,115 @@
         <b>투입 인력의 등급·MM</b> 에서 나옵니다.</p>
     </div>
 
-    <h3><span class="n">1</span>전체 흐름</h3>
-    <p>처음 쓰신다면 아래 순서대로 한 번 따라 하시면 됩니다. <b>STEP 1~2 는 처음 한 번만</b>,
-      STEP 3~8 은 프로젝트마다 반복합니다. 수익률은 <b>계약 → 협의 → 실투입</b> 세 단계로 각각 관리합니다.</p>
-    <div class="flow">
-      <div class="fs"><div class="fn">STEP 1</div><div class="ft">직원 명부 등록</div>
-        <div class="fd">직원 명부·단가 탭 → 엑셀/구글시트로 일괄 등록</div></div>
-      <div class="fa">›</div>
-      <div class="fs"><div class="fn">STEP 2</div><div class="ft">단가표 확인</div>
-        <div class="fd">소속별·등급별 단가 확인 → [단가표 저장]</div></div>
-      <div class="fa">›</div>
-      <div class="fs"><div class="fn">STEP 3</div><div class="ft">프로젝트 등록</div>
-        <div class="fd">일괄 등록 또는 [+ 새 프로젝트]</div></div>
-      <div class="fa">›</div>
-      <div class="fs"><div class="fn">STEP 4</div><div class="ft">① 계약 MM 입력</div>
-        <div class="fd">계약액 + 계약 시점 투입계획 → 기준 수익률</div></div>
-      <div class="fa">›</div>
-      <div class="fs"><div class="fn">STEP 5</div><div class="ft">② 협의 MM 입력</div>
-        <div class="fd">고객사와 협의해 조정한 MM + 협의 사유</div></div>
-      <div class="fa">›</div>
-      <div class="fs"><div class="fn">STEP 6</div><div class="ft">③ 실투입 MM 입력</div>
-        <div class="fd">H9 가 실제로 투입한 MM</div></div>
-      <div class="fa">›</div>
-      <div class="fs"><div class="fn">STEP 7</div><div class="ft">변동 사유 기록</div>
-        <div class="fd">차이 원인을 적고 [수익률 저장]</div></div>
-      <div class="fa">›</div>
-      <div class="fs"><div class="fn">STEP 8</div><div class="ft">상태 = 완료</div>
-        <div class="fd">대시보드 최종 집계에 반영</div></div>
+    <h3><span class="n">1</span>전체 프로세스</h3>
+    <p>위에서 아래로 한 번 훑으면 됩니다. <b>STEP 0 은 처음 한 번만</b>,
+      <b>STEP 1~4 는 프로젝트마다 반복</b>합니다. 각 띠의 왼쪽이 <b>어느 화면에서</b> 하는 일인지입니다.</p>
+
+    <div class="pf">
+
+      <div class="pfl prep">
+        <div class="pfl-h"><div class="pn">STEP 0 · 처음 한 번만</div>
+          <div class="pt">기준 데이터 준비</div>
+          <div class="pw">직원 명부 · 단가 탭</div></div>
+        <div class="pfs">
+          <div class="pfb"><div class="bl">직원 명부 등록</div>
+            <div class="bs">엑셀 · 구글시트 · 붙여넣기로 일괄 등록<br>소속 · 이름 · 등급</div></div>
+          <div class="pfarr">›</div>
+          <div class="pfb"><div class="bl">단가표 확인 · 저장</div>
+            <div class="bs">소속별 × 등급별 단가<br>[직원 소속 채우기] 로 빠진 소속 보충</div></div>
+        </div>
+      </div>
+
+      <div class="pfx"><span class="tagx">연계</span>
+        <span>이 단가표는 <b>PMO 프로젝트 관리 견적서의 원가</b>로도 그대로 쓰입니다 —
+          여기서 단가를 고치면 그쪽 견적 수익률도 따라옵니다.</span></div>
+
+      <div class="pfj"><span class="pfjb"></span>
+        <span class="pfjt">준비가 끝나면 <b>프로젝트마다 아래를 반복</b>합니다</span></div>
+
+      <div class="pfl reg">
+        <div class="pfl-h"><div class="pn">STEP 1</div>
+          <div class="pt">프로젝트 등록</div>
+          <div class="pw">프로젝트 수익률 탭</div></div>
+        <div class="pfs">
+          <div class="pfb"><div class="bl">구글시트 · 엑셀 일괄 등록</div>
+            <div class="bs">프로젝트번호 · 프로젝트명 · 클라이언트 · 상태<br>이미 있는 번호는 중복 등록되지 않습니다</div></div>
+          <div class="pfarr or">또는</div>
+          <div class="pfb"><div class="bl">[+ 새 프로젝트]</div>
+            <div class="bs">한 건씩 직접 등록<br>클라이언트 · 담당 PM 은 목록에서 선택</div></div>
+        </div>
+      </div>
+
+      <div class="pfx"><span class="tagx">연계</span>
+        <span>PMO 에서 <b>견적서를 수주로 전환</b>한 프로젝트는, 그쪽 <b>수익률 탭 →
+          [월 수익률 관리에 등록 · 연결]</b> 을 누르면 여기 자동으로 등록되고
+          <b>① 계약 투입까지 채워집니다</b>. 그때는 STEP 1~2 를 건너뛰고 확인만 하세요.</span></div>
+
+      <div class="pfj"><span class="pfjb"></span>
+        <span class="pfjt">프로젝트를 고른 뒤 <b>세 단계를 각각</b> 입력합니다</span></div>
+
+      <div class="pfl calc">
+        <div class="pfl-h"><div class="pn">STEP 2 · 핵심</div>
+          <div class="pt">3단계 수익률 입력</div>
+          <div class="pw">프로젝트 수익률 탭<br>세 카드에 나란히</div></div>
+        <div class="pfs">
+          <div class="pfb hi"><div class="bl">① 계약 시점</div>
+            <div class="bs">계약액 + 계약서의 등급 × MM<br><b>기준선</b> · 단가는 이때 값으로 고정</div></div>
+          <div class="pfarr">›</div>
+          <div class="pfb opt"><div class="bl">② 협의 시점 <span class="muted">(선택)</span></div>
+            <div class="bs">고객사와 합의해 조정한 MM + 협의 사유<br>없으면 <b>비워 두세요</b></div></div>
+          <div class="pfarr">›</div>
+          <div class="pfb hi"><div class="bl">③ 리소스 실투입</div>
+            <div class="bs">각 실 상황에 맞춰 실제 투입한 등급 × MM<br>[← 협의 투입 복사] 후 달라진 부분만 수정</div></div>
+        </div>
+      </div>
+
+      <div class="pfj"><span class="pfjb"></span>
+        <span class="pfjt">세 수익률이 자동 산출되면 <b>차이의 원인을 남깁니다</b></span></div>
+
+      <div class="pfl save">
+        <div class="pfl-h"><div class="pn">STEP 3</div>
+          <div class="pt">변동 확인 · 이력 저장</div>
+          <div class="pw">프로젝트 수익률 탭 아래</div></div>
+        <div class="pfs">
+          <div class="pfb"><div class="bl">변동 분석 확인</div>
+            <div class="bs">계약 / 협의 / 실투입 3열 비교<br>인건비 변동 상세 (어느 소속·등급이 늘었나)</div></div>
+          <div class="pfarr">›</div>
+          <div class="pfb hi"><div class="bl">사유 + [수익률 저장 (이력 기록)]</div>
+            <div class="bs">3단계 투입 행과 이력이 함께 저장됩니다<br>이력에 그때의 3단계 수익률·MM 이 쌓입니다</div></div>
+          <div class="pfarr">›</div>
+          <div class="pfb"><div class="bl">상태 = 완료</div>
+            <div class="bs">정산이 끝나면 진행중 → <b>완료</b><br>확정(정산) 월도 함께 입력</div></div>
+        </div>
+      </div>
+
+      <div class="pfj"><span class="pfjb"></span>
+        <span class="pfjt"><b>완료</b>로 바꾼 건만 최종 집계에 들어갑니다
+          (진행중은 <span class="prov">잠정</span>)</span></div>
+
+      <div class="pfl dash">
+        <div class="pfl-h"><div class="pn">STEP 4</div>
+          <div class="pt">대시보드에서 읽기</div>
+          <div class="pw">대시보드 탭</div></div>
+        <div class="pfs">
+          <div class="pfb"><div class="bl">전체 요약</div>
+            <div class="bs">건수 · 계약액 합계 · 확정 매출 합계<br>계약 수익률 · 실투입 수익률 · 변동</div></div>
+          <div class="pfarr">›</div>
+          <div class="pfb"><div class="bl">3단 막대그래프</div>
+            <div class="bs">프로젝트별 <span class="lg-c">① 계약</span> ·
+              <span class="lg-a">② 협의</span> · <span class="lg-f">③ 실투입</span><br>좌우로 넘겨 보기</div></div>
+          <div class="pfarr">›</div>
+          <div class="pfb"><div class="bl">프로젝트별 · 유형별 · CSV</div>
+            <div class="bs">담당 PM 으로 골라 보기<br>행을 누르면 입력 화면으로 이동</div></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="box">
+      <div class="bt">한 줄 요약</div>
+      <p><b>명부·단가</b>를 한 번 맞춰 두고 → 프로젝트마다 <b>계약 · (협의) · 실투입</b> 세 번 입력하고 →
+        <b>사유를 적어 저장</b>하고 → <b>완료</b>로 바꾸면, 대시보드가 알아서 집계합니다.</p>
     </div>
 
     <h3><span class="n">2</span>왜 수익률을 3단계로 나누나</h3>
@@ -1226,7 +1351,7 @@
 
 
 <script>
-const APP_VERSION='v5.5 · 3단계 도식';
+const APP_VERSION='v5.6 · 프로세스 도식';
 const GRADES=['초급','중급','고급','특급'];
 let projects=[],staff=[],rates={},allRows=[];
 let curId=null,cDraft=[],aDraft=[],fDraft=[];
@@ -3036,6 +3161,7 @@ async function refresh(){
 // ── 업데이트 히스토리 ─────────────────────────────────
 // 새 버전을 낼 때 APP_VERSION 을 올리고 이 목록 맨 위에 한 줄 추가한다.
 const CHANGELOG=[
+  ['v5.6','프로세스 도식','매뉴얼 1번 절 <b>「전체 프로세스」</b> 를 나열식 STEP 목록에서 <b>위에서 아래로 읽는 스윔레인 도식</b> 으로 다시 만들었다. 띠마다 왼쪽에 <b>STEP 번호 · 하는 일 · 어느 화면</b> 을 두고, 오른쪽에 그 단계의 실제 작업 상자를 놓았다 — <b>STEP 0 기준 데이터 준비</b>(처음 한 번만) → <b>1 프로젝트 등록</b> → <b>2 3단계 수익률 입력</b>(핵심) → <b>3 변동 확인·이력 저장</b> → <b>4 대시보드에서 읽기</b>. 띠 사이에 <b>넘어가는 조건</b>("준비가 끝나면 프로젝트마다 반복", "완료로 바꾼 건만 최종 집계") 을 적었고, <b>PMO 프로젝트 관리와의 연계 지점 2곳</b>(단가표가 견적 원가로 쓰인다 · 수주 전환 프로젝트는 ① 계약 투입까지 자동으로 채워진다) 을 점선 박스로 표시했다. ② 협의는 <b>점선 상자(선택)</b> 로 그려 건너뛸 수 있음을 한눈에 보이게 했다. 넓으면 왼쪽 라벨 + 상자 2열, 900px 아래에서는 세로로 접힌다.'],
   ['v5.5','3단계 도식','매뉴얼에 <b>「왜 수익률을 3단계로 나누나」</b> 절을 새로 넣었다(2번). 세 단계를 <b>누가 정하는가</b>(계약서 / 고객사 합의 / 각 실의 리소스 상황) 기준으로 나란히 놓은 도식과, 각 단계가 <b>답하는 질문</b>·<b>단가 기준</b>·<b>언제 바뀌나</b> 를 함께 표시한다. 단계 사이의 차이가 뜻하는 것도 두 눈금으로 갈랐다 — <b>② − ① = 대외 요인(영업·협상)</b>, <b>③ − ② = 내부 요인(리소스 운영·가동율)</b>. 숫자 예시(77.7% → 82.1% → 79.7%)로 <b>한 숫자만 보면 +2.0%p 로 끝나지만 3단계로 끊으면 협의로 +4.5%p 벌고 내부 투입에서 −2.5%p 잃었다</b> 는 것이 드러남을 보여 준다. 나눈 이유 4가지(원인 분리 · 책임 주체 · 기준선 고정 · 내부 리소스 가동율)와 "세 단계를 모두 채울 필요는 없다" 안내도 함께 넣었다. 이후 절 번호가 하나씩 밀렸다(3~10).'],
   ['v5.4','실투입 수익률','대시보드의 <b>확정 수익률 → 실투입 수익률</b> 로 명칭을 바꿨다 — 프로젝트별 수익률 목록의 열, 전체 요약 카드, 유형별 수익률 표, 매뉴얼·FAQ·용어 설명이 모두 <b>③ 리소스 실투입</b> 단계 이름과 같아졌다. CSV 머리글도 <code>확정수익률(%)</code> → <code>실투입수익률(%)</code> 로 바뀐다. <b>확정 매출</b> 은 이름을 그대로 두었다(그 단계의 매출액이라는 뜻).'],
   ['v5.3','PMO 연계','<b>PMO 프로젝트 관리</b>(H9 Works) 와의 연계를 정리했다 — 전사 수익률은 <b>⓿ 견적(PMO 견적서) → ① 계약 → ② 협의 → ③ 리소스 실투입</b> 네 단계이고, 이 앱이 ①②③ 을 담당한다. PMO 프로젝트의 <b>수익률</b> 탭에서 [월 수익률 관리에 등록·연결] 을 누르면 같은 프로젝트로 묶이고, <b>① 계약 투입</b>(견적서의 파트·등급·MM·원가) 과 <b>③ 리소스 실투입</b>(PMO 투입인력) 의 첫 줄이 자동으로 채워진다(이미 입력된 단계는 건드리지 않는다). 연결된 프로젝트에는 저장줄에 <b>[PMO 프로젝트 관리에서 열기 ↗]</b> 링크가 생기고, 반대로 PMO 에서 넘어오는 <code>#proj/{id}</code> 딥링크도 받는다. 또한 <b>견적서 원가가 이 앱의 단가표를 단일 기준으로 쓰도록</b> 바로잡았다 — 전에는 PMO 리포의 별도 표를 읽어서, 이 앱에서 단가를 고쳐도 견적 수익률이 따라오지 않았다. 매뉴얼 앞에 전사 4단계와 두 앱의 데이터 분담 표를 넣었다.'],

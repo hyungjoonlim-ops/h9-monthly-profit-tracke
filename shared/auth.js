@@ -459,7 +459,7 @@ export function accountRoutes() {
   // 계정 수정 (이름/소속/권한/상태=제한)
   r.patch('/api/users/:id', requireAuth, requireAdmin, async (req, res) => {
     const id = Number(req.params.id);
-    const { name, dept, role, status } = req.body || {};
+    const { name, dept, role, status, loginType } = req.body || {};
     try {
       if (id === req.user.id && (role === 'member' || status === 'disabled')) {
         return res.status(400).json({ error: '본인 계정의 권한/상태는 변경할 수 없습니다.' });
@@ -484,7 +484,28 @@ export function accountRoutes() {
          role === 'admin' || role === 'member' ? role : null,
          status === 'active' || status === 'disabled' ? status : null]
       );
-      res.json(publicUser(rows[0]));
+
+      // ── 로그인 방식 전환 ─────────────────────────────
+      //  sso      → 비밀번호를 지워 회사 계정(Google) 전용으로
+      //  password → 임시 비밀번호를 발급하고 첫 로그인 시 변경을 요구
+      let tempPassword = null;
+      if (loginType === 'sso') {
+        if (id === req.user.id) {
+          return res.status(400).json({ error: '본인 계정의 로그인 방식은 다른 관리자가 변경해야 합니다.' });
+        }
+        await pool.query(
+          `UPDATE users SET password_hash=NULL, must_change_pw=false, updated_at=now() WHERE id=$1`, [id]
+        );
+      } else if (loginType === 'password') {
+        tempPassword = randomPassword();
+        await pool.query(
+          `UPDATE users SET password_hash=$2, must_change_pw=true, updated_at=now() WHERE id=$1`,
+          [id, hashPassword(tempPassword)]
+        );
+      }
+
+      const fresh = await findById(id);
+      res.json({ ...publicUser({ ...fresh, sso_only: !fresh.password_hash }), tempPassword });
     } catch (e) {
       res.status(500).json({ error: e.message });
     }

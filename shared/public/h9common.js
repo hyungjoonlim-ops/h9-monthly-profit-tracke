@@ -111,10 +111,12 @@
   }
 
   // ── 비밀번호 변경 ────────────────────────────────────────
-  function openChangePw() {
+  function openChangePw(forced) {
     const bg = modal(`
       <h3>비밀번호 변경</h3>
       <div class="h9sub">${esc(ME.user.email)}</div>
+      ${forced ? `<div class="h9tempbox" style="margin-bottom:14px">⚠️ <b>임시 비밀번호로 로그인 중입니다.</b><br>
+        보안을 위해 지금 새 비밀번호로 변경해 주세요. 현재 비밀번호 칸에는 전달받은 임시 비밀번호를 입력합니다.</div>` : ''}
       <form id="h9pwf">
         <div class="h9f"><label>현재 비밀번호</label><input type="password" id="h9pc" autocomplete="current-password"></div>
         <div class="h9f"><label>새 비밀번호 (8자 이상)</label><input type="password" id="h9pn" autocomplete="new-password"></div>
@@ -136,6 +138,9 @@
       try {
         await api('/api/change-password', { method: 'POST', body: JSON.stringify({ current: cur, next: nw }) });
         msg.className = 'h9msg ok'; msg.textContent = '✓ 변경되었습니다.';
+        if (ME && ME.user) ME.user.mustChangePw = false;
+        const badge = document.getElementById('h9pwwarn');
+        if (badge) badge.remove();
         setTimeout(() => bg.remove(), 1000);
       } catch (err) { msg.className = 'h9msg err'; msg.textContent = '✗ ' + err.message; }
     };
@@ -195,9 +200,8 @@ kim@${esc(ME.emailDomain)}, lee@${esc(ME.emailDomain)}"
             <td>${u.status === 'active' ? '<span class="h9pill on">사용</span>' : '<span class="h9pill off">제한</span>'}</td>
             <td style="color:#93a8c0;font-size:12px">${u.lastLoginAt ? esc(String(u.lastLoginAt).slice(0, 10)) : '-'}</td>
             <td style="white-space:nowrap;text-align:right">
+              <button class="ghost sm" data-act="edit">수정</button>
               <button class="ghost sm" data-act="toggle">${u.status === 'active' ? '제한' : '해제'}</button>
-              <button class="ghost sm" data-act="role">${u.role === 'admin' ? '일반으로' : '관리자로'}</button>
-              <button class="ghost sm" data-act="reset">초기화</button>
               <button class="danger sm" data-act="del">삭제</button>
             </td>
           </tr>`).join('') ||
@@ -209,16 +213,12 @@ kim@${esc(ME.emailDomain)}, lee@${esc(ME.emailDomain)}"
             const u = users.find((x) => String(x.id) === id);
             msg.className = 'h9msg';
             try {
-              if (btn.dataset.act === 'toggle') {
+              if (btn.dataset.act === 'edit') {
+                openUserEdit(u, showTemp, load);
+                return;
+              } else if (btn.dataset.act === 'toggle') {
                 await api('/api/users/' + id, { method: 'PATCH',
                   body: JSON.stringify({ status: u.status === 'active' ? 'disabled' : 'active' }) });
-              } else if (btn.dataset.act === 'role') {
-                await api('/api/users/' + id, { method: 'PATCH',
-                  body: JSON.stringify({ role: u.role === 'admin' ? 'member' : 'admin' }) });
-              } else if (btn.dataset.act === 'reset') {
-                if (!confirm(`${u.email} 의 비밀번호를 초기화할까요?`)) return;
-                const res = await api('/api/users/' + id + '/reset-password', { method: 'POST' });
-                showTemp(u.email, res.tempPassword);
               } else if (btn.dataset.act === 'del') {
                 if (!confirm(`${u.email} 계정을 삭제할까요? 되돌릴 수 없습니다.`)) return;
                 await api('/api/users/' + id, { method: 'DELETE' });
@@ -258,6 +258,85 @@ kim@${esc(ME.emailDomain)}, lee@${esc(ME.emailDomain)}"
     load();
   }
 
+  // ── 계정 하나 수정 (이름·소속·권한·상태·로그인 방식) ─────
+  function openUserEdit(u, showTemp, refresh) {
+    const self = u.id === ME.user.id;
+    const bg = modal(`
+      <h3>계정 수정</h3>
+      <div class="h9sub">${esc(u.email)}</div>
+      <div class="h9row">
+        <div class="h9f"><label>이름</label><input id="h9en" value="${esc(u.name || '')}"></div>
+        <div class="h9f"><label>소속</label><input id="h9ed" value="${esc(u.dept || '')}"></div>
+      </div>
+      <div class="h9row">
+        <div class="h9f"><label>권한</label><select id="h9er" ${self ? 'disabled' : ''}>
+          <option value="member" ${u.role !== 'admin' ? 'selected' : ''}>일반</option>
+          <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>관리자</option></select></div>
+        <div class="h9f"><label>상태</label><select id="h9es" ${self ? 'disabled' : ''}>
+          <option value="active" ${u.status === 'active' ? 'selected' : ''}>사용</option>
+          <option value="disabled" ${u.status !== 'active' ? 'selected' : ''}>제한</option></select></div>
+        <div class="h9f"><label>로그인 방식</label><select id="h9el">
+          <option value="sso" ${u.ssoOnly ? 'selected' : ''}>회사 계정(Google) 전용</option>
+          <option value="password" ${u.ssoOnly ? '' : 'selected'}>이메일 + 비밀번호</option></select></div>
+      </div>
+      <div class="h9sub" style="margin:2px 0 0">로그인 방식을 <b>비밀번호</b>로 바꾸면 임시 비밀번호가 새로 발급되고,
+        본인이 첫 로그인에서 반드시 변경하도록 안내됩니다. <b>회사 계정 전용</b>으로 바꾸면 기존 비밀번호는 삭제됩니다.</div>
+      <div class="h9msg" id="h9em"></div>
+      <div id="h9etemp"></div>
+      <div class="h9btns">
+        <button type="button" class="ghost" id="h9ereset">임시 비밀번호 재발급</button>
+        <button type="button" class="ghost" id="h9ecancel">취소</button>
+        <button type="button" id="h9esave">저장</button>
+      </div>`, 'sm');
+    const msg = bg.querySelector('#h9em');
+    const tempBox = bg.querySelector('#h9etemp');
+    const showTempHere = (email, pw) => {
+      tempBox.innerHTML = `<div class="h9tempbox">🔑 <b>${esc(email)}</b> 임시 비밀번호: <code>${esc(pw)}</code>
+        <div style="color:#93a8c0;margin-top:6px">이 창을 닫으면 다시 볼 수 없습니다. 본인에게 전달하세요.
+        첫 로그인 시 비밀번호 변경 안내가 자동으로 뜹니다.</div></div>`;
+    };
+    bg.querySelector('#h9ecancel').onclick = () => { bg.remove(); refresh(); };
+    bg.querySelector('#h9ereset').onclick = async () => {
+      if (u.ssoOnly && bg.querySelector('#h9el').value === 'sso') {
+        msg.className = 'h9msg err';
+        msg.textContent = '회사 계정 전용에는 비밀번호가 없습니다 — 로그인 방식을 먼저 "이메일 + 비밀번호"로 바꾸고 저장하세요.';
+        return;
+      }
+      if (!confirm(`${u.email} 의 비밀번호를 초기화할까요?`)) return;
+      try {
+        const res = await api('/api/users/' + u.id + '/reset-password', { method: 'POST' });
+        showTempHere(u.email, res.tempPassword);
+        msg.className = 'h9msg ok'; msg.textContent = '✓ 임시 비밀번호를 발급했습니다.';
+      } catch (err) { msg.className = 'h9msg err'; msg.textContent = '✗ ' + err.message; }
+    };
+    bg.querySelector('#h9esave').onclick = async () => {
+      msg.className = 'h9msg'; msg.textContent = '저장 중…';
+      const wantType = bg.querySelector('#h9el').value;
+      const typeChanged = (wantType === 'sso') !== !!u.ssoOnly;
+      const payload = {
+        name: bg.querySelector('#h9en').value.trim(),
+        dept: bg.querySelector('#h9ed').value.trim(),
+      };
+      if (!self) {
+        payload.role = bg.querySelector('#h9er').value;
+        payload.status = bg.querySelector('#h9es').value;
+      }
+      if (typeChanged) payload.loginType = wantType;
+      try {
+        const res = await api('/api/users/' + u.id, { method: 'PATCH', body: JSON.stringify(payload) });
+        if (res.tempPassword) {
+          showTempHere(u.email, res.tempPassword);
+          msg.className = 'h9msg ok';
+          msg.textContent = '✓ 저장되었습니다. 아래 임시 비밀번호를 본인에게 전달하세요.';
+          u = { ...u, ...res };   // 이어서 수정할 수 있게 최신 상태 반영
+        } else {
+          msg.className = 'h9msg ok'; msg.textContent = '✓ 저장되었습니다.';
+          setTimeout(() => { bg.remove(); refresh(); }, 600);
+        }
+      } catch (err) { msg.className = 'h9msg err'; msg.textContent = '✗ ' + err.message; }
+    };
+  }
+
   // ── 상단바 렌더 ──────────────────────────────────────────
   function render() {
     const style = document.createElement('style');
@@ -287,6 +366,7 @@ kim@${esc(ME.emailDomain)}, lee@${esc(ME.emailDomain)}"
         <span class="h9who">${esc(u.name || u.email || '')}
           <small>${esc(u.email || '')}</small>
           ${u.isAdmin ? '<span class="h9badge">ADMIN</span>' : ''}</span>
+        ${u.mustChangePw ? '<button id="h9pwwarn" style="background:rgba(239,107,107,.15);border-color:#ef6b6b;color:#ef6b6b;font-weight:700">⚠ 비밀번호 변경 필요</button>' : ''}
         ${u.isAdmin ? '<button id="h9acct">계정 관리</button>' : ''}
         <button id="h9pw">비밀번호 변경</button>
         <button id="h9out">로그아웃</button>
@@ -295,13 +375,16 @@ kim@${esc(ME.emailDomain)}, lee@${esc(ME.emailDomain)}"
 
     const acct = bar.querySelector('#h9acct');
     if (acct) acct.onclick = openAccounts;
-    bar.querySelector('#h9pw').onclick = openChangePw;
+    bar.querySelector('#h9pw').onclick = () => openChangePw(false);
+    const warn = bar.querySelector('#h9pwwarn');
+    if (warn) warn.onclick = () => openChangePw(true);
     bar.querySelector('#h9out').onclick = async () => {
       try { await fetch('/logout', { method: 'POST' }); } catch (e) {}
       location.href = '/login.html';
     };
 
-    if (u.mustChangePw) setTimeout(openChangePw, 400);
+    // 임시 비밀번호로 로그인한 경우 — 변경 창을 바로 띄우고, 바꿀 때까지 상단에 경고를 남깁니다.
+    if (u.mustChangePw) setTimeout(() => openChangePw(true), 400);
   }
 
   window.H9 = { api, esc, openAccounts, openChangePw, get me() { return ME; } };

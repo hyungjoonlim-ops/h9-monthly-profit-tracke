@@ -237,6 +237,12 @@ export function oidcRoutes() {
       req.session.email = user.email;
       req.session.ssoTriedAt = null;
       await pool.query('UPDATE users SET last_login_at = now() WHERE id = $1', [user.id]);
+      // 접속 이력에 기록 (기록 실패는 로그인을 막지 않습니다)
+      try {
+        const al = await import('./access-log.js');
+        const { appKeyOf } = await import('./auth.js');
+        await al.startSession(req, { user, app: appKeyOf(), method: 'sso' });
+      } catch { /* 무시 */ }
 
       const next = saved.next && saved.next.startsWith('/') ? saved.next : '/';
       res.redirect(next);

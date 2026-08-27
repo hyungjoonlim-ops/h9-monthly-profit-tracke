@@ -9,6 +9,8 @@ import {
   ensureUsersTable, ensureBootstrapAdmin, SHARED_PUBLIC,
 } from './shared/auth.js';
 import { oidcRoutes, autoSsoGate } from './shared/oidc.js';
+import { audit, auditRoutes } from './shared/audit.js';
+import { accessLogRoutes, touchSession } from './shared/access-log.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -29,7 +31,11 @@ app.use('/shared', express.static(SHARED_PUBLIC));
 
 app.use(autoSsoGate());                                  // 미로그인 → 바로 회사 계정 인증
 app.use(requireAuth);                                    // 인증 게이트
+// 머문 시간 계산용 — 로그인한 사용자의 활동 시각을 60초에 한 번 갱신합니다.
+app.use(touchSession());
 app.use(accountRoutes());                                // 본인 비밀번호 변경 + 계정 관리
+app.use(auditRoutes());                                  // 변경 이력 (관리자)
+app.use(accessLogRoutes());                              // 통합 접속 이력 (관리자)
 
 app.use(express.static(PUBLIC));
 
@@ -96,6 +102,7 @@ app.put('/api/rates', async (req, res) => {
       );
     }
     await client.query('COMMIT');
+    audit(req, 'update', 'rates', null, `단가표 저장 — ${i}개 소속`);
     res.json({ ok: true, count: i });
   } catch (e) {
     await client.query('ROLLBACK');
@@ -122,6 +129,7 @@ app.post('/api/staff', async (req, res) => {
       [txt(s.name), txt(s.dept) || '', txt(s.team), gr(s.grade), txt(s.career),
        txt(s.title), s.active !== false, txt(s.memo)]
     );
+    audit(req, 'create', 'staff', rows[0].id, `직원 등록 — ${rows[0].name} (${rows[0].dept || '소속 없음'})`);
     res.json(mapStaff(rows[0]));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -137,13 +145,17 @@ app.put('/api/staff/:id', async (req, res) => {
        txt(s.title), s.active !== false, txt(s.memo), req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: '인력을 찾을 수 없습니다.' });
+    audit(req, 'update', 'staff', rows[0].id, `직원 수정 — ${rows[0].name} (${rows[0].dept || '소속 없음'})`);
     res.json(mapStaff(rows[0]));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.delete('/api/staff/:id', async (req, res) => {
   try {
-    await pool.query('DELETE FROM h9_staff WHERE id=$1', [req.params.id]);
+    const { rows } = await pool.query(
+      'DELETE FROM h9_staff WHERE id=$1 RETURNING name, dept', [req.params.id]);
+    if (rows[0]) audit(req, 'delete', 'staff', req.params.id,
+      `직원 삭제 — ${rows[0].name} (${rows[0].dept || '소속 없음'})`);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -207,6 +219,10 @@ app.post('/api/staff/bulk', async (req, res) => {
       }
     }
     await client.query('COMMIT');
+    audit(req, 'import', 'staff', null,
+      `직원 명부 일괄 등록 — 추가 ${added} · 수정 ${changed}` +
+      (removed ? ` · 삭제 ${removed}` : '') + (deactivated ? ` · 재직 해제 ${deactivated}` : '') +
+      (skipped ? ` · 건너뜀 ${skipped}` : ''));
     res.json({ ok: true, added, changed, removed, deactivated, skipped });
   } catch (e) {
     await client.query('ROLLBACK');
@@ -274,6 +290,8 @@ app.post('/api/projects', async (req, res) => {
                $19,$20,$21,$22,$23) RETURNING *`,
       projParams(p)
     );
+    audit(req, 'create', 'project', rows[0].id,
+      `프로젝트 등록 — ${rows[0].name}${rows[0].code ? ' (' + rows[0].code + ')' : ''}`);
     res.json(mapProject(rows[0]));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -312,13 +330,21 @@ app.put('/api/projects/:id', async (req, res) => {
         updatedAt: new Date(cur.rows[0].updated_at).toISOString(),
       });
     }
+    audit(req, 'update', 'project', rows[0].id,
+      `프로젝트 정보 저장 — ${rows[0].name} · 상태 ${rows[0].status}` +
+      ` · 계약액 ${Number(rows[0].c_amount || 0).toLocaleString('ko-KR')}`);
     res.json(mapProject(rows[0]));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.delete('/api/projects/:id', async (req, res) => {
   try {
-    await pool.query('DELETE FROM h9_projects WHERE id=$1', [req.params.id]);
+    const { rows } = await pool.query(
+      'DELETE FROM h9_projects WHERE id=$1 RETURNING name, code', [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: '프로젝트를 찾을 수 없습니다.' });
+    audit(req, 'delete', 'project', req.params.id,
+      `프로젝트 삭제 — ${rows[0].name}${rows[0].code ? ' (' + rows[0].code + ')' : ''}` +
+      ' · 투입 행·이력 함께 삭제');
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -352,6 +378,8 @@ app.put('/api/projects/:id/rows/:phase', async (req, res) => {
       );
     }
     await client.query('COMMIT');
+    const PH = { C: '① 계약', A: '② 협의', F: '③ 리소스 실투입' };
+    audit(req, 'update', 'rows', req.params.id, `${PH[phase]} 투입 저장 — ${i}행`);
     res.json({ ok: true, count: i });
   } catch (e) {
     await client.query('ROLLBACK');
@@ -394,6 +422,10 @@ app.post('/api/projects/:id/logs', async (req, res) => {
        b.cMm == null ? null : num(b.cMm),
        b.aMm == null ? null : num(b.aMm),
        b.fMm == null ? null : num(b.fMm)]);
+    const pc = (v) => v == null ? '-' : num(v).toFixed(1) + '%';
+    audit(req, 'margin', 'logs', req.params.id,
+      `수익률 저장 — 계약 ${pc(b.cMargin)} → 협의 ${pc(b.aMargin)} → 실투입 ${pc(b.fMargin)}` +
+      (txt(b.reason) ? ` · 사유: ${txt(b.reason).slice(0, 120)}` : ''));
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -504,6 +536,9 @@ app.post('/api/projects/import', async (req, res) => {
       }
     }
     await client.query('COMMIT');
+    audit(req, 'import', 'project', null,
+      `프로젝트 일괄 등록 — 신규 ${created} · 갱신 ${updated}` +
+      (renamed.length ? ` · 이름 변경 ${renamed.length}` : ''));
     res.json({ ok: true, created, updated, rowCount, merged, renamed });
   } catch (e) {
     await client.query('ROLLBACK');
@@ -705,6 +740,10 @@ app.post('/api/reset', async (req, res) => {
     if (b.resetStaff) await client.query('TRUNCATE h9_staff RESTART IDENTITY CASCADE');
     if (b.resetRates) await client.query('DELETE FROM h9_rates');
     await client.query('COMMIT');
+    audit(req, 'reset', 'project', null,
+      `데이터 초기화 — 프로젝트 ${before.h9_projects} · 투입행 ${before.h9_rows} · 이력 ${before.h9_logs} 삭제` +
+      (b.resetStaff ? ` · 직원 명부 ${before.h9_staff} 삭제` : '') +
+      (b.resetRates ? ` · 단가표 ${before.h9_rates} 삭제` : ''));
     res.json({
       ok: true,
       deleted: {

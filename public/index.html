@@ -679,15 +679,21 @@
           <div class="n2">단일 파일 (<code>public/index.html</code>) · 외부 프레임워크·CDN 미사용</div></div>
         <div class="sp-i"><div class="k">데이터베이스</div><div class="v"><b>PostgreSQL</b> (Supabase 관리형)</div>
           <div class="n2">Session pooler 접속(IPv4) · SSL 사용</div></div>
-        <div class="sp-i"><div class="k">테이블 (6개)</div>
+        <div class="sp-i"><div class="k">테이블</div>
           <div class="v"><code>h9_projects</code> <code>h9_rows</code> <code>h9_logs</code></div>
-          <div class="n2"><code>h9_staff</code> <code>h9_rates</code> <code>h9_settings</code> — 접두사 <code>h9_</code>, 서버 시작 시 자동 생성</div></div>
+          <div class="n2"><code>h9_staff</code> <code>h9_rates</code> <code>h9_settings</code> — 접두사 <code>h9_</code>, 서버 시작 시 자동 생성<br>
+            공용 — <code>users</code> <code>login_sessions</code> <code>audit_log</code> (PMO 프로젝트 관리와 함께 씀)</div></div>
         <div class="sp-i"><div class="k">소스 관리</div><div class="v"><b>GitHub</b> — <code>hyungjoonlim-ops/h9-monthly-profit-tracke</code></div>
           <div class="n2">기본 브랜치 <code>main</code> · push 하면 자동 배포</div></div>
         <div class="sp-i"><div class="k">호스팅 · 배포</div><div class="v"><b>Render</b> Web Service (Blueprint)</div>
           <div class="n2"><code>render.yaml</code> 자동 인식 · 싱가포르 리전 · 무료 플랜</div></div>
-        <div class="sp-i"><div class="k">로그인 · 보안</div><div class="v"><b>공용 비밀번호</b> 1개 + 입력자 이름 기록</div>
-          <div class="n2">scrypt 해시 저장 · HttpOnly 쿠키 세션(12시간) · 앱에서 비밀번호 변경 가능</div></div>
+        <div class="sp-i"><div class="k">로그인 · 보안</div><div class="v"><b>H9 통합 계정</b> (PMO 프로젝트 관리와 공용)</div>
+          <div class="n2">회사 메일 + 비밀번호 또는 <b>회사 계정(Google) SSO</b> · 등록된 계정만 입장 ·
+            scrypt 해시 · HttpOnly 쿠키 세션(12시간)</div></div>
+        <div class="sp-i"><div class="k">접속 이력 <span style="color:var(--muted);font-weight:400">(관리자)</span></div>
+          <div class="v">상단바 <b>[접속 이력]</b> — 로그인·머문 시간·수정 내용</div>
+          <div class="n2">두 앱이 같은 표(<code>login_sessions</code> · <code>audit_log</code>)에 함께 씁니다 ·
+            관리자만 조회</div></div>
         <div class="sp-i"><div class="k">외부 연동</div><div class="v"><b>구글시트</b> 읽기 · <b>엑셀/CSV</b> 업로드</div>
           <div class="n2">보기 권한만으로 읽기 · <code>.xlsx</code> <code>.xls</code> <code>.csv</code>(UTF-8·CP949) 인식</div></div>
         <div class="sp-i"><div class="k">사내 연계</div><div class="v"><b>PMO 프로젝트 관리</b>(H9 Works) 와 같은 DB</div>
@@ -1180,7 +1186,48 @@
       </table>
     </div>
 
-    <h3><span class="n">9</span>용어</h3>
+    <h3><span class="n">9</span>접속 이력 <span class="pill acc" style="font-size:9.5px;vertical-align:middle">관리자</span></h3>
+    <p>상단바 <span class="btn-ref g">접속 이력</span> — <b>월 수익률 관리</b>와 <b>PMO 프로젝트 관리</b>
+      두 사이트의 로그인·수정 기록을 한 화면에서 봅니다. <b>관리자에게만 버튼이 보이고</b>,
+      주소를 직접 불러도 일반 사용자는 차단됩니다.</p>
+    <div class="tw">
+      <table>
+        <thead><tr><th style="width:120px">탭</th><th>보이는 것</th></tr></thead>
+        <tbody>
+          <tr><td><b>접속 이력</b></td>
+            <td>이메일 · 이름 · 사이트 · <b>로그인 일자</b> · <b>머문 시간</b> ·
+              <b>수정 건수</b>(누르면 그 접속에서 무엇을 고쳤는지 아래로 펼쳐집니다) · 로그인 방식 · IP</td></tr>
+          <tr><td><b>사람별 합계</b></td>
+            <td>이메일 · 이름 · 소속 · 접속 횟수 · <b>총 머문 시간</b> · 수정 건수 · 최근 접속</td></tr>
+          <tr><td><b>수정 내용</b></td>
+            <td>일시 · 이메일 · 사이트 · 구분(생성 / 수정 / 삭제 / 수익률 저장 / 일괄 등록 …) ·
+              대상 · 내용 한 줄</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>기간(7 · 30 · 90 · 365일) · 사이트 · 이메일로 걸러 보고 <b>CSV</b> 로 내려받습니다.
+      로그인 방식(비밀번호 / 회사 계정 Google / 앱 간 이동)도 함께 남습니다.</p>
+
+    <div class="box">
+      <div class="bt">머문 시간은 이렇게 잽니다</div>
+      <p><code>머문 시간 = (로그아웃 시각 또는 마지막 활동 시각) − 로그인 시각</code></p>
+      <p><span class="btn-ref g">로그아웃</span> 을 누르면 그 시각까지 정확히 계산하고, 누르지 않고
+        <b>창을 닫았으면 마지막 활동까지</b>로 봅니다(목록에 <code>~</code> 로 표시).
+        로그인한 사용자의 요청이 들어올 때마다 활동 시각을 <b>60초에 한 번</b> 갱신하므로,
+        화면만 열어 두고 아무 것도 하지 않은 시간은 포함되지 않습니다.</p>
+    </div>
+
+    <div class="box warn">
+      <div class="bt">이 앱에서 남는 수정 기록</div>
+      <p>프로젝트 <b>등록 · 정보 저장 · 삭제</b>, <b>①②③ 투입 저장</b>(어느 단계인지 함께),
+        <b>수익률 저장</b>(계약 → 협의 → 실투입 값과 사유), <b>단가표 저장</b>,
+        직원 <b>등록 · 수정 · 삭제</b>, <b>일괄 등록</b>(추가·수정·삭제 건수), <b>데이터 초기화</b>.</p>
+      <p>수정 내용은 <b>접속과 시간으로 맞춰</b> 묶습니다 — 로그인한 시각부터 마지막 활동까지 사이의
+        기록을 그 접속에 붙여 보여 줍니다. 두 사이트를 동시에 쓰고 있으면 같은 기록이
+        양쪽 접속에 함께 보일 수 있습니다.</p>
+    </div>
+
+    <h3><span class="n">10</span>용어</h3>
     <div class="tw">
       <table>
         <thead><tr><th style="width:150px">용어</th><th>뜻</th></tr></thead>
@@ -1200,7 +1247,7 @@
       </table>
     </div>
 
-    <h3><span class="n">10</span>문의</h3>
+    <h3><span class="n">11</span>문의</h3>
     <div class="box good">
       <div class="bt">개발 수정 및 오류 문의 — PMO 그룹 임형준</div>
       <p><a href="mailto:hyungjoon.lim@hnine.com" style="color:var(--accent)">hyungjoon.lim@hnine.com</a>
@@ -1351,7 +1398,7 @@
 
 
 <script>
-const APP_VERSION='v5.6 · 프로세스 도식';
+const APP_VERSION='v5.7 · 통합 접속 이력';
 const GRADES=['초급','중급','고급','특급'];
 let projects=[],staff=[],rates={},allRows=[];
 let curId=null,cDraft=[],aDraft=[],fDraft=[];
@@ -3161,6 +3208,7 @@ async function refresh(){
 // ── 업데이트 히스토리 ─────────────────────────────────
 // 새 버전을 낼 때 APP_VERSION 을 올리고 이 목록 맨 위에 한 줄 추가한다.
 const CHANGELOG=[
+  ['v5.7','통합 접속 이력','상단바에 <b>[접속 이력]</b> 을 새로 넣었다(<b>관리자만</b> 보임). <b>월 수익률 관리</b>와 <b>PMO 프로젝트 관리</b> 두 사이트가 같은 표에 함께 기록하므로 한 화면에서 봅니다 — <b>접속 이력</b>(이메일 · 사이트 · 로그인 일자 · <b>머문 시간</b> · 수정 건수 · 로그인 방식 · IP), <b>사람별 합계</b>(접속 횟수 · 총 머문 시간 · 수정 건수), <b>수정 내용</b>(일시 · 구분 · 대상 · 내용). 수정 건수를 누르면 <b>그 접속에서 무엇을 고쳤는지</b> 아래로 펼쳐진다. 머문 시간은 로그아웃을 누르면 그 시각까지, 창을 닫았으면 <b>마지막 활동까지</b>로 계산한다(활동 시각을 60초에 한 번 갱신 · 목록에 <code>~</code> 표시). 기간·사이트·이메일 필터와 CSV 내보내기가 있고, 일반 사용자는 버튼이 보이지 않으며 주소를 직접 불러도 차단된다. 이 앱의 <b>프로젝트 등록·저장·삭제 · ①②③ 투입 저장 · 수익률 저장 · 단가표 저장 · 직원 관리 · 일괄 등록 · 초기화</b> 가 모두 수정 기록으로 남는다. 매뉴얼 9번 절에 정리했다(이후 절 번호가 밀림).'],
   ['v5.6','프로세스 도식','매뉴얼 1번 절 <b>「전체 프로세스」</b> 를 나열식 STEP 목록에서 <b>위에서 아래로 읽는 스윔레인 도식</b> 으로 다시 만들었다. 띠마다 왼쪽에 <b>STEP 번호 · 하는 일 · 어느 화면</b> 을 두고, 오른쪽에 그 단계의 실제 작업 상자를 놓았다 — <b>STEP 0 기준 데이터 준비</b>(처음 한 번만) → <b>1 프로젝트 등록</b> → <b>2 3단계 수익률 입력</b>(핵심) → <b>3 변동 확인·이력 저장</b> → <b>4 대시보드에서 읽기</b>. 띠 사이에 <b>넘어가는 조건</b>("준비가 끝나면 프로젝트마다 반복", "완료로 바꾼 건만 최종 집계") 을 적었고, <b>PMO 프로젝트 관리와의 연계 지점 2곳</b>(단가표가 견적 원가로 쓰인다 · 수주 전환 프로젝트는 ① 계약 투입까지 자동으로 채워진다) 을 점선 박스로 표시했다. ② 협의는 <b>점선 상자(선택)</b> 로 그려 건너뛸 수 있음을 한눈에 보이게 했다. 넓으면 왼쪽 라벨 + 상자 2열, 900px 아래에서는 세로로 접힌다.'],
   ['v5.5','3단계 도식','매뉴얼에 <b>「왜 수익률을 3단계로 나누나」</b> 절을 새로 넣었다(2번). 세 단계를 <b>누가 정하는가</b>(계약서 / 고객사 합의 / 각 실의 리소스 상황) 기준으로 나란히 놓은 도식과, 각 단계가 <b>답하는 질문</b>·<b>단가 기준</b>·<b>언제 바뀌나</b> 를 함께 표시한다. 단계 사이의 차이가 뜻하는 것도 두 눈금으로 갈랐다 — <b>② − ① = 대외 요인(영업·협상)</b>, <b>③ − ② = 내부 요인(리소스 운영·가동율)</b>. 숫자 예시(77.7% → 82.1% → 79.7%)로 <b>한 숫자만 보면 +2.0%p 로 끝나지만 3단계로 끊으면 협의로 +4.5%p 벌고 내부 투입에서 −2.5%p 잃었다</b> 는 것이 드러남을 보여 준다. 나눈 이유 4가지(원인 분리 · 책임 주체 · 기준선 고정 · 내부 리소스 가동율)와 "세 단계를 모두 채울 필요는 없다" 안내도 함께 넣었다. 이후 절 번호가 하나씩 밀렸다(3~10).'],
   ['v5.4','실투입 수익률','대시보드의 <b>확정 수익률 → 실투입 수익률</b> 로 명칭을 바꿨다 — 프로젝트별 수익률 목록의 열, 전체 요약 카드, 유형별 수익률 표, 매뉴얼·FAQ·용어 설명이 모두 <b>③ 리소스 실투입</b> 단계 이름과 같아졌다. CSV 머리글도 <code>확정수익률(%)</code> → <code>실투입수익률(%)</code> 로 바뀐다. <b>확정 매출</b> 은 이름을 그대로 두었다(그 단계의 매출액이라는 뜻).'],

@@ -65,6 +65,30 @@
   .h9tempbox{background:#22364a;border:1px dashed #3ea6ff;border-radius:8px;padding:10px 12px;
     margin-top:12px;font-size:12px;color:#eef3f9}
   .h9tempbox code{font-size:14px;font-weight:800;color:#3ea6ff;letter-spacing:.5px}
+
+  /* 접속 이력 */
+  .h9modal.lg{max-width:1120px}
+  .h9tabs{display:flex;gap:4px;margin:2px 0 14px;border-bottom:1px solid #2c3e52}
+  .h9tab{padding:8px 13px;color:#93a8c0;cursor:pointer;border-bottom:2px solid transparent;
+    font-weight:700;font-size:12.5px}
+  .h9tab.on{color:#eef3f9;border-bottom-color:#3ea6ff}
+  .h9filters{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:6px}
+  .h9filters .h9f{margin:0;min-width:130px}
+  .h9filters .h9f.sm{min-width:96px}
+  .h9cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:9px;margin:0 0 14px}
+  .h9card{background:#22364a;border:1px solid #38506a;border-radius:9px;padding:10px 12px}
+  .h9card .k{color:#93a8c0;font-size:11px}
+  .h9card .v{color:#eef3f9;font-size:19px;font-weight:800;margin-top:2px;letter-spacing:-.4px}
+  .h9num{text-align:right;font-variant-numeric:tabular-nums}
+  .h9modal tr.h9open{background:#22364a}
+  .h9modal tr.h9chg td{background:#1a2534;font-size:12px;white-space:normal}
+  .h9modal tr.h9chg .h9chglist{margin:0;padding:2px 0 2px 2px;list-style:none}
+  .h9modal tr.h9chg .h9chglist li{padding:3px 0;border-bottom:1px dashed #2c3e52;color:#c9d7e4}
+  .h9modal tr.h9chg .h9chglist li:last-child{border-bottom:none}
+  .h9modal tr.h9chg .h9chglist b{color:#eef3f9}
+  .h9modal tr.h9chg time{color:#93a8c0;margin-right:8px}
+  .h9dim{color:#93a8c0}
+  .h9live{color:#37c98b}
   `;
 
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
@@ -337,6 +361,228 @@ kim@${esc(ME.emailDomain)}, lee@${esc(ME.emailDomain)}"
     };
   }
 
+  // ── 통합 접속 이력 (관리자) ──────────────────────────────
+  // 두 앱(월 수익률 관리 · PMO 프로젝트 관리)의 로그인·수정 기록을 한 화면에서 봅니다.
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const fmtAt = (v) => {
+    if (!v) return '-';
+    const d = new Date(v);
+    if (isNaN(d)) return String(v).slice(0, 16).replace('T', ' ');
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ` +
+      `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  };
+  const fmtTime = (v) => {
+    if (!v) return '';
+    const d = new Date(v);
+    return isNaN(d) ? '' : `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  };
+  // 머문 시간 — 초를 사람이 읽는 형태로
+  const fmtStay = (sec) => {
+    const n = Math.max(0, Math.round(Number(sec) || 0));
+    if (n < 60) return n + '초';
+    const m = Math.floor(n / 60), h = Math.floor(m / 60);
+    if (h === 0) return m + '분';
+    return h + '시간 ' + pad2(m % 60) + '분';
+  };
+
+  function openAccessLog() {
+    const bg = modal(`
+      <h3>통합 접속 이력</h3>
+      <div class="h9sub"><b>월 수익률 관리</b>와 <b>PMO 프로젝트 관리</b> 두 사이트의 로그인과 수정 기록입니다.
+        관리자만 볼 수 있습니다. 머문 시간은 <b>로그아웃</b>을 누른 경우 그 시각까지,
+        누르지 않고 창을 닫았으면 <b>마지막 활동까지</b>로 계산합니다.</div>
+
+      <div class="h9tabs">
+        <div class="h9tab on" data-t="sess">접속 이력</div>
+        <div class="h9tab" data-t="user">사람별 합계</div>
+        <div class="h9tab" data-t="chg">수정 내용</div>
+      </div>
+
+      <div class="h9filters">
+        <div class="h9f sm"><label>기간</label><select id="h9lday">
+          <option value="7">최근 7일</option>
+          <option value="30" selected>최근 30일</option>
+          <option value="90">최근 90일</option>
+          <option value="365">최근 1년</option></select></div>
+        <div class="h9f sm"><label>사이트</label><select id="h9lapp">
+          <option value="">전체</option>
+          <option value="monthly">월 수익률 관리</option>
+          <option value="pmo">PMO 프로젝트 관리</option></select></div>
+        <div class="h9f"><label>이메일 (정확히 일치)</label><input id="h9lem" placeholder="예: hong@${esc(ME.emailDomain)}"></div>
+        <div class="h9f sm" style="flex:0 0 auto;min-width:0"><label>&nbsp;</label>
+          <button class="sm" id="h9lgo" style="width:100%">조회</button></div>
+        <div class="h9f sm" style="flex:0 0 auto;min-width:0"><label>&nbsp;</label>
+          <button class="ghost sm" id="h9lcsv" style="width:100%">CSV</button></div>
+      </div>
+
+      <div class="h9cards" id="h9lsum"></div>
+      <div class="h9msg" id="h9lmsg"></div>
+      <div class="h9tblwrap"><table>
+        <thead id="h9lhead"></thead>
+        <tbody id="h9lbody"><tr><td colspan="8" class="h9dim" style="padding:18px">불러오는 중…</td></tr></tbody>
+      </table></div>
+      <div class="h9btns"><button class="ghost" id="h9lclose">닫기</button></div>`, 'lg');
+
+    const head = bg.querySelector('#h9lhead'), body = bg.querySelector('#h9lbody');
+    const msg = bg.querySelector('#h9lmsg'), sum = bg.querySelector('#h9lsum');
+    let tab = 'sess', rows = [];
+    bg.querySelector('#h9lclose').onclick = () => bg.remove();
+
+    const qs = () => {
+      const p = new URLSearchParams();
+      p.set('days', bg.querySelector('#h9lday').value);
+      const app = bg.querySelector('#h9lapp').value;
+      const em = bg.querySelector('#h9lem').value.trim();
+      if (app) p.set('app', app);
+      if (em) p.set('email', em);
+      return p.toString();
+    };
+
+    const HEADS = {
+      sess: ['이메일', '이름', '사이트', '로그인 일자', '머문 시간', '수정', '방식', 'IP'],
+      user: ['이메일', '이름', '소속', '접속 횟수', '총 머문 시간', '수정 건수', '최근 접속'],
+      chg: ['일시', '이메일', '사이트', '구분', '대상', '내용'],
+    };
+
+    function renderSummary() {
+      if (tab === 'chg') {
+        sum.innerHTML = `<div class="h9card"><div class="k">수정 건수</div><div class="v">${rows.length}</div></div>`;
+        return;
+      }
+      if (tab === 'user') {
+        const stay = rows.reduce((a, x) => a + x.staySec, 0);
+        const edits = rows.reduce((a, x) => a + x.editCount, 0);
+        sum.innerHTML =
+          `<div class="h9card"><div class="k">사용자</div><div class="v">${rows.length}명</div></div>` +
+          `<div class="h9card"><div class="k">총 접속</div><div class="v">${rows.reduce((a, x) => a + x.visits, 0)}회</div></div>` +
+          `<div class="h9card"><div class="k">총 머문 시간</div><div class="v">${fmtStay(stay)}</div></div>` +
+          `<div class="h9card"><div class="k">수정 건수</div><div class="v">${edits}</div></div>`;
+        return;
+      }
+      const people = new Set(rows.map((x) => String(x.email).toLowerCase())).size;
+      const stay = rows.reduce((a, x) => a + x.staySec, 0);
+      sum.innerHTML =
+        `<div class="h9card"><div class="k">접속</div><div class="v">${rows.length}회</div></div>` +
+        `<div class="h9card"><div class="k">사용자</div><div class="v">${people}명</div></div>` +
+        `<div class="h9card"><div class="k">총 머문 시간</div><div class="v">${fmtStay(stay)}</div></div>` +
+        `<div class="h9card"><div class="k">평균 머문 시간</div><div class="v">${rows.length ? fmtStay(stay / rows.length) : '-'}</div></div>` +
+        `<div class="h9card"><div class="k">수정 건수</div><div class="v">${rows.reduce((a, x) => a + x.editCount, 0)}</div></div>`;
+    }
+
+    function rowsHtml() {
+      if (!rows.length) {
+        return `<tr><td colspan="8" class="h9dim" style="padding:18px">기록이 없습니다.</td></tr>`;
+      }
+      if (tab === 'sess') {
+        return rows.map((x) => `
+          <tr data-sid="${x.id}">
+            <td>${esc(x.email)}${x.isAdmin ? ' <span class="h9pill adm">관리자</span>' : ''}</td>
+            <td>${esc(x.name || '-')}</td>
+            <td>${esc(x.appLabel)}</td>
+            <td>${esc(fmtAt(x.loginAt))}</td>
+            <td class="h9num">${esc(fmtStay(x.staySec))}${x.explicitLogout ? '' :
+              ` <span class="h9dim" title="로그아웃을 누르지 않아 마지막 활동(${esc(fmtTime(x.endAt))})까지로 계산">~</span>`}</td>
+            <td class="h9num">${x.editCount
+              ? `<button class="ghost sm" data-act="chg">${x.editCount}건</button>` : '<span class="h9dim">0</span>'}</td>
+            <td class="h9dim">${esc(x.methodLabel)}</td>
+            <td class="h9dim">${esc(x.ip || '-')}</td>
+          </tr>`).join('');
+      }
+      if (tab === 'user') {
+        return rows.map((x) => `
+          <tr>
+            <td>${esc(x.email)}</td>
+            <td>${esc(x.name || '-')}</td>
+            <td>${esc(x.dept || '-')}</td>
+            <td class="h9num">${x.visits}회</td>
+            <td class="h9num">${esc(fmtStay(x.staySec))}</td>
+            <td class="h9num">${x.editCount}</td>
+            <td>${esc(fmtAt(x.lastLogin))}</td>
+          </tr>`).join('');
+      }
+      return rows.map((x) => `
+        <tr>
+          <td>${esc(fmtAt(x.at))}</td>
+          <td>${esc(x.actor || '-')}</td>
+          <td>${esc(x.appLabel || '-')}</td>
+          <td>${esc(x.actionLabel)}</td>
+          <td>${esc(x.entityLabel)}${x.entityId ? ` <span class="h9dim">#${x.entityId}</span>` : ''}</td>
+          <td style="white-space:normal">${esc(x.summary || '-')}</td>
+        </tr>`).join('');
+    }
+
+    // 한 접속의 수정 내용을 그 아래에 펼쳐 보여 줍니다.
+    async function toggleChanges(tr) {
+      const next = tr.nextElementSibling;
+      if (next && next.classList.contains('h9chg')) {
+        next.remove(); tr.classList.remove('h9open'); return;
+      }
+      tr.classList.add('h9open');
+      const row = document.createElement('tr');
+      row.className = 'h9chg';
+      row.innerHTML = `<td colspan="8" class="h9dim">불러오는 중…</td>`;
+      tr.after(row);
+      try {
+        const list = await api(`/api/access-log/${tr.dataset.sid}/changes`);
+        row.innerHTML = `<td colspan="8"><ul class="h9chglist">` +
+          (list.length ? list.map((c) => `<li><time>${esc(fmtAt(c.at))}</time>` +
+            `<b>${esc(c.actionLabel)}</b> · ${esc(c.entityLabel)}` +
+            (c.entityId ? ` #${c.entityId}` : '') +
+            (c.appLabel ? ` <span class="h9dim">(${esc(c.appLabel)})</span>` : '') +
+            (c.summary ? ` — ${esc(c.summary)}` : '') + `</li>`).join('')
+            : `<li class="h9dim">이 접속에서 남긴 수정 기록이 없습니다.</li>`) +
+          `</ul></td>`;
+      } catch (err) {
+        row.innerHTML = `<td colspan="8" style="color:#ef6b6b">${esc(err.message)}</td>`;
+      }
+    }
+
+    async function load() {
+      head.innerHTML = `<tr>${HEADS[tab].map((h, i) =>
+        `<th${i >= 3 && tab !== 'chg' ? ' class="h9num"' : ''}>${h}</th>`).join('')}</tr>`;
+      body.innerHTML = `<tr><td colspan="8" class="h9dim" style="padding:18px">불러오는 중…</td></tr>`;
+      msg.className = 'h9msg'; msg.textContent = '';
+      const path = tab === 'sess' ? '/api/access-log'
+        : tab === 'user' ? '/api/access-log/summary' : '/api/change-log';
+      try {
+        rows = await api(path + '?' + qs());
+        body.innerHTML = rowsHtml();
+        renderSummary();
+        body.querySelectorAll('button[data-act="chg"]').forEach((b) => {
+          b.onclick = () => toggleChanges(b.closest('tr'));
+        });
+      } catch (err) {
+        rows = []; sum.innerHTML = '';
+        body.innerHTML = `<tr><td colspan="8" style="color:#ef6b6b;padding:18px">${esc(err.message)}</td></tr>`;
+      }
+    }
+
+    bg.querySelectorAll('.h9tab').forEach((t) => {
+      t.onclick = () => {
+        bg.querySelectorAll('.h9tab').forEach((x) => x.classList.remove('on'));
+        t.classList.add('on'); tab = t.dataset.t; load();
+      };
+    });
+    bg.querySelector('#h9lgo').onclick = load;
+    bg.querySelector('#h9lem').onkeydown = (e) => { if (e.key === 'Enter') load(); };
+    ['#h9lday', '#h9lapp'].forEach((sel) => { bg.querySelector(sel).onchange = load; });
+
+    bg.querySelector('#h9lcsv').onclick = () => {
+      const csv = '﻿' + [HEADS[tab]].concat(rows.map((x) => tab === 'sess'
+        ? [x.email, x.name || '', x.appLabel, fmtAt(x.loginAt), fmtStay(x.staySec), x.editCount, x.methodLabel, x.ip || '']
+        : tab === 'user'
+          ? [x.email, x.name || '', x.dept || '', x.visits, fmtStay(x.staySec), x.editCount, fmtAt(x.lastLogin)]
+          : [fmtAt(x.at), x.actor || '', x.appLabel || '', x.actionLabel, x.entityLabel + (x.entityId ? ' #' + x.entityId : ''), x.summary || '']
+      )).map((r) => r.map((c) => '"' + String(c == null ? '' : c).replace(/"/g, '""') + '"').join(',')).join('\n');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+      a.download = `H9_접속이력_${tab}_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click(); URL.revokeObjectURL(a.href);
+    };
+
+    load();
+  }
+
   // ── 상단바 렌더 ──────────────────────────────────────────
   function render() {
     const style = document.createElement('style');
@@ -367,6 +613,7 @@ kim@${esc(ME.emailDomain)}, lee@${esc(ME.emailDomain)}"
           <small>${esc(u.email || '')}</small>
           ${u.isAdmin ? '<span class="h9badge">ADMIN</span>' : ''}</span>
         ${u.mustChangePw ? '<button id="h9pwwarn" style="background:rgba(239,107,107,.15);border-color:#ef6b6b;color:#ef6b6b;font-weight:700">⚠ 비밀번호 변경 필요</button>' : ''}
+        ${u.isAdmin ? '<button id="h9log">접속 이력</button>' : ''}
         ${u.isAdmin ? '<button id="h9acct">계정 관리</button>' : ''}
         <button id="h9pw">비밀번호 변경</button>
         <button id="h9out">로그아웃</button>
@@ -375,6 +622,8 @@ kim@${esc(ME.emailDomain)}, lee@${esc(ME.emailDomain)}"
 
     const acct = bar.querySelector('#h9acct');
     if (acct) acct.onclick = openAccounts;
+    const logbtn = bar.querySelector('#h9log');
+    if (logbtn) logbtn.onclick = openAccessLog;
     bar.querySelector('#h9pw').onclick = () => openChangePw(false);
     const warn = bar.querySelector('#h9pwwarn');
     if (warn) warn.onclick = () => openChangePw(true);
@@ -387,7 +636,7 @@ kim@${esc(ME.emailDomain)}, lee@${esc(ME.emailDomain)}"
     if (u.mustChangePw) setTimeout(() => openChangePw(true), 400);
   }
 
-  window.H9 = { api, esc, openAccounts, openChangePw, get me() { return ME; } };
+  window.H9 = { api, esc, openAccounts, openChangePw, openAccessLog, get me() { return ME; } };
 
   fetch('/api/me').then((r) => r.json()).then((m) => {
     ME = m;

@@ -126,6 +126,9 @@ export async function ensureUsersTable() {
       used_at    timestamptz
     );
   `);
+  // 접속 이력 · 변경 이력 표도 함께 준비합니다 (두 앱이 같은 표를 씁니다).
+  const al = await accessLog();
+  if (al) await al.ensureAccessLog();
 }
 
 // ── 최초 관리자 부트스트랩 ─────────────────────────────────
@@ -211,6 +214,11 @@ export function sessionMiddleware() {
   });
 }
 
+// 접속 이력 기록 — 순환 참조(access-log → auth)를 피해 필요할 때 불러옵니다.
+async function accessLog() {
+  try { return await import('./access-log.js'); } catch { return null; }
+}
+
 // 매 요청마다 DB에서 사용자를 다시 읽어 '제한(disabled)' 이 즉시 반영되게 합니다.
 export function loadUser() {
   return async (req, res, next) => {
@@ -267,7 +275,13 @@ function noteLoginFail(key) {
   }
 }
 
+// 지금 구동 중인 앱 키 (monthly | pmo | profit) — authRoutes 를 마운트할 때 정해집니다.
+// oidc.js 처럼 appKey 를 따로 받지 않는 모듈이 접속 이력을 남길 때 씁니다.
+let currentApp = 'unknown';
+export const appKeyOf = () => currentApp;
+
 export function authRoutes(appKey) {
+  currentApp = appKey || 'unknown';
   const r = express.Router();
 
   r.get('/login.html', (req, res) => res.sendFile(join(SHARED_PUBLIC, 'login.html')));
@@ -308,13 +322,18 @@ export function authRoutes(appKey) {
       req.session.uid = Number(u.id);
       req.session.email = u.email;
       await pool.query('UPDATE users SET last_login_at = now() WHERE id = $1', [u.id]);
+      const al = await accessLog();
+      if (al) await al.startSession(req, { user: u, app: appKey, method: 'password' });
       res.json({ ok: true, user: publicUser(u) });
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
   });
 
-  r.post('/logout', (req, res) => {
+  r.post('/logout', async (req, res) => {
+    // 세션을 비우기 전에 머문 시간을 마감합니다.
+    const al = await accessLog();
+    if (al) await al.endSession(req);
     req.session = null;
     res.json({ ok: true });
   });
@@ -366,6 +385,8 @@ export function authRoutes(appKey) {
       req.session.uid = uid;
       req.session.email = us[0].email;
       await pool.query('UPDATE users SET last_login_at = now() WHERE id = $1', [uid]);
+      const al = await accessLog();
+      if (al) await al.startSession(req, { user: us[0], app: appKey, method: 'handoff' });
       res.redirect('/');
     } catch (e) {
       res.redirect('/login.html');
